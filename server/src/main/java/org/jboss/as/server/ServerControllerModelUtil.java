@@ -68,8 +68,6 @@ import org.jboss.as.controller.extension.ExtensionResourceDefinition;
 import org.jboss.as.controller.operations.common.InterfaceCriteriaWriteHandler;
 import org.jboss.as.controller.operations.common.NamespaceAddHandler;
 import org.jboss.as.controller.operations.common.NamespaceRemoveHandler;
-import org.jboss.as.controller.operations.common.PathAddHandler;
-import org.jboss.as.controller.operations.common.PathRemoveHandler;
 import org.jboss.as.controller.operations.common.ProcessReloadHandler;
 import org.jboss.as.controller.operations.common.ProcessStateAttributeHandler;
 import org.jboss.as.controller.operations.common.ResolveExpressionHandler;
@@ -95,6 +93,8 @@ import org.jboss.as.controller.registry.OperationEntry;
 import org.jboss.as.controller.registry.OperationEntry.EntryType;
 import org.jboss.as.controller.registry.OperationEntry.Flag;
 import org.jboss.as.controller.resource.SocketBindingGroupResourceDefinition;
+import org.jboss.as.controller.services.path.PathManagerService;
+import org.jboss.as.controller.services.path.PathResourceDefinition;
 import org.jboss.as.domain.management.connections.ldap.LdapConnectionResourceDefinition;
 import org.jboss.as.domain.management.security.SecurityRealmResourceDefinition;
 import org.jboss.as.domain.management.security.WhoAmIOperation;
@@ -194,7 +194,8 @@ public class ServerControllerModelUtil {
                                       final AbstractVaultReader vaultReader,
                                       final ExtensionRegistry extensionRegistry,
                                       final boolean parallelBoot,
-                                      final DeploymentFileRepository remoteFileRepository) {
+                                      final DeploymentFileRepository remoteFileRepository,
+                                      final PathManagerService pathManager) {
 
         boolean isDomain = serverEnvironment == null || serverEnvironment.getLaunchType() == LaunchType.DOMAIN;
 
@@ -297,7 +298,8 @@ public class ServerControllerModelUtil {
         sysProps.registerOperationHandler(SystemPropertyAddHandler.OPERATION_NAME, spah, spah, false);
         SystemPropertyRemoveHandler sprh = new SystemPropertyRemoveHandler(serverEnvironment);
         sysProps.registerOperationHandler(SystemPropertyRemoveHandler.OPERATION_NAME, sprh, sprh, false);
-        sysProps.registerReadWriteAttribute(VALUE, null, SystemPropertyValueWriteAttributeHandler.INSTANCE, AttributeAccess.Storage.CONFIGURATION);
+        SystemPropertyValueWriteAttributeHandler spvwah = new SystemPropertyValueWriteAttributeHandler(serverEnvironment);
+        sysProps.registerReadWriteAttribute(VALUE, null, spvwah, AttributeAccess.Storage.CONFIGURATION);
 
         //vault
         ManagementResourceRegistration vault = root.registerSubModel(PathElement.pathElement(CORE_SERVICE, VAULT), CommonProviders.VAULT_PROVIDER);
@@ -325,9 +327,7 @@ public class ServerControllerModelUtil {
         PlatformMBeanResourceRegistrar.registerPlatformMBeanResources(root);
 
         // Paths
-        ManagementResourceRegistration paths = root.registerSubModel(PathElement.pathElement(PATH), CommonProviders.SPECIFIED_PATH_PROVIDER);
-        paths.registerOperationHandler(PathAddHandler.OPERATION_NAME, PathAddHandler.SPECIFIED_INSTANCE, PathAddHandler.SPECIFIED_INSTANCE, false);
-        paths.registerOperationHandler(PathRemoveHandler.OPERATION_NAME, PathRemoveHandler.SPECIFIED_INSTANCE, PathRemoveHandler.SPECIFIED_INSTANCE, false);
+        root.registerSubModel(PathResourceDefinition.createSpecified(pathManager));
 
         // Interfaces
         ManagementResourceRegistration interfaces = root.registerSubModel(PathElement.pathElement(INTERFACE), CommonProviders.SPECIFIED_INTERFACE_PROVIDER);

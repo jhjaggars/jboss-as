@@ -33,6 +33,7 @@ public interface RemoteInterface {
     void add(int i);
 
     int get();
+    ValueWrapper getValue();
 
     @Remove
     void remove();

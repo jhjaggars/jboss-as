@@ -20,6 +20,7 @@ package org.jboss.as.cli.gui;
 
 import java.awt.BorderLayout;
 import java.awt.Container;
+import java.awt.Dialog;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -54,12 +55,14 @@ import org.jboss.dmr.Property;
  */
 public class OperationDialog extends JDialog {
 
+    private CliGuiContext cliGuiCtx;
     private ManagementModelNode node;
     private String opName;
     private SortedSet<RequestProp> props;
 
-    public OperationDialog(ManagementModelNode node, String opName, String strDescription, ModelNode requestProperties) {
-        super(GuiMain.getFrame(), opName, true);
+    public OperationDialog(CliGuiContext cliGuiCtx, ManagementModelNode node, String opName, String strDescription, ModelNode requestProperties) {
+        super(cliGuiCtx.getMainWindow(), opName, Dialog.ModalityType.APPLICATION_MODAL);
+        this.cliGuiCtx = cliGuiCtx;
         this.node = node;
         this.opName = opName;
 
@@ -116,7 +119,7 @@ public class OperationDialog extends JDialog {
             nameNodeValue.set(usrObj.getName());
             props.add(new RequestProp("name", requestProperties.get("name"), nameNodeValue));
 
-            ModelNode rscDesc = GuiMain.getExecutor().doCommand(node.addressPath() + ":read-resource-description");
+            ModelNode rscDesc = cliGuiCtx.getExecutor().doCommand(node.addressPath() + ":read-resource-description");
             ModelNode valueNode = rscDesc.get("result", "attributes", usrObj.getName());
             valueNode.get("required").set(false); // value is never required for write-attribute
             ModelNode valueNodeValue = usrObj.getBackingNode().get(usrObj.getName());
@@ -198,9 +201,10 @@ public class OperationDialog extends JDialog {
             command.append(OperationDialog.this.opName);
             addRequestProps(command, OperationDialog.this.props);
 
-            GuiMain.getCommandText().setText(command.toString());
+            JTextComponent cmdText = cliGuiCtx.getCommandLine().getCmdText();
+            cmdText.setText(command.toString());
             OperationDialog.this.dispose();
-            GuiMain.getCommandText().requestFocus();
+            cmdText.requestFocus();
         }
 
         private void addRequestProps(StringBuilder command, SortedSet<RequestProp> reqProps) {

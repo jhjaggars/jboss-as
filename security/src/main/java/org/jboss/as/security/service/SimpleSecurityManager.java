@@ -37,7 +37,9 @@ import java.util.UUID;
 
 import javax.security.auth.Subject;
 
+import org.jboss.as.controller.security.ServerSecurityManager;
 import org.jboss.as.controller.security.SubjectUserInfo;
+import org.jboss.as.controller.security.UniqueIdUserInfo;
 import org.jboss.as.domain.management.security.PasswordCredential;
 import org.jboss.as.security.SecurityMessages;
 import org.jboss.as.security.remoting.RemotingContext;
@@ -64,7 +66,7 @@ import org.jboss.security.identity.plugins.SimpleIdentity;
  * @author <a href="mailto:cdewolf@redhat.com">Carlo de Wolf</a>
  * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>
  */
-public class SimpleSecurityManager {
+public class SimpleSecurityManager implements ServerSecurityManager {
     private ThreadLocalStack<SecurityContext> contexts = new ThreadLocalStack<SecurityContext>();
 
     private ISecurityManagement securityManagement = null;
@@ -111,6 +113,14 @@ public class SimpleSecurityManager {
         return principal;
     }
 
+    public Subject getSubject() {
+        final SecurityContext securityContext = doPrivileged(securityContext());
+        if (securityContext != null) {
+            return securityContext.getSubjectInfo().getAuthenticatedSubject();
+        }
+        return null;
+    }
+
     /**
      * Get the Principal given the authenticated Subject. Currently the first principal that is not of type {@code Group} is
      * considered or the single principal inside the CallerPrincipal group.
@@ -150,8 +160,9 @@ public class SimpleSecurityManager {
      * @param roleNames The role names for which the caller is being checked for
      * @return true if the user is in <b>any</b> one of the <code>roleNames</code>. Else returns false
      */
-    public boolean isCallerInRole(final SecurityRolesMetaData mappedRoles, final Map<String, Collection<String>> roleLinks,
+    public boolean isCallerInRole(final Object incommingMappedRoles, final Map<String, Collection<String>> roleLinks,
                                   final String... roleNames) {
+        final SecurityRolesMetaData mappedRoles = (SecurityRolesMetaData) incommingMappedRoles;
         final SecurityContext securityContext = doPrivileged(securityContext());
         if (securityContext == null) {
             return false;
@@ -258,7 +269,16 @@ public class SimpleSecurityManager {
                         credential = new String(pc.getCredential());
                         RemotingContext.clear(); // Now that it has been used clear it.
                     }
+                    if ((p == null || credential == null) && userInfo instanceof UniqueIdUserInfo) {
+                        UniqueIdUserInfo uinfo = (UniqueIdUserInfo) userInfo;
+                        p = new SimplePrincipal(sinfo.getUserName());
+                        credential = uinfo.getId();
+                        // In this case we do not clear the RemotingContext as it is still to be used
+                        // here extracting the ID just ensures we are not continually calling the modules
+                        // for each invocation.
+                    }
                 }
+
                 if (p == null || credential == null) {
                     p = new SimplePrincipal(UUID.randomUUID().toString());
                     credential = UUID.randomUUID().toString();
@@ -269,7 +289,7 @@ public class SimpleSecurityManager {
 
             // If we have a trusted identity no need for a re-auth.
             if (authenticated == false) {
-                authenticated = authenticate(current);
+                authenticated = authenticate(current, null);
             }
             if (authenticated == false) {
                 // TODO - Better type needed.
@@ -286,10 +306,38 @@ public class SimpleSecurityManager {
         }
     }
 
-    private boolean authenticate(SecurityContext context) {
+    public void push(final String securityDomain, String userName, char[] password, final Subject subject) {
+        final SecurityContext previous = SecurityContextAssociation.getSecurityContext();
+        contexts.push(previous);
+        SecurityContext current = establishSecurityContext(securityDomain);
+        if (previous != null) {
+            current.setSubjectInfo(previous.getSubjectInfo());
+            current.setIncomingRunAs(previous.getOutgoingRunAs());
+        }
+
+        RunAs currentRunAs = current.getIncomingRunAs();
+        boolean trusted = currentRunAs != null && currentRunAs instanceof RunAsIdentity;
+
+        if (trusted == false) {
+            SecurityContextUtil util = current.getUtil();
+            util.createSubjectInfo(new SimplePrincipal(userName), new String(password), subject);
+            if (authenticate(current, subject) == false) {
+                throw SecurityMessages.MESSAGES.invalidUserException();
+            }
+        }
+
+        if (previous != null && previous.getOutgoingRunAs() != null) {
+            // Ensure the propagation continues.
+            current.setOutgoingRunAs(previous.getOutgoingRunAs());
+        }
+    }
+
+    private boolean authenticate(SecurityContext context, Subject subject) {
         SecurityContextUtil util = context.getUtil();
         SubjectInfo subjectInfo = context.getSubjectInfo();
-        Subject subject = new Subject();
+        if (subject == null) {
+            subject = new Subject();
+        }
         Principal principal = util.getUserPrincipal();
         Object credential = util.getCredential();
 

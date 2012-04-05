@@ -470,14 +470,6 @@
             <maven-resource group="net.jcip" artifact="jcip-annotations"/>
         </module-def>
 
-        <module-def name="net.sourceforge.cssparser">
-            <maven-resource group="net.sourceforge.cssparser" artifact="cssparser"/>
-        </module-def>
-
-        <module-def name="net.sourceforge.nekohtml">
-            <maven-resource group="net.sourceforge.nekohtml" artifact="nekohtml"/>
-        </module-def>
-
         <module-def name="org.apache.commons.beanutils">
             <maven-resource group="commons-beanutils" artifact="commons-beanutils"/>
         </module-def>
@@ -555,7 +547,7 @@
         <module-def name="org.apache.james.mime4j">
             <maven-resource group="org.apache.james" artifact="apache-mime4j"/>
         </module-def>
-    	
+
         <module-def name="org.apache.juddi.juddi-client">
             <maven-resource group="org.apache.juddi" artifact="juddi-client"/>
         </module-def>
@@ -981,7 +973,6 @@
         <module-def name="org.jboss.osgi.resolver">
             <maven-resource group="org.jboss.osgi.resolver" artifact="jbosgi-resolver-api"/>
             <maven-resource group="org.jboss.osgi.resolver" artifact="jbosgi-resolver-felix"/>
-            <maven-resource group="org.apache.felix" artifact="org.apache.felix.resolver"/>
         </module-def>
 
         <module-def name="org.jboss.osgi.metadata">
@@ -1185,10 +1176,6 @@
 
         <module-def name="org.slf4j.ext">
             <maven-resource group="org.slf4j" artifact="slf4j-ext"/>
-        </module-def>
-
-        <module-def name="org.w3c.css.sac">
-            <maven-resource group="org.w3c.css" artifact="sac"/>
         </module-def>
 
         <module-def name="org.yaml.snakeyaml">

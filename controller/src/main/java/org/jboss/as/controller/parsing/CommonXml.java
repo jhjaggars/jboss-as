@@ -240,6 +240,16 @@ public abstract class CommonXml implements XMLElementReader<List<ModelNode>>, XM
 
     protected void writePaths(final XMLExtendedStreamWriter writer, final ModelNode node) throws XMLStreamException {
         List<Property> paths = node.asPropertyList();
+
+        for (Iterator<Property> it = paths.iterator() ; it.hasNext() ; ) {
+            ModelNode path = it.next().getValue();
+
+            if (!path.isDefined()) {
+                //The runtime resources for the hardcoded paths don't appear in the model
+                it.remove();
+            }
+        }
+
         if (paths.size() > 0) {
             writer.writeStartElement(Element.PATHS.getLocalName());
 
@@ -419,11 +429,18 @@ public abstract class CommonXml implements XMLElementReader<List<ModelNode>>, XM
     }
 
     public static ModelNode parseProperties(final XMLExtendedStreamReader reader, final Namespace expectedNs) throws XMLStreamException {
+        return parseProperties(reader, expectedNs, Element.PROPERTY);
+    }
 
+    public static ModelNode parseEnvironmentVariables(final XMLExtendedStreamReader reader, final Namespace expectedNs) throws XMLStreamException {
+        return parseProperties(reader, expectedNs, Element.VARIABLE);
+    }
+
+    private static ModelNode parseProperties(final XMLExtendedStreamReader reader, final Namespace expectedNs, final Element element) throws XMLStreamException {
         final ModelNode properties = new ModelNode();
         while (reader.nextTag() != END_ELEMENT) {
             requireNamespace(reader, expectedNs);
-            if (Element.forName(reader.getLocalName()) != Element.PROPERTY) {
+            if (Element.forName(reader.getLocalName()) != element) {
                 throw unexpectedElement(reader);
             }
             final String[] array = requireAttributes(reader, Attribute.NAME.getLocalName(), Attribute.VALUE.getLocalName());
@@ -710,7 +727,7 @@ public abstract class CommonXml implements XMLElementReader<List<ModelNode>>, XM
     protected String parseSocketBinding(final XMLExtendedStreamReader reader, final Set<String> interfaces,
             final ModelNode address, final List<ModelNode> updates) throws XMLStreamException {
 
-        final EnumSet<Attribute> required = EnumSet.of(Attribute.NAME, Attribute.PORT);
+        final EnumSet<Attribute> required = EnumSet.of(Attribute.NAME);
         String name = null;
 
         final ModelNode binding = new ModelNode();
@@ -1087,9 +1104,6 @@ public abstract class CommonXml implements XMLElementReader<List<ModelNode>>, XM
     }
 
     protected void parseVault(final XMLExtendedStreamReader reader, final ModelNode address, final Namespace expectedNs, final List<ModelNode> list) throws XMLStreamException {
-        // Some form of assertion could be added to ensure we did not reach here for 1.0 schema based XML but in reality that
-        // should not happen.
-
         final int vaultAttribCount = reader.getAttributeCount();
 
         ModelNode vault = new ModelNode();
@@ -1311,8 +1325,9 @@ public abstract class CommonXml implements XMLElementReader<List<ModelNode>>, XM
                     writeAttribute(writer, Attribute.INTERFACE, attr.asString());
                 }
                 attr = binding.get(PORT);
-                writeAttribute(writer, Attribute.PORT, attr.asString());
-
+                if (attr.isDefined()) {
+                    writeAttribute(writer, Attribute.PORT, attr.asString());
+                }
                 attr = binding.get(FIXED_PORT);
                 if (attr.isDefined() && attr.asBoolean()) {
                     writeAttribute(writer, Attribute.FIXED_PORT, attr.asString());

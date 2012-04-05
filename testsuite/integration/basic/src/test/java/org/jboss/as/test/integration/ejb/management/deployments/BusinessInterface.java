@@ -22,14 +22,14 @@
 
 package org.jboss.as.test.integration.ejb.management.deployments;
 
-import javax.ejb.Local;
+import javax.ejb.Remote;
 
 /**
  * Dummy interface for session beans in this class.
  *
  * @author Brian Stansberry (c) 2011 Red Hat Inc.
  */
-@Local
+@Remote
 public interface BusinessInterface {
 
     void doIt();

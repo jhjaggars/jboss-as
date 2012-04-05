@@ -106,9 +106,11 @@ import org.jboss.as.cli.handlers.batch.BatchListHandler;
 import org.jboss.as.cli.handlers.batch.BatchMoveLineHandler;
 import org.jboss.as.cli.handlers.batch.BatchRemoveLineHandler;
 import org.jboss.as.cli.handlers.batch.BatchRunHandler;
+import org.jboss.as.cli.handlers.jca.JDBCDriverNameProvider;
 import org.jboss.as.cli.handlers.jca.XADataSourceAddCompositeHandler;
 import org.jboss.as.cli.handlers.jms.CreateJmsResourceHandler;
 import org.jboss.as.cli.handlers.jms.DeleteJmsResourceHandler;
+import org.jboss.as.cli.handlers.module.ASModuleHandler;
 import org.jboss.as.cli.operation.CommandLineParser;
 import org.jboss.as.cli.operation.OperationCandidatesProvider;
 import org.jboss.as.cli.operation.OperationFormatException;
@@ -268,6 +270,7 @@ class CommandContextImpl implements CommandContext {
         cmdRegistry.registerHandler(new HelpHandler(), "help", "h");
         cmdRegistry.registerHandler(new HistoryHandler(), "history");
         cmdRegistry.registerHandler(new LsHandler(), "ls");
+        cmdRegistry.registerHandler(new ASModuleHandler(this), "module");
         cmdRegistry.registerHandler(new PrintWorkingNodeHandler(), "pwd", "pwn");
         cmdRegistry.registerHandler(new QuitHandler(), "quit", "q", "exit");
         cmdRegistry.registerHandler(new ReadAttributeHandler(this), "read-attribute");
@@ -291,10 +294,16 @@ class CommandContextImpl implements CommandContext {
         cmdRegistry.registerHandler(new BatchEditLineHandler(), "edit-batch-line");
 
         // data-source
-        cmdRegistry.registerHandler(new GenericTypeOperationHandler(this, "/subsystem=datasources/data-source", null), "data-source");
+        GenericTypeOperationHandler dsHandler = new GenericTypeOperationHandler(this, "/subsystem=datasources/data-source", null);
+        final DefaultCompleter driverNameCompleter = new DefaultCompleter(JDBCDriverNameProvider.INSTANCE);
+        dsHandler.addValueCompleter(Util.DRIVER_NAME, driverNameCompleter);
+        cmdRegistry.registerHandler(dsHandler, "data-source");
         GenericTypeOperationHandler xaDsHandler = new GenericTypeOperationHandler(this, "/subsystem=datasources/xa-data-source", null);
+        xaDsHandler.addValueCompleter(Util.DRIVER_NAME, driverNameCompleter);
         // override the add operation with the handler that accepts xa props
-        xaDsHandler.addHandler("add", new XADataSourceAddCompositeHandler(this, "/subsystem=datasources/xa-data-source"));
+        final XADataSourceAddCompositeHandler xaDsAddHandler = new XADataSourceAddCompositeHandler(this, "/subsystem=datasources/xa-data-source");
+        xaDsAddHandler.addValueCompleter(Util.DRIVER_NAME, driverNameCompleter);
+        xaDsHandler.addHandler("add", xaDsAddHandler);
         cmdRegistry.registerHandler(xaDsHandler, "xa-data-source");
 
         // JMS
@@ -628,22 +637,31 @@ class CommandContextImpl implements CommandContext {
                         break;
                 }
 
-                if (newClient != null) {
-                    if (this.client != null) {
-                        disconnectController();
-                    }
-
-                    client = newClient;
-                    this.controllerHost = host;
-                    this.controllerPort = port;
-
-                    List<String> nodeTypes = Util.getNodeTypes(newClient, new DefaultOperationRequestAddress());
-                    domainMode = nodeTypes.contains(Util.SERVER_GROUP);
-                }
+                initNewClient(newClient, host, port);
             } catch (UnknownHostException e) {
                 throw new CommandLineException("Failed to resolve host '" + host + "': " + e.getLocalizedMessage());
             }
         } while (retry);
+    }
+
+    @Override
+    public void bindClient(ModelControllerClient newClient) {
+        initNewClient(newClient, null, -1);
+    }
+
+    private void initNewClient(ModelControllerClient newClient, String host, int port) {
+        if (newClient != null) {
+            if (this.client != null) {
+                disconnectController();
+            }
+
+            client = newClient;
+            this.controllerHost = host;
+            this.controllerPort = port;
+
+            List<String> nodeTypes = Util.getNodeTypes(newClient, new DefaultOperationRequestAddress());
+            domainMode = nodeTypes.contains(Util.SERVER_GROUP);
+        }
     }
 
     @Override

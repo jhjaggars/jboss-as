@@ -132,7 +132,7 @@
             <groupId>org.jboss.logmanager</groupId>
             <artifactId>jboss-logmanager</artifactId>
             <scope>test</scope>
-        </dependency>
+        </dependency>        
 
     </dependencies>
 

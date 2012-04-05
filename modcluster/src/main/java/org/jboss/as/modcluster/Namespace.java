@@ -21,10 +21,10 @@
  */
 package org.jboss.as.modcluster;
 
-import java.util.List;
-
 import org.jboss.dmr.ModelNode;
 import org.jboss.staxmapper.XMLElementReader;
+
+import java.util.List;
 
 /**
  * @author Jean-Frederic Clere
@@ -34,12 +34,13 @@ public enum Namespace {
     // must be first
     UNKNOWN(0, 0, null),
 
-    MODCLUSTER_1_0(1, 0, new ModClusterSubsystemXMLReader_1_0()),   // IMPORTANT: Management API version != XSD version!
+    MODCLUSTER_1_0(1, 0, new ModClusterSubsystemXMLReader_1_0()),
+    MODCLUSTER_1_1(1, 1, new ModClusterSubsystemXMLReader_1_1()),
     ;
     /**
      * The current namespace version.
      */
-    public static final Namespace CURRENT = MODCLUSTER_1_0;
+    public static final Namespace CURRENT = MODCLUSTER_1_1;
 
     private final int major;
     private final int minor;
@@ -60,13 +61,6 @@ public enum Namespace {
         return "urn:jboss:domain:" + ModClusterExtension.SUBSYSTEM_NAME + ":" + major + "." + minor;
     }
 
-    public int getMajorVersion() {
-        return this.major;
-    }
-
-    public int getMinorVersion() {
-        return this.minor;
-    }
 
     public XMLElementReader<List<ModelNode>> getXMLReader() {
         return this.reader;

@@ -89,6 +89,8 @@ import static org.jboss.as.messaging.CommonAttributes.JMS_QUEUE;
 import static org.jboss.as.messaging.CommonAttributes.JMS_TOPIC;
 import static org.jboss.as.messaging.CommonAttributes.LIVE_CONNECTOR_REF;
 import static org.jboss.as.messaging.CommonAttributes.LOCAL_TX;
+import static org.jboss.as.messaging.CommonAttributes.MAX_POOL_SIZE;
+import static org.jboss.as.messaging.CommonAttributes.MIN_POOL_SIZE;
 import static org.jboss.as.messaging.CommonAttributes.PARAM;
 import static org.jboss.as.messaging.CommonAttributes.PARAMS;
 import static org.jboss.as.messaging.CommonAttributes.PATH;
@@ -134,13 +136,12 @@ public class MessagingSubsystemParser implements XMLStreamConstants, XMLElementR
         }
     }
 
-    private MessagingSubsystemParser() {
+    protected MessagingSubsystemParser() {
         //
     }
 
 
     public void readElement(final XMLExtendedStreamReader reader, final List<ModelNode> list) throws XMLStreamException {
-
         final ModelNode address = new ModelNode();
         address.add(SUBSYSTEM, MessagingExtension.SUBSYSTEM_NAME);
         address.protect();
@@ -156,6 +157,7 @@ public class MessagingSubsystemParser implements XMLStreamConstants, XMLElementR
                 processHornetQServer(reader, address, list, schemaVer);
                 break;
             case MESSAGING_1_1:
+            case MESSAGING_1_2:
                 processHornetQServers(reader, address, list);
                 break;
             default:
@@ -788,7 +790,7 @@ public class MessagingSubsystemParser implements XMLStreamConstants, XMLElementR
         updates.add(discoveryGroup);
     }
 
-    static void processConnectionFactories(final XMLExtendedStreamReader reader, ModelNode address, List<ModelNode> updates) throws XMLStreamException {
+    void processConnectionFactories(final XMLExtendedStreamReader reader, ModelNode address, List<ModelNode> updates) throws XMLStreamException {
        while(reader.hasNext() && reader.nextTag() != END_ELEMENT) {
           final Element element = Element.forName(reader.getLocalName());
           switch(element) {
@@ -849,7 +851,7 @@ public class MessagingSubsystemParser implements XMLStreamConstants, XMLElementR
                 }
             }
             if(name == null) {
-                ParseUtils.missingRequired(reader, Collections.singleton(Attribute.NAME));
+                throw ParseUtils.missingRequired(reader, Collections.singleton(Attribute.NAME));
             }
 
             final ModelNode acceptorAddress = address.clone();
@@ -866,7 +868,7 @@ public class MessagingSubsystemParser implements XMLStreamConstants, XMLElementR
                 } case NETTY_ACCEPTOR: {
                     acceptorAddress.add(REMOTE_ACCEPTOR, name);
                     if(socketBinding == null) {
-                        ParseUtils.missingRequired(reader, Collections.singleton(Attribute.SOCKET_BINDING));
+                        throw ParseUtils.missingRequired(reader, Collections.singleton(Attribute.SOCKET_BINDING));
                     }
                     operation.get(SOCKET_BINDING.getName()).set(socketBinding);
                     parseTransportConfigurationParams(reader, operation, false);
@@ -1383,8 +1385,12 @@ public class MessagingSubsystemParser implements XMLStreamConstants, XMLElementR
         }
     }
 
+    public Namespace getExpectedNamespace() {
+        return Namespace.MESSAGING_1_1;
+    }
+
     public void writeContent(final XMLExtendedStreamWriter writer, final SubsystemMarshallingContext context) throws XMLStreamException {
-        context.startSubsystemElement(Namespace.CURRENT.getUriString(), false);
+        context.startSubsystemElement(getExpectedNamespace().getUriString(), false);
         final ModelNode node = context.getModelNode();
 
         final ModelNode servers = node.require(HORNETQ_SERVER);
@@ -1917,7 +1923,7 @@ public class MessagingSubsystemParser implements XMLStreamConstants, XMLElementR
         }
     }
 
-    private void writePooledConnectionFactories(final XMLExtendedStreamWriter writer, final ModelNode node) throws XMLStreamException {
+    protected void writePooledConnectionFactories(final XMLExtendedStreamWriter writer, final ModelNode node) throws XMLStreamException {
         List<Property> properties = node.asPropertyList();
         if (!properties.isEmpty()) {
             for (Property prop : properties) {
@@ -1926,13 +1932,14 @@ public class MessagingSubsystemParser implements XMLStreamConstants, XMLElementR
                 if (factory.isDefined()) {
                    writer.writeStartElement(Element.POOLED_CONNECTION_FACTORY.getLocalName());
                    writer.writeAttribute(Attribute.NAME.getLocalName(), name);
+
                    writeConnectionFactory(writer, name, factory);
                 }
             }
         }
     }
 
-    private void writeConnectionFactory(XMLExtendedStreamWriter writer, String name, ModelNode factory) throws XMLStreamException
+    protected void writeConnectionFactory(XMLExtendedStreamWriter writer, String name, ModelNode factory) throws XMLStreamException
     {
         if(factory.hasDefined(INBOUND_CONFIG)) {
             final ModelNode inboundConfigs = factory.get(INBOUND_CONFIG);
@@ -2131,7 +2138,7 @@ public class MessagingSubsystemParser implements XMLStreamConstants, XMLElementR
        updates.add(queue);
     }
 
-    static void processConnectionFactory(final XMLExtendedStreamReader reader, ModelNode address, List<ModelNode> updates) throws XMLStreamException {
+    void processConnectionFactory(final XMLExtendedStreamReader reader, ModelNode address, List<ModelNode> updates) throws XMLStreamException {
 
         requireSingleAttribute(reader, CommonAttributes.NAME);
         final String name = reader.getAttributeValue(0);
@@ -2143,7 +2150,7 @@ public class MessagingSubsystemParser implements XMLStreamConstants, XMLElementR
         updates.add(createConnectionFactory(reader, connectionFactory, false));
     }
 
-    static void processPooledConnectionFactory(final XMLExtendedStreamReader reader, ModelNode address, List<ModelNode> updates) throws XMLStreamException {
+    void processPooledConnectionFactory(final XMLExtendedStreamReader reader, ModelNode address, List<ModelNode> updates) throws XMLStreamException {
         final String name = reader.getAttributeValue(0);
         if(name == null) {
             ParseUtils.missingRequired(reader, Collections.singleton("name"));
@@ -2194,7 +2201,7 @@ public class MessagingSubsystemParser implements XMLStreamConstants, XMLElementR
         return connectors;
     }
 
-    private static ModelNode createConnectionFactory(XMLExtendedStreamReader reader, ModelNode connectionFactory, boolean pooled) throws XMLStreamException
+    protected ModelNode createConnectionFactory(XMLExtendedStreamReader reader, ModelNode connectionFactory, boolean pooled) throws XMLStreamException
     {
         while(reader.hasNext() && reader.nextTag() != END_ELEMENT) {
             final Element element = Element.forName(reader.getLocalName());

@@ -18,11 +18,10 @@
  */
 package org.jboss.as.cli.gui;
 
+import java.awt.Cursor;
 import java.io.IOException;
 import org.jboss.as.cli.CommandContext;
 import org.jboss.as.cli.CommandFormatException;
-import org.jboss.as.cli.operation.CommandLineParser;
-import org.jboss.as.cli.operation.impl.DefaultCallbackHandler;
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.dmr.ModelNode;
 
@@ -33,23 +32,71 @@ import org.jboss.dmr.ModelNode;
  */
 public class CommandExecutor {
 
+    private CliGuiContext cliGuiCtx;
     private ModelControllerClient client;
-    private DefaultCallbackHandler parsedCmd = new DefaultCallbackHandler(true);
     private CommandContext cmdCtx;
-    private CommandLineParser parser;
 
-    public CommandExecutor(CommandContext cmdCtx) {
+    public CommandExecutor(CliGuiContext cliGuiCtx, CommandContext cmdCtx) {
+        this.cliGuiCtx = cliGuiCtx;
         this.cmdCtx = cmdCtx;
         this.client = cmdCtx.getModelControllerClient();
-        this.parser = cmdCtx.getCommandLineParser();
     }
 
+    /**
+     * Submit a command to the server.
+     *
+     * @param command The CLI command
+     * @return The DMR response as a ModelNode
+     * @throws CommandFormatException
+     * @throws IOException
+     */
     public synchronized ModelNode doCommand(String command) throws CommandFormatException, IOException {
-//        System.out.println("command=" + command);
-        parsedCmd.rootNode(0);
-        parser.parse(command, parsedCmd);
-        ModelNode request = parsedCmd.toOperationRequest(cmdCtx);
-        return client.execute(request);
+        ModelNode request = cmdCtx.buildRequest(command);
+        return execute(command, request);
+    }
+
+    public synchronized Response doCommandFullResponse(String command) throws CommandFormatException, IOException {
+        ModelNode request = cmdCtx.buildRequest(command);
+        ModelNode response = execute(command, request);
+        return new Response(command, request, response);
+    }
+
+    private ModelNode execute(String command, ModelNode request) throws IOException {
+        try {
+            if (command.startsWith("deploy")) {
+                cliGuiCtx.getMainWindow().setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+            }
+            return client.execute(request);
+        } finally {
+            if (command.startsWith("deploy")) {
+                cliGuiCtx.getMainWindow().setCursor(Cursor.getDefaultCursor());
+            }
+        }
+    }
+
+    public static class Response {
+        private String command;
+        private ModelNode dmrRequest;
+        private ModelNode dmrResponse;
+
+        Response(String command, ModelNode dmrRequest, ModelNode dmrResponse) {
+            this.command = command;
+            this.dmrRequest = dmrRequest;
+            this.dmrResponse = dmrResponse;
+        }
+
+        public String getCommand() {
+            return command;
+        }
+
+        public ModelNode getDmrRequest() {
+            return dmrRequest;
+        }
+
+        public ModelNode getDmrResponse() {
+            return dmrResponse;
+        }
+
     }
 
 }

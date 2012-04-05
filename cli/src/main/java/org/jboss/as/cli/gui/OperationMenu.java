@@ -24,8 +24,8 @@ import java.util.List;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.JPopupMenu;
-import javax.swing.JTextField;
 import javax.swing.JTree;
+import javax.swing.text.JTextComponent;
 import org.jboss.as.cli.gui.ManagementModelNode.UserObject;
 import org.jboss.dmr.ModelNode;
 
@@ -40,14 +40,14 @@ public class OperationMenu extends JPopupMenu {
     private static final String[] leafOps = {"write-attribute", "undefine-attribute"};
     private static final List<String> leafOpList = Arrays.asList(leafOps);
 
+    private CliGuiContext cliGuiCtx;
     private CommandExecutor executor;
     private JTree invoker;
-    private JTextField cmdText;
 
-    public OperationMenu(CommandExecutor executor, JTree invoker, JTextField cmdText) {
-        this.executor = executor;
+    public OperationMenu(CliGuiContext cliGuiCtx, JTree invoker) {
+        this.cliGuiCtx = cliGuiCtx;
+        this.executor = cliGuiCtx.getExecutor();
         this.invoker = invoker;
-        this.cmdText = cmdText;
         setLightWeightPopupEnabled(true);
         setOpaque(true);
     }
@@ -117,6 +117,7 @@ public class OperationMenu extends JPopupMenu {
         }
 
         public void actionPerformed(ActionEvent ae) {
+            JTextComponent cmdText = cliGuiCtx.getCommandLine().getCmdText();
             ModelNode requestProperties = opDescription.get("result", "request-properties");
             if ((requestProperties == null) || (!requestProperties.isDefined()) || requestProperties.asList().isEmpty()) {
                 cmdText.setText(addressPath + ":" + opName);
@@ -131,8 +132,8 @@ public class OperationMenu extends JPopupMenu {
                 return;
             }
 
-            OperationDialog dialog = new OperationDialog(node, opName, strDescription, requestProperties);
-            dialog.setLocationRelativeTo(GuiMain.getFrame());
+            OperationDialog dialog = new OperationDialog(cliGuiCtx, node, opName, strDescription, requestProperties);
+            dialog.setLocationRelativeTo(cliGuiCtx.getMainWindow());
             dialog.setVisible(true);
         }
 

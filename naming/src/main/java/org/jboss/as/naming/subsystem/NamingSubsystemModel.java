@@ -32,21 +32,25 @@ public interface NamingSubsystemModel {
     String BINDING = "binding";
     String BINDING_TYPE = "binding-type";
 
-    String CLASS ="class";
+    String CLASS = "class";
 
     String LOOKUP = "lookup";
 
     String OBJECT_FACTORY = "object-factory";
 
-    String MODULE ="module";
+    String MODULE = "module";
+
+    String REMOTE_NAMING = "remote-naming";
 
     String SIMPLE = "simple";
+    String SERVICE = "service";
 
     String TYPE = "type";
 
     String VALUE = "value";
 
     PathElement BINDING_PATH = PathElement.pathElement(BINDING);
+    PathElement REMOTE_NAMING_PATH = PathElement.pathElement(SERVICE, REMOTE_NAMING);
 
 
 }

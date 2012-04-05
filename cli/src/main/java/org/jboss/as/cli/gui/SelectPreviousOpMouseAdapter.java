@@ -25,7 +25,6 @@ import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.Transferable;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Utilities;
@@ -35,14 +34,14 @@ import javax.swing.text.Utilities;
  * @author Stan Silvert ssilvert@redhat.com (C) 2012 Red Hat Inc.
  */
 public class SelectPreviousOpMouseAdapter extends MouseAdapter implements ClipboardOwner {
+    private CliGuiContext cliGuiCtx;
     private JTextPane output;
-    private JTextField cmdText;
     private DoOperationActionListener opListener;
     private Clipboard systemClipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
 
-    public SelectPreviousOpMouseAdapter(JTextPane output, JTextField cmdText, DoOperationActionListener opListener) {
+    public SelectPreviousOpMouseAdapter(CliGuiContext cliGuiCtx, JTextPane output, DoOperationActionListener opListener) {
+        this.cliGuiCtx = cliGuiCtx;
         this.output = output;
-        this.cmdText = cmdText;
         this.opListener = opListener;
     }
 
@@ -58,7 +57,7 @@ public class SelectPreviousOpMouseAdapter extends MouseAdapter implements Clipbo
             String line = output.getDocument().getText(rowStart, rowEnd - rowStart);
             if (opListener.getCmdHistory().contains(line)) {
                 output.select(rowStart, rowEnd);
-                cmdText.setText(line);
+                cliGuiCtx.getCommandLine().getCmdText().setText(line);
                 systemClipboard.setContents(new StringSelection(line), this);
             }
         } catch (BadLocationException e) {

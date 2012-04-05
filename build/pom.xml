@@ -37,7 +37,7 @@
 
     <name>JBoss Application Server: Build</name>
     <packaging>pom</packaging>
-    
+
     <properties>
         <!-- generated configs root dirs -->
         <generated.configs>${basedir}/target/generated-configs</generated.configs>
@@ -101,7 +101,7 @@
                         <version>${version.rhino.js}</version>
                     </dependency>
                 </dependencies>
-            </plugin>    
+            </plugin>
         </plugins>
     </build>
 
@@ -278,6 +278,11 @@
                 </dependency>
 
                 <dependency>
+                    <groupId>commons-configuration</groupId>
+                    <artifactId>commons-configuration</artifactId>
+                </dependency>
+
+                <dependency>
                     <groupId>commons-pool</groupId>
                     <artifactId>commons-pool</artifactId>
                 </dependency>
@@ -360,16 +365,6 @@
                 <dependency>
                     <groupId>net.jcip</groupId>
                     <artifactId>jcip-annotations</artifactId>
-                </dependency>
-
-                <dependency>
-                    <groupId>net.sourceforge.cssparser</groupId>
-                    <artifactId>cssparser</artifactId>
-                </dependency>
-
-                <dependency>
-                    <groupId>net.sourceforge.nekohtml</groupId>
-                    <artifactId>nekohtml</artifactId>
                 </dependency>
 
                 <dependency>
@@ -563,8 +558,18 @@
                 </dependency>
 
                 <dependency>
+                    <groupId>org.apache.juddi</groupId>
+                    <artifactId>juddi-client</artifactId>
+                </dependency>
+
+                <dependency>
                     <groupId>org.apache.juddi.scout</groupId>
                     <artifactId>scout</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.apache.juddi</groupId>
+                    <artifactId>uddi-ws</artifactId>
                 </dependency>
 
                 <dependency>
@@ -896,6 +901,11 @@
 
                 <dependency>
                     <groupId>org.jboss.as</groupId>
+                    <artifactId>jboss-as-management-client-content</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-messaging</artifactId>
                 </dependency>
 
@@ -1184,6 +1194,11 @@
                 </dependency>
 
                 <dependency>
+                    <groupId>org.jboss.osgi.deployment</groupId>
+                    <artifactId>jbosgi-deployment</artifactId>
+                </dependency>
+
+                <dependency>
                     <groupId>org.jboss.osgi.framework</groupId>
                     <artifactId>jbosgi-framework-core</artifactId>
                 </dependency>
@@ -1199,6 +1214,11 @@
                 </dependency>
 
                 <dependency>
+                    <groupId>org.jboss.osgi.metadata</groupId>
+                    <artifactId>jbosgi-metadata</artifactId>
+                </dependency>
+
+                <dependency>
                     <groupId>org.jboss.osgi.repository</groupId>
                     <artifactId>jbosgi-repository-api</artifactId>
                 </dependency>
@@ -1209,8 +1229,28 @@
                 </dependency>
 
                 <dependency>
+                    <groupId>org.jboss.osgi.resolver</groupId>
+                    <artifactId>jbosgi-resolver-api</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.jboss.osgi.resolver</groupId>
+                    <artifactId>jbosgi-resolver-felix</artifactId>
+                </dependency>
+
+                <dependency>
                     <groupId>org.jboss.osgi.spi</groupId>
                     <artifactId>jbosgi-spi</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.jboss.osgi.vfs</groupId>
+                    <artifactId>jbosgi-vfs</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.jboss.osgi.vfs</groupId>
+                    <artifactId>jbosgi-vfs30</artifactId>
                 </dependency>
 
                 <dependency>
@@ -1642,11 +1682,6 @@
                 <dependency>
                     <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-ext</artifactId>
-                </dependency>
-
-                <dependency>
-                    <groupId>org.w3c.css</groupId>
-                    <artifactId>sac</artifactId>
                 </dependency>
 
                 <dependency>

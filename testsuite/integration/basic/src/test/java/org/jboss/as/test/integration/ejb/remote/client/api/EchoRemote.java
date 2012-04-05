@@ -37,4 +37,5 @@ public interface EchoRemote {
 
     boolean testRequestScopeActive();
 
+    ValueWrapper getValue();
 }

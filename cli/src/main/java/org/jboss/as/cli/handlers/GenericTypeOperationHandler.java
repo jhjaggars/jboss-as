@@ -1,6 +1,6 @@
 /*
  * JBoss, Home of Professional Open Source.
- * Copyright 2011, Red Hat, Inc., and individual contributors
+ * Copyright 2012, Red Hat, Inc., and individual contributors
  * as indicated by the @author tags. See the copyright.txt file in the
  * distribution for a full listing of individual contributors.
  *
@@ -413,6 +413,10 @@ public class GenericTypeOperationHandler extends BatchModeCommandHandler {
     }
 
     public void addArgument(CommandArgument arg) {
+    }
+
+    protected void recognizeArguments(CommandContext ctx) throws CommandFormatException {
+        // argument validation is performed during request construction
     }
 
     @Override

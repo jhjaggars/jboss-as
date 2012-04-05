@@ -857,12 +857,13 @@ public interface ControllerMessages {
     /**
      * Creates an exception indicating the {@code key} is invalid.
      *
+     * @param element the path element
      * @param key the invalid value.
      *
      * @return an {@link OperationFailedRuntimeException} for the error.
      */
-    @Message(id = 14701, value = "Invalid key specification %s")
-    String invalidPathElementKey(String key);
+    @Message(id = 14701, value = "Invalid resource address element '%s'. The key '%s' is not valid for an element in a resource address.")
+    String invalidPathElementKey(String element, String key);
 
     /**
      * Creates an exception indicating the load factor must be greater than 0 and less than or equal to 1.
@@ -1092,12 +1093,14 @@ public interface ControllerMessages {
     /**
      * Creates an exception indicating the {@code value} is invalid.
      *
+     * @param element the path element
      * @param value the invalid value.
+     * @param character the invalid character
      *
      * @return an {@link OperationFailedRuntimeException} for the error.
      */
-    @Message(id = 14719, value = "Invalid value specification %s")
-    String invalidPathElementValue(String value);
+    @Message(id = 14719, value = "Invalid resource address element '%s'. The value '%s' is not valid for an element in a resource address. Character '%s' is not allowed.")
+    String invalidPathElementValue(String element, String value, Character character);
 
     /**
      * A message indicating the {@code value} for the parameter, represented by the {@code name} parameter, is invalid.
@@ -2425,4 +2428,35 @@ public interface ControllerMessages {
 
     @Message(id = 14844, value = "Can't have same criteria for both not and inclusion %s")
     String cantHaveSameCriteriaForBothNotAndInclusion(InterfaceCriteria interfaceCriteria);
+
+    @Message(id = 14845, value = "Invalid value '%s' for attribute '%s' -- no interface configuration with that name exists")
+    OperationFailedException nonexistentInterface(String attributeValue, String attributeName);
+
+    @Message(id = 14846, value = "%s is empty")
+    IllegalArgumentException emptyVar(String name);
+
+    @Message(id = 14847, value = "Could not find a path called '%s'")
+    IllegalArgumentException pathEntryNotFound(String pathName);
+
+    @Message(id = 14848, value="Path entry is read-only: '%s'")
+    IllegalArgumentException pathEntryIsReadOnly(String pathName);
+
+    @Message(id = 14849, value="There is already a path entry called: '%s'")
+    IllegalArgumentException pathEntryAlreadyExists(String pathName);
+
+    @Message(id = 14850, value="Could not find relativeTo path '%s' for relative path '%s'")
+    IllegalStateException pathEntryNotFoundForRelativePath(String relativePath, String pathName);
+
+    @Message(id = 14851, value="Invalid relativePath value '%s'")
+    IllegalArgumentException invalidRelativePathValue(String relativePath);
+
+    @Message(id = 14852, value="'%s' is a Windows absolute path")
+    IllegalArgumentException pathIsAWindowsAbsolutePath(String path);
+
+    @Message(id = 14853, value="Path '%s' is read-only; it cannot be removed")
+    OperationFailedException cannotRemoveReadOnlyPath(String pathName);
+
+    @Message(id = 14854, value="Path '%s' is read-only; it cannot be modified")
+    OperationFailedException cannotModifyReadOnlyPath(String pathName);
+
 }

@@ -67,6 +67,7 @@ import org.jboss.as.controller.persistence.ConfigurationPersistenceException;
 import org.jboss.as.controller.persistence.ConfigurationPersister;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
 import org.jboss.as.controller.registry.Resource;
+import org.jboss.as.controller.services.path.PathManagerService;
 import org.jboss.as.domain.controller.DomainController;
 import org.jboss.as.domain.controller.DomainModelUtil;
 import org.jboss.as.domain.controller.LocalHostControllerInfo;
@@ -77,9 +78,7 @@ import org.jboss.as.host.controller.RemoteDomainConnectionService.RemoteFileRepo
 import org.jboss.as.host.controller.ignored.IgnoredDomainResourceRegistry;
 import org.jboss.as.host.controller.mgmt.MasterDomainControllerOperationHandlerService;
 import org.jboss.as.host.controller.mgmt.ServerToHostOperationHandlerFactoryService;
-import org.jboss.as.host.controller.operations.HttpManagementAddHandler;
 import org.jboss.as.host.controller.operations.LocalHostControllerInfoImpl;
-import org.jboss.as.host.controller.operations.NativeManagementAddHandler;
 import org.jboss.as.host.controller.operations.StartServersHandler;
 import org.jboss.as.process.CommandLineConstants;
 import org.jboss.as.process.ExitCodes;
@@ -87,16 +86,17 @@ import org.jboss.as.process.ProcessControllerClient;
 import org.jboss.as.process.ProcessInfo;
 import org.jboss.as.process.ProcessMessageHandler;
 import org.jboss.as.protocol.mgmt.ManagementChannelHandler;
-import org.jboss.as.remoting.EndpointService;
-import org.jboss.as.remoting.management.ManagementChannelRegistryService;
 import org.jboss.as.remoting.management.ManagementRemotingServices;
 import org.jboss.as.repository.ContentRepository;
 import org.jboss.as.repository.HostFileRepository;
 import org.jboss.as.repository.LocalFileRepository;
 import org.jboss.as.server.BootstrapListener;
 import org.jboss.as.server.RuntimeExpressionResolver;
+import org.jboss.as.server.mgmt.HttpManagementService;
 import org.jboss.as.server.services.security.AbstractVaultReader;
 import org.jboss.dmr.ModelNode;
+import org.jboss.msc.service.Service;
+import org.jboss.msc.service.ServiceBuilder;
 import org.jboss.msc.service.ServiceController;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.ServiceTarget;
@@ -136,6 +136,7 @@ public class DomainModelControllerService extends AbstractControllerService impl
     private final ExtensionRegistry extensionRegistry;
     private final ControlledProcessState processState;
     private final IgnoredDomainResourceRegistry ignoredRegistry;
+    private final PathManagerService pathManager;
 
     private volatile ServerInventory serverInventory;
 
@@ -144,7 +145,8 @@ public class DomainModelControllerService extends AbstractControllerService impl
                                                             final HostControllerEnvironment environment,
                                                             final HostRunningModeControl runningModeControl,
                                                             final ControlledProcessState processState,
-                                                            final BootstrapListener bootstrapListener) {
+                                                            final BootstrapListener bootstrapListener,
+                                                            final PathManagerService pathManager){
         final Map<String, ProxyController> hostProxies = new ConcurrentHashMap<String, ProxyController>();
         final Map<String, ProxyController> serverProxies = new ConcurrentHashMap<String, ProxyController>();
         final LocalHostControllerInfoImpl hostControllerInfo = new LocalHostControllerInfoImpl(processState, environment);
@@ -156,7 +158,7 @@ public class DomainModelControllerService extends AbstractControllerService impl
                 hostProxies, serverProxies, ignoredRegistry);
         DomainModelControllerService service = new DomainModelControllerService(environment, runningModeControl, processState,
                 hostControllerInfo, contentRepository, hostProxies, serverProxies, prepareStepHandler, vaultReader,
-                ignoredRegistry, bootstrapListener);
+                ignoredRegistry, bootstrapListener, pathManager);
         return serviceTarget.addService(SERVICE_NAME, service)
                 .addDependency(HostControllerService.HC_EXECUTOR_SERVICE_NAME, ExecutorService.class, service.getExecutorServiceInjector())
                 .addDependency(ProcessControllerConnectionService.SERVICE_NAME, ProcessControllerConnectionService.class, service.injectedProcessControllerConnection)
@@ -174,7 +176,8 @@ public class DomainModelControllerService extends AbstractControllerService impl
                                          final PrepareStepHandler prepareStepHandler,
                                          final AbstractVaultReader vaultReader,
                                          final IgnoredDomainResourceRegistry ignoredRegistry,
-                                         final BootstrapListener bootstrapListener) {
+                                         final BootstrapListener bootstrapListener,
+                                         final PathManagerService pathManager) {
         super(ProcessType.HOST_CONTROLLER, runningModeControl, null, processState,
                 DomainDescriptionProviders.ROOT_PROVIDER, prepareStepHandler, new RuntimeExpressionResolver(vaultReader));
         this.environment = environment;
@@ -192,6 +195,7 @@ public class DomainModelControllerService extends AbstractControllerService impl
         this.ignoredRegistry = ignoredRegistry;
         this.bootstrapListener = bootstrapListener;
         this.extensionRegistry = new ExtensionRegistry(ProcessType.HOST_CONTROLLER, runningModeControl);
+        this.pathManager = pathManager;
     }
 
     @Override
@@ -298,7 +302,7 @@ public class DomainModelControllerService extends AbstractControllerService impl
         DomainModelUtil.updateCoreModel(rootResource, environment);
         HostModelUtil.createHostRegistry(rootRegistration, hostControllerConfigurationPersister, environment, runningModeControl,
                 localFileRepository, hostControllerInfo, new DelegatingServerInventory(), remoteFileRepository, contentRepository,
-                this, extensionRegistry,vaultReader, ignoredRegistry, processState);
+                this, extensionRegistry,vaultReader, ignoredRegistry, processState, pathManager);
         this.modelNodeRegistration = rootRegistration;
     }
 
@@ -311,18 +315,17 @@ public class DomainModelControllerService extends AbstractControllerService impl
         boolean ok = false;
         boolean reachedServers = false;
         try {
+            // Install server inventory callback
+            ServerInventoryCallbackService.install(serviceTarget);
+
             // Parse the host.xml and invoke all the ops. The ops should rollback on any Stage.RUNTIME failure
             ok = boot(hostControllerConfigurationPersister.load(), true);
 
             final RunningMode currentRunningMode = runningModeControl.getRunningMode();
 
             if (ok) {
-                // Install the core remoting endpoint and listener
-                ManagementRemotingServices.installRemotingEndpoint(serviceTarget, ManagementRemotingServices.MANAGEMENT_ENDPOINT,
-                        hostControllerInfo.getLocalHostName(), EndpointService.EndpointType.MANAGEMENT, null, null);
 
                 // Now we know our management interface configuration. Install the server inventory
-                ManagementChannelRegistryService.addService(serviceTarget);
                 Future<ServerInventory> inventoryFuture = ServerInventoryService.install(serviceTarget, this, runningModeControl, environment,
                         hostControllerInfo.getNativeManagementInterface(), hostControllerInfo.getNativeManagementPort());
 
@@ -388,16 +391,21 @@ public class DomainModelControllerService extends AbstractControllerService impl
             }
 
             if (ok) {
-                // TODO look into adding some of these services in the handlers, but ON-DEMAND.
-                // Then here just add some simple service that demands them
-
+                // Install the server > host operation handler
                 ServerToHostOperationHandlerFactoryService.install(serviceTarget, ServerInventoryService.SERVICE_NAME, proxyExecutor, localFileRepository);
 
-                NativeManagementAddHandler.installNativeManagementServices(serviceTarget, hostControllerInfo, null, null);
+                // demand native mgmt services
+                serviceTarget.addService(ServiceName.JBOSS.append("native-mgmt-startup"), Service.NULL)
+                        .addDependency(ManagementRemotingServices.channelServiceName(ManagementRemotingServices.MANAGEMENT_ENDPOINT, ManagementRemotingServices.SERVER_CHANNEL))
+                        .setInitialMode(ServiceController.Mode.ACTIVE)
+                        .install();
 
-                if (hostControllerInfo.getHttpManagementInterface() != null) {
-                    HttpManagementAddHandler.installHttpManagementServices(currentRunningMode, serviceTarget, hostControllerInfo, environment, null);
-                }
+                // demand http mgmt services
+                serviceTarget.addService(ServiceName.JBOSS.append("http-mgmt-startup"), Service.NULL)
+                        .addDependency(ServiceBuilder.DependencyType.OPTIONAL, HttpManagementService.SERVICE_NAME)
+                        .setInitialMode(ServiceController.Mode.ACTIVE)
+                        .install();
+
                 reachedServers = true;
                 if (currentRunningMode == RunningMode.NORMAL) {
                     startServers();

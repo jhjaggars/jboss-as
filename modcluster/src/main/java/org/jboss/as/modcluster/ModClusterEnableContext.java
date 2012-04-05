@@ -22,31 +22,23 @@
 
 package org.jboss.as.modcluster;
 
-import java.util.Locale;
-
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.OperationStepHandler;
-import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.ServiceController;
 
+import static org.jboss.as.modcluster.ModClusterMessages.MESSAGES;
 import static org.jboss.as.modcluster.ModClusterLogger.ROOT_LOGGER;
 
-// implements ModelQueryOperationHandler, DescriptionProvider
-public class ModClusterEnableContext implements OperationStepHandler, DescriptionProvider{
+public class ModClusterEnableContext implements OperationStepHandler {
 
     static final ModClusterEnableContext INSTANCE = new ModClusterEnableContext();
 
     @Override
-    public ModelNode getModelDescription(Locale locale) {
-        return ModClusterSubsystemDescriptions.getEnableContextDescription(locale);
-    }
-
-    @Override
     public void execute(OperationContext context, ModelNode operation)
             throws OperationFailedException {
-        if (context.isNormalServer() && context.getServiceRegistry(false).getService(ModClusterService.NAME)!=null) {
+        if (context.isNormalServer() && context.getServiceRegistry(false).getService(ModClusterService.NAME) != null) {
             context.addStep(new OperationStepHandler() {
                 @Override
                 public void execute(OperationContext context, ModelNode operation) throws OperationFailedException {
@@ -55,7 +47,11 @@ public class ModClusterEnableContext implements OperationStepHandler, Descriptio
                     ROOT_LOGGER.debugf("enable-context: %s", operation);
 
                     ContextHost contexthost = new ContextHost(operation);
-                    modcluster.enableContext(contexthost.webhost, contexthost.webcontext);
+                    try {
+                        modcluster.enableContext(contexthost.webhost, contexthost.webcontext);
+                    } catch(IllegalArgumentException e) {
+                        throw new OperationFailedException(new ModelNode().set(MESSAGES.ContextorHostNotFound(contexthost.webhost, contexthost.webcontext)));
+                    }
 
                     context.completeStep();
                 }

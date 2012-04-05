@@ -302,6 +302,7 @@ public class CLIWrapper implements Runnable {
         CLIOpResult res = new CLIOpResult();
         res.setIsOutcomeSuccess("success".equals(compound.get("outcome")));
         res.setResult(compound.get("result"));
+        res.setServerGroups(compound.get("server-groups"));
         return res;
     }
 
@@ -417,7 +418,11 @@ public class CLIWrapper implements Runnable {
 
     }
 
-    private static String getCliCommand() throws Exception {
+    protected Process getCliProcess() {
+        return cliProcess;
+    }
+
+    protected String getCliCommand() throws Exception {
         if (cliCommand != null) {
             return cliCommand;
         }

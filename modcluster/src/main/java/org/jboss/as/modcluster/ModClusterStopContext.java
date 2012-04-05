@@ -22,31 +22,23 @@
 
 package org.jboss.as.modcluster;
 
-import java.util.Locale;
-
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.OperationStepHandler;
-import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.ServiceController;
 
+import static org.jboss.as.modcluster.ModClusterMessages.MESSAGES;
 import static org.jboss.as.modcluster.ModClusterLogger.ROOT_LOGGER;
 
-// implements ModelQueryOperationHandler, DescriptionProvider
-public class ModClusterStopContext implements OperationStepHandler, DescriptionProvider{
+public class ModClusterStopContext implements OperationStepHandler {
 
     static final ModClusterStopContext INSTANCE = new ModClusterStopContext();
 
     @Override
-    public ModelNode getModelDescription(Locale locale) {
-        return ModClusterSubsystemDescriptions.getStopContextDescription(locale);
-    }
-
-    @Override
     public void execute(OperationContext context, ModelNode operation)
             throws OperationFailedException {
-        if (context.isNormalServer() && context.getServiceRegistry(false).getService(ModClusterService.NAME)!=null) {
+        if (context.isNormalServer() && context.getServiceRegistry(false).getService(ModClusterService.NAME) != null) {
             context.addStep(new OperationStepHandler() {
                 @Override
                 public void execute(OperationContext context, ModelNode operation) throws OperationFailedException {
@@ -55,7 +47,11 @@ public class ModClusterStopContext implements OperationStepHandler, DescriptionP
                     ROOT_LOGGER.debugf("stop-context: %s", operation);
                     ContextHost contexthost = new ContextHost(operation);
 
+                    try {
                     modcluster.stopContext(contexthost.webhost, contexthost.webcontext, contexthost.waittime);
+                    } catch(IllegalArgumentException e) {
+                        throw new OperationFailedException(new ModelNode().set(MESSAGES.ContextorHostNotFound(contexthost.webhost, contexthost.webcontext)));
+                    }
                     context.completeStep();
                 }
             }, OperationContext.Stage.RUNTIME);

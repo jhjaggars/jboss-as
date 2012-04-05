@@ -69,8 +69,6 @@ public class SecurityContext {
         if (securityManager != null) {
             securityManager.checkPermission(permission);
         }
-
-
     }
 
 }

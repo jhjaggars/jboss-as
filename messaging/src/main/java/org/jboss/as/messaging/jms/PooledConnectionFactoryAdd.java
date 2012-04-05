@@ -29,6 +29,8 @@ import static org.jboss.as.messaging.CommonAttributes.CONNECTOR;
 import static org.jboss.as.messaging.CommonAttributes.DISCOVERY_GROUP_NAME;
 import static org.jboss.as.messaging.CommonAttributes.LOCAL;
 import static org.jboss.as.messaging.CommonAttributes.LOCAL_TX;
+import static org.jboss.as.messaging.CommonAttributes.MAX_POOL_SIZE;
+import static org.jboss.as.messaging.CommonAttributes.MIN_POOL_SIZE;
 import static org.jboss.as.messaging.CommonAttributes.NONE;
 import static org.jboss.as.messaging.CommonAttributes.NO_TX;
 import static org.jboss.as.messaging.CommonAttributes.TRANSACTION;
@@ -97,17 +99,21 @@ public class PooledConnectionFactoryAdd extends AbstractAddStepHandler {
         final PathAddress address = PathAddress.pathAddress(opAddr);
         final String name = address.getLastElement().getValue();
 
+        final ModelNode resolvedModel = model.clone();
         for(final AttributeDefinition attribute : JMSServices.POOLED_CONNECTION_FACTORY_ATTRS) {
-            attribute.resolveModelAttribute(context, model);
+            resolvedModel.get(attribute.getName()).set(attribute.resolveModelAttribute(context, resolvedModel ));
         }
 
         // We validated that jndiName part of the model in populateModel
         // TODO we only use a single jndi name here but the xsd indicates support for many
-        final String jndiName = model.get(CommonAttributes.ENTRIES.getName()).asList().get(0).asString();
+        final String jndiName = resolvedModel.get(CommonAttributes.ENTRIES.getName()).asList().get(0).asString();
+
+        final int minPoolSize = resolvedModel.get(MIN_POOL_SIZE.getName()).asInt();
+        final int maxPoolSize = resolvedModel.get(MAX_POOL_SIZE.getName()).asInt();
 
         final String txSupport;
-        if(model.hasDefined(TRANSACTION)) {
-            String txType = model.get(TRANSACTION).asString();
+        if(resolvedModel.hasDefined(TRANSACTION)) {
+            String txType = resolvedModel.get(TRANSACTION).asString();
             if(LOCAL.equals(txType)) {
                 txSupport = LOCAL_TX;
             } else if (NONE.equals(txType)) {
@@ -121,15 +127,15 @@ public class PooledConnectionFactoryAdd extends AbstractAddStepHandler {
 
         ServiceTarget serviceTarget = context.getServiceTarget();
 
-        List<String> connectors = getConnectors(model);
+        List<String> connectors = getConnectors(resolvedModel);
 
-        String discoveryGroupName = getDiscoveryGroup(model);
+        String discoveryGroupName = getDiscoveryGroup(resolvedModel);
 
-        List<PooledConnectionFactoryConfigProperties> adapterParams = getAdapterParams(model, context);
+        List<PooledConnectionFactoryConfigProperties> adapterParams = getAdapterParams(resolvedModel, context);
 
-        final ServiceName hqServiceName = MessagingServices.getHornetQServiceName(PathAddress.pathAddress(opAddr));
+        final ServiceName hqServiceName = MessagingServices.getHornetQServiceName(address);
         ServiceName hornetQResourceAdapterService = JMSServices.getPooledConnectionFactoryBaseServiceName(hqServiceName).append(name);
-        PooledConnectionFactoryService resourceAdapterService = new PooledConnectionFactoryService(name, connectors, discoveryGroupName, adapterParams, jndiName, txSupport);
+        PooledConnectionFactoryService resourceAdapterService = new PooledConnectionFactoryService(name, connectors, discoveryGroupName, adapterParams, jndiName, txSupport, minPoolSize, maxPoolSize);
         ServiceBuilder serviceBuilder = serviceTarget
                 .addService(hornetQResourceAdapterService, resourceAdapterService)
                 .addDependency(TxnServices.JBOSS_TXN_TRANSACTION_MANAGER, resourceAdapterService.getTransactionManager())

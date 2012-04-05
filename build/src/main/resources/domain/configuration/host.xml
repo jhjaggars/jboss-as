@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 
-<host name="master" xmlns="urn:jboss:domain:1.2">
+<host name="master" xmlns="urn:jboss:domain:1.3">
 
     <management>
         <security-realms>
@@ -13,6 +13,9 @@
                 <authentication>
                     <properties path="application-users.properties" relative-to="jboss.domain.config.dir" />
                 </authentication>
+                <authorization>
+                    <properties path="application-roles.properties" relative-to="jboss.domain.config.dir"/>
+                </authorization>                
             </security-realm>
         </security-realms>
         <management-interfaces>

@@ -192,26 +192,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.jboss.jsfunit</groupId>
-            <artifactId>jsfunit-arquillian</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.jboss.jsfunit</groupId>
-            <artifactId>jboss-jsfunit-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.jboss.arquillian.protocol</groupId>
-            <artifactId>arquillian-protocol-servlet</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.jboss.arquillian.container</groupId>
-            <artifactId>arquillian-container-spi</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.jboss.arquillian.testenricher</groupId>
             <artifactId>arquillian-testenricher-initialcontext</artifactId>
         </dependency>
@@ -1022,8 +1002,8 @@
                                                     <fileset dir="../deployment-scanner/src/main/java"><include name="**/*.java"/></fileset>
                                                     <fileset dir="../domain-http/interface/src/main/java"><include name="**/*.java"/></fileset>
                                                     <fileset dir="../domain-management/src/main/java"><include name="**/*.java"/></fileset>
-                                                    <fileset dir="../ee-deployment/src/main/java"><include name="**/*.java"/></fileset>
                                                     <fileset dir="../ee/src/main/java"><include name="**/*.java"/></fileset>
+                                                    <fileset dir="../ee-deployment/src/main/java"><include name="**/*.java"/></fileset>
                                                     <fileset dir="../ejb3/src/main/java"><include name="**/*.java"/></fileset>
                                                     <fileset dir="../embedded/src/main/java"><include name="**/*.java"/></fileset>
                                                     <fileset dir="../host-controller/src/main/java"><include name="**/*.java"/></fileset>

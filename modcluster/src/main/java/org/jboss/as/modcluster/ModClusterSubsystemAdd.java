@@ -22,19 +22,14 @@
 
 package org.jboss.as.modcluster;
 
-import static org.jboss.as.modcluster.ModClusterLogger.ROOT_LOGGER;
-
-import java.util.List;
-import java.util.Locale;
-
 import org.jboss.as.controller.AbstractAddStepHandler;
 import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.PathAddress;
-import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.ServiceVerificationHandler;
-import org.jboss.as.controller.descriptions.DescriptionProvider;
+import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
+import org.jboss.as.controller.operations.common.Util;
 import org.jboss.as.controller.registry.Resource;
 import org.jboss.as.network.SocketBinding;
 import org.jboss.as.network.SocketBindingManager;
@@ -43,135 +38,220 @@ import org.jboss.as.web.WebSubsystemServices;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.Property;
 import org.jboss.modcluster.config.impl.ModClusterConfig;
+import org.jboss.modcluster.load.LoadBalanceFactorProvider;
+import org.jboss.modcluster.load.impl.DynamicLoadBalanceFactorProvider;
+import org.jboss.modcluster.load.impl.SimpleLoadBalanceFactorProvider;
+import org.jboss.modcluster.load.metric.LoadMetric;
 import org.jboss.msc.service.ServiceBuilder;
 import org.jboss.msc.service.ServiceController;
 import org.jboss.msc.service.ServiceController.Mode;
-import org.omg.CosCollection.Command;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+import static org.jboss.as.modcluster.LoadMetricDefinition.CAPACITY;
+import static org.jboss.as.modcluster.LoadMetricDefinition.TYPE;
+import static org.jboss.as.modcluster.LoadMetricDefinition.WEIGHT;
+import static org.jboss.as.modcluster.ModClusterConfigResourceDefinition.*;
+import static org.jboss.as.modcluster.ModClusterExtension.SSL_CONFIGURATION_PATH;
+import static org.jboss.as.modcluster.ModClusterLogger.ROOT_LOGGER;
+import static org.jboss.as.modcluster.ModClusterSSLResourceDefinition.CA_CERTIFICATE_FILE;
+import static org.jboss.as.modcluster.ModClusterSSLResourceDefinition.CA_REVOCATION_URL;
+import static org.jboss.as.modcluster.ModClusterSSLResourceDefinition.CERTIFICATE_KEY_FILE;
+import static org.jboss.as.modcluster.ModClusterSSLResourceDefinition.CIPHER_SUITE;
+import static org.jboss.as.modcluster.ModClusterSSLResourceDefinition.KEY_ALIAS;
+import static org.jboss.as.modcluster.ModClusterSSLResourceDefinition.PASSWORD;
+import static org.jboss.as.modcluster.ModClusterSSLResourceDefinition.PROTOCOL;
 
 /**
  * The managed subsystem add update.
  *
  * @author Jean-Frederic Clere
+ * @author Tomaz Cerar
  */
-class ModClusterSubsystemAdd extends AbstractAddStepHandler implements DescriptionProvider {
-
+class ModClusterSubsystemAdd extends AbstractAddStepHandler {
     static final ModClusterSubsystemAdd INSTANCE = new ModClusterSubsystemAdd();
-
-    @Override
-    protected void populateModel(final ModelNode operation, final Resource resource) throws OperationFailedException {
-         if (operation.hasDefined(CommonAttributes.MOD_CLUSTER_CONFIG)) {
-            ModelNode configuration;
-            if (operation.get(CommonAttributes.MOD_CLUSTER_CONFIG).hasDefined(CommonAttributes.CONFIGURATION)) {
-                configuration = operation.get(CommonAttributes.MOD_CLUSTER_CONFIG).get(CommonAttributes.CONFIGURATION);
-            }else {
-                configuration = operation.get(CommonAttributes.MOD_CLUSTER_CONFIG);
-            }
-            resource.registerChild(ModClusterExtension.configurationPath, Resource.Factory.create());
-            final Resource conf = resource.getChild(ModClusterExtension.configurationPath);
-            final ModelNode confModel = conf.getModel();
-            for(final String attribute : configuration.keys()) {
-                if (attribute.equals(CommonAttributes.SSL)) {
-                    conf.registerChild(ModClusterExtension.sslConfigurationPath, Resource.Factory.create());
-                    final Resource ssl = conf.getChild(ModClusterExtension.sslConfigurationPath);
-                    ModelNode sslnode;
-                    if (configuration.get(attribute).hasDefined(CommonAttributes.CONFIGURATION)) {
-                        sslnode = configuration.get(attribute).get(CommonAttributes.CONFIGURATION);
-                    } else {
-                        sslnode = configuration.get(attribute);
-                    }
-                    final ModelNode sslModel = ssl.getModel();
-                    for (AttributeDefinition sslAttr : ModClusterSSLResourceDefinition.ATTRIBUTES) {
-                        sslAttr.validateAndSet(sslnode, sslModel);
-                    }
-                }
-                else if (attribute.equals(CommonAttributes.DYNAMIC_LOAD_PROVIDER) || attribute.equals(CommonAttributes.SIMPLE_LOAD_PROVIDER)) {
-                    // TODO AS7-4050 properly handle these
-                    confModel.get(attribute).set(configuration.get(attribute));
-                } else {
-                    AttributeDefinition ad = ModClusterConfigResourceDefinition.ATTRIBUTES_BY_NAME.get(attribute);
-                    if (ad != null) {
-                        ad.validateAndSet(configuration, confModel);
-                    } // else ignore unknown params
-                }
-            }
-        }
-    }
 
     @Override
     protected void performRuntime(OperationContext context, ModelNode operation, ModelNode model,
                                   ServiceVerificationHandler verificationHandler, List<ServiceController<?>> newControllers) throws OperationFailedException {
 
         final ModelNode fullModel = Resource.Tools.readModel(context.readResource(PathAddress.EMPTY_ADDRESS));
-        // Use ModClusterExtension.configurationPath here so if we change the PathElement components,
-        // we don't have to change this code
-        final ModelNode unresolvedConfig = fullModel.get(ModClusterExtension.configurationPath.getKey(), ModClusterExtension.configurationPath.getValue());
-        final ModelNode resolvedConfig = resolveConfig(context, unresolvedConfig);
-
+        final ModelNode modelConfig = fullModel.get(ModClusterExtension.CONFIGURATION_PATH.getKeyValuePair());
+        final ModClusterConfig config = getModClusterConfig(context, modelConfig);
+        final LoadBalanceFactorProvider loadProvider = getModClusterLoadProvider(context, modelConfig);
         // Add mod_cluster service
-        final ModClusterService service = new ModClusterService(resolvedConfig);
+        final ModClusterService service = new ModClusterService(config, loadProvider);
         final ServiceBuilder<ModCluster> serviceBuilder = context.getServiceTarget().addService(ModClusterService.NAME, service)
                 .addDependency(WebSubsystemServices.JBOSS_WEB, WebServer.class, service.getWebServer())
                 .addDependency(SocketBindingManager.SOCKET_BINDING_MANAGER, SocketBindingManager.class, service.getBindingManager())
                 .addListener(verificationHandler)
                 .setInitialMode(Mode.ACTIVE);
-        final ModelNode bindingRefNode = resolvedConfig.get(ModClusterConfigResourceDefinition.ADVERTISE_SOCKET.getName());
+        final ModelNode bindingRefNode = ADVERTISE_SOCKET.resolveModelAttribute(context, modelConfig);
         final String bindingRef = bindingRefNode.isDefined() ? bindingRefNode.asString() : null;
-         if (bindingRef != null) {
+        if (bindingRef != null) {
             serviceBuilder.addDependency(SocketBinding.JBOSS_BINDING_NAME.append(bindingRef), SocketBinding.class, service.getBinding());
-         }
-
+        }
         newControllers.add(serviceBuilder.install());
     }
 
-    /**
-     * Creates a copy of unresolvedConfig with all expressions resolved and all undefined attributes that
-     * have a default value set to the default.
-     * @param context the operation context
-     * @param unresolvedConfig the raw configuration model
-     * @return the resolved configuration model
-     * @throws OperationFailedException if there is a problem resolving an attribute
+    /*
+    this is here so legacy configuration can be supported
      */
-    private ModelNode resolveConfig(OperationContext context, ModelNode unresolvedConfig) throws OperationFailedException {
-
-        final ModelNode resolved = new ModelNode();
-
-        // First the simple core attributes
-        for (AttributeDefinition coreAttr : ModClusterConfigResourceDefinition.ATTRIBUTES) {
-            resolved.get(coreAttr.getName()).set(coreAttr.resolveModelAttribute(context, unresolvedConfig));
-        }
-        // Next SSL
-        // Use ModClusterExtension.sslConfigurationPath here so if we change the PathElement components,
-        // we don't have to change this code
-        final ModelNode unresolvedSSL = unresolvedConfig.get(ModClusterExtension.sslConfigurationPath.getKey(),
-                                                             ModClusterExtension.sslConfigurationPath.getValue());
-        if (unresolvedSSL.isDefined()) {
-            final ModelNode resolvedSSL = resolved.get(ModClusterExtension.sslConfigurationPath.getKey(),
-                                                       ModClusterExtension.sslConfigurationPath.getValue());
-            for (AttributeDefinition sslAttr : ModClusterConfigResourceDefinition.ATTRIBUTES) {
-                resolvedSSL.get(sslAttr.getName()).set(sslAttr.resolveModelAttribute(context, unresolvedSSL));
+    @Override
+    protected void populateModel(OperationContext context, ModelNode operation, Resource resource) throws OperationFailedException {
+        if (operation.hasDefined(CommonAttributes.MOD_CLUSTER_CONFIG)) {
+            PathAddress opAddress = PathAddress.pathAddress(operation.get(ModelDescriptionConstants.OP_ADDR));
+            PathAddress parent = opAddress.append(ModClusterExtension.CONFIGURATION_PATH);
+            ModelNode targetOperation = Util.createAddOperation(parent);
+            for (AttributeDefinition def : ModClusterConfigResourceDefinition.ATTRIBUTES) {
+                def.validateAndSet(operation, targetOperation);
             }
+            context.addStep(targetOperation, ModClusterConfigAdd.INSTANCE, OperationContext.Stage.IMMEDIATE);
+            context.completeStep(OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER);
         }
-
-        // Finally the load-provider stuff
-        // TODO AS7-4050 properly handle these
-        for (Property property : unresolvedConfig.asPropertyList()) {
-            String key = property.getName();
-            if (!ModClusterConfigResourceDefinition.ATTRIBUTES_BY_NAME.containsKey(key) &&
-                    !key.equals(ModClusterExtension.sslConfigurationPath.getKey())) {
-                resolved.get(key).set(context.resolveExpressions(property.getValue()));
-            }
-        }
-
-        return resolved;
     }
 
     @Override
-    public ModelNode getModelDescription(Locale locale) {
-        return ModClusterSubsystemDescriptions.getSubsystemAddDescription(locale);
+    protected void populateModel(ModelNode operation, ModelNode model) throws OperationFailedException {
+
     }
 
-    @Override
-    protected void populateModel(ModelNode operation, ModelNode model) {
-        // not called because we override the variant that takes a Resource param; we just implement it because it is abstract
+    private ModClusterConfig getModClusterConfig(final OperationContext context, ModelNode model) throws OperationFailedException {
+        ModClusterConfig config = new ModClusterConfig();
+        config.setAdvertise(ADVERTISE.resolveModelAttribute(context, model).asBoolean());
+
+        if (model.get(SSL_CONFIGURATION_PATH.getKeyValuePair()).isDefined()) {
+            // Add SSL configuration.
+            config.setSsl(true);
+            final ModelNode ssl = model.get(SSL_CONFIGURATION_PATH.getKeyValuePair());
+            ModelNode keyAlias = KEY_ALIAS.resolveModelAttribute(context, ssl);
+            ModelNode password = PASSWORD.resolveModelAttribute(context, ssl);
+            if (keyAlias.isDefined()) {
+                config.setSslKeyAlias(keyAlias.asString());
+            }
+            if (password.isDefined()) {
+                config.setSslTrustStorePassword(password.asString());
+                config.setSslKeyStorePassword(password.asString());
+            }
+            if (ssl.has(CommonAttributes.CERTIFICATE_KEY_FILE)) {
+                config.setSslKeyStore(CERTIFICATE_KEY_FILE.resolveModelAttribute(context, ssl).asString());
+            }
+            if (ssl.has(CommonAttributes.CIPHER_SUITE)) {
+                config.setSslCiphers(CIPHER_SUITE.resolveModelAttribute(context, ssl).asString());
+            }
+            if (ssl.has(CommonAttributes.PROTOCOL)) {
+                config.setSslProtocol(PROTOCOL.resolveModelAttribute(context, ssl).asString());
+            }
+            if (ssl.has(CommonAttributes.CA_CERTIFICATE_FILE)) {
+                config.setSslTrustStore(CA_CERTIFICATE_FILE.resolveModelAttribute(context, ssl).asString());
+            }
+            if (ssl.has(CommonAttributes.CA_REVOCATION_URL)) {
+                config.setSslCrlFile(CA_REVOCATION_URL.resolveModelAttribute(context, ssl).asString());
+            }
+        }
+        if (model.hasDefined(CommonAttributes.PROXY_LIST)) {
+            config.setProxyList(PROXY_LIST.resolveModelAttribute(context, model).asString());
+        }
+        if (model.hasDefined(CommonAttributes.ADVERTISE_SECURITY_KEY)) {
+            config.setAdvertiseSecurityKey(ADVERTISE_SECURITY_KEY.resolveModelAttribute(context, model).asString());
+        }
+        config.setProxyURL(PROXY_URL.resolveModelAttribute(context, model).asString());
+        config.setExcludedContexts(EXCLUDED_CONTEXTS.resolveModelAttribute(context, model).asString().trim());
+        config.setAutoEnableContexts(AUTO_ENABLE_CONTEXTS.resolveModelAttribute(context, model).asBoolean());
+
+        config.setStopContextTimeout(STOP_CONTEXT_TIMEOUT.resolveModelAttribute(context, model).asInt());
+        config.setStopContextTimeoutUnit(TimeUnit.valueOf(STOP_CONTEXT_TIMEOUT.getMeasurementUnit().getName()));
+        //config.setStopContextTimeoutUnit(TimeUnit.SECONDS); //todo use AttributeDefinition.getMeasurementUnit
+        // the default value is 20000 = 20 seconds.
+        config.setSocketTimeout(SOCKET_TIMEOUT.resolveModelAttribute(context, model).asInt() * 1000);
+        config.setStickySession(STICKY_SESSION.resolveModelAttribute(context, model).asBoolean());
+        config.setStickySessionRemove(STICKY_SESSION_REMOVE.resolveModelAttribute(context, model).asBoolean());
+        config.setStickySessionForce(STICKY_SESSION_FORCE.resolveModelAttribute(context, model).asBoolean());
+        config.setWorkerTimeout(WORKER_TIMEOUT.resolveModelAttribute(context, model).asInt());
+        config.setMaxAttempts(MAX_ATTEMPTS.resolveModelAttribute(context, model).asInt());
+        config.setFlushPackets(FLUSH_PACKETS.resolveModelAttribute(context, model).asBoolean());
+        config.setFlushWait(FLUSH_WAIT.resolveModelAttribute(context, model).asInt());
+        config.setPing(PING.resolveModelAttribute(context, model).asInt());
+        config.setSmax(SMAX.resolveModelAttribute(context, model).asInt());
+        config.setTtl(TTL.resolveModelAttribute(context, model).asInt());
+        config.setNodeTimeout(NODE_TIMEOUT.resolveModelAttribute(context, model).asInt());
+
+        if (model.hasDefined(CommonAttributes.BALANCER)) {
+            config.setBalancer(BALANCER.resolveModelAttribute(context, model).asString());
+        }
+        if (model.hasDefined(CommonAttributes.LOAD_BALANCING_GROUP)) {
+            config.setLoadBalancingGroup(LOAD_BALANCING_GROUP.resolveModelAttribute(context, model).asString());
+        }
+        return config;
     }
+
+    private LoadBalanceFactorProvider getModClusterLoadProvider(final OperationContext context, ModelNode model) throws OperationFailedException {
+        LoadBalanceFactorProvider load = null;
+        if (model.hasDefined(CommonAttributes.SIMPLE_LOAD_PROVIDER_FACTOR)) {
+            // TODO it seems we don't support that stuff.
+            int value = ModClusterConfigResourceDefinition.SIMPLE_LOAD_PROVIDER.resolveModelAttribute(context, model).asInt(1);
+            SimpleLoadBalanceFactorProvider myload = new SimpleLoadBalanceFactorProvider();
+            myload.setLoadBalanceFactor(value);
+            load = myload;
+        }
+
+        Set<LoadMetric> metrics = new HashSet<LoadMetric>();
+        if (model.get(ModClusterExtension.DYNAMIC_LOAD_PROVIDER.getKeyValuePair()).isDefined()) {
+            final ModelNode node = model.get(ModClusterExtension.DYNAMIC_LOAD_PROVIDER.getKeyValuePair());
+            int decayFactor = DynamicLoadProviderDefinition.DECAY.resolveModelAttribute(context, model).asInt();
+            int history = DynamicLoadProviderDefinition.HISTORY.resolveModelAttribute(context, model).asInt();
+            if (node.hasDefined(CommonAttributes.LOAD_METRIC)) {
+                addLoadMetrics(metrics, node.get(CommonAttributes.LOAD_METRIC), context);
+            }
+            if (node.hasDefined(CommonAttributes.CUSTOM_LOAD_METRIC)) {
+                addLoadMetrics(metrics, node.get(CommonAttributes.CUSTOM_LOAD_METRIC), context);
+            }
+            if (!metrics.isEmpty()) {
+                DynamicLoadBalanceFactorProvider loader = new DynamicLoadBalanceFactorProvider(metrics);
+                loader.setDecayFactor(decayFactor);
+                loader.setHistory(history);
+                load = loader;
+            }
+        }
+        return load;
+    }
+
+
+    private void addLoadMetrics(Set<LoadMetric> metrics, ModelNode nodes, final OperationContext context) throws OperationFailedException {
+        for (Property p : nodes.asPropertyList()) {
+            ModelNode node = p.getValue();
+            double capacity = CAPACITY.resolveModelAttribute(context, node).asDouble();
+            int weight = WEIGHT.resolveModelAttribute(context, node).asInt();
+            Class<? extends LoadMetric> loadMetricClass = null;
+            if (node.hasDefined(CommonAttributes.TYPE)) {
+                String type = TYPE.resolveModelAttribute(context, node).asString();
+                LoadMetricEnum metric = LoadMetricEnum.forType(type);
+                loadMetricClass = (metric != null) ? metric.getLoadMetricClass() : null;
+            } else {
+                String className = CustomLoadMetricDefinition.CLASS.resolveModelAttribute(context, node).asString();
+                try {
+                    loadMetricClass = this.getClass().getClassLoader().loadClass(className).asSubclass(LoadMetric.class);
+                } catch (ClassNotFoundException e) {
+                    ROOT_LOGGER.errorAddingMetrics(e);
+                }
+            }
+
+            if (loadMetricClass != null) {
+                try {
+                    LoadMetric metric = loadMetricClass.newInstance();
+                    metric.setCapacity(capacity);
+                    metric.setWeight(weight);
+                    metrics.add(metric);
+                } catch (InstantiationException e) {
+                    ROOT_LOGGER.errorAddingMetrics(e);
+                } catch (IllegalAccessException e) {
+                    ROOT_LOGGER.errorAddingMetrics(e);
+                }
+            }
+        }
+    }
+
 }
