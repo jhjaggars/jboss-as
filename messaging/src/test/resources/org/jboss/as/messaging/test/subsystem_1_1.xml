@@ -3,6 +3,7 @@
         <hornetq-server>
             <!-- disable messaging persistence -->
             <persistence-enabled>false</persistence-enabled>
+            <thread-pool-max-size>${messaging.thread.pool.max.size:5}</thread-pool-max-size>
             <security-domain>someDomain</security-domain>
             <cluster-user>${messaging.cluster.user.name}</cluster-user>
             <cluster-password>${messaging.cluster.user.password}</cluster-password>
@@ -20,6 +21,11 @@
             <journal-directory path="test" relative-to="test" />
             <large-messages-directory path="test" relative-to="test" />
             <connectors>
+               <connector name="myconnector">
+                  <factory-class>org.hornetq.core.remoting.impl.netty.NettyConnectorFactory</factory-class>
+                  <param key="host" value="192.168.1.2"/>
+                  <param key="port" value="5445"/>
+               </connector>
                <netty-connector name="netty" socket-binding="messaging" />
                <netty-connector name="netty-throughput" socket-binding="messaging-throughput">
                   <param key="batch-delay" value="50"/>
@@ -203,13 +209,14 @@
                  </entries>
               </connection-factory>
               <connection-factory name="RemoteConnectionFactory">
+                 <factory-type>XA_QUEUE</factory-type>
                  <connectors>
                     <connector-ref connector-name="netty" backup-connector-name="netty-throughput"/>
                  </connectors>
                  <entries>
                     <entry name="RemoteConnectionFactory"/>
                  </entries>
-                 <client-id>testClient</client-id>
+                 <client-id>testClient2</client-id>
               </connection-factory>
               <pooled-connection-factory name="hornetq-ra">
                  <transaction mode="xa"/>

@@ -50,6 +50,7 @@ import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.Property;
 import org.jboss.msc.service.ServiceBuilder;
 import org.jboss.msc.service.ServiceController;
+import org.jboss.msc.service.ServiceName;
 import org.omg.CORBA.ORB;
 import org.omg.PortableServer.IdAssignmentPolicyValue;
 import org.omg.PortableServer.LifespanPolicyValue;
@@ -76,6 +77,8 @@ public class JacORBSubsystemAdd extends AbstractAddStepHandler {
     private static final String JACORB_SSL_SOCKET_BINDING = "jacorb-ssl";
 
     static final JacORBSubsystemAdd INSTANCE = new JacORBSubsystemAdd();
+
+    private static final ServiceName SECURITY_DOMAIN_SERVICE_NAME = ServiceName.JBOSS.append("security").append("security-domain");
 
     /**
      * <p>
@@ -140,6 +143,12 @@ public class JacORBSubsystemAdd extends AbstractAddStepHandler {
         CorbaORBService orbService = new CorbaORBService(props);
         final ServiceBuilder<ORB> builder = context.getServiceTarget().addService(
                 CorbaORBService.SERVICE_NAME, orbService);
+
+        // if a security domain has been specified, add a dependency to the domain service.
+        String securityDomain = props.getProperty(JacORBSubsystemConstants.SECURITY_SECURITY_DOMAIN);
+        if (securityDomain != null && !securityDomain.isEmpty())
+            builder.addDependency(SECURITY_DOMAIN_SERVICE_NAME.append(securityDomain));
+
         // inject the socket bindings that specify the JacORB IIOP and IIOP/SSL ports.
         builder.addDependency(SocketBinding.JBOSS_BINDING_NAME.append(JACORB_SOCKET_BINDING), SocketBinding.class,
                 orbService.getJacORBSocketBindingInjector());
@@ -274,7 +283,7 @@ public class JacORBSubsystemAdd extends AbstractAddStepHandler {
      * @throws OperationFailedException if the SSL setup has not been done correctly (SSL support has been turned on
      * but no security domain has been specified).
      */
-    private void setupSSLFactories(Properties props) throws OperationFailedException {
+    private void setupSSLFactories(final Properties props) throws OperationFailedException {
         String supportSSLKey = PropertiesMap.JACORB_PROPS_MAP.get(JacORBSubsystemConstants.SECURITY_SUPPORT_SSL);
         boolean supportSSL = "on".equalsIgnoreCase(props.getProperty(supportSSLKey));
 

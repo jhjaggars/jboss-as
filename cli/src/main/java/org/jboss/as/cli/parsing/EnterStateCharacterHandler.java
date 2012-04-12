@@ -32,6 +32,9 @@ public class EnterStateCharacterHandler implements CharacterHandler {
     protected final ParsingState state;
 
     public EnterStateCharacterHandler(ParsingState state) {
+        if(state == null) {
+            throw new IllegalArgumentException("State can't be null.");
+        }
         this.state = state;
     }
 

@@ -86,6 +86,17 @@ public class ArgumentValueConverterTestCase {
     }
 
     @Test
+    public void testList_NoBracketsOneItem() throws Exception {
+        final ModelNode value = ArgumentValueConverter.LIST.fromString("a");
+        assertNotNull(value);
+        assertEquals(ModelType.LIST, value.getType());
+        final List<ModelNode> list = value.asList();
+        assertEquals(1, list.size());
+        assertNotNull(list.get(0));
+        assertEquals("a", list.get(0).asString());
+    }
+
+    @Test
     public void testList_WithBrackets() throws Exception {
         final ModelNode value = ArgumentValueConverter.LIST.fromString("[a,b,c]");
         assertNotNull(value);
