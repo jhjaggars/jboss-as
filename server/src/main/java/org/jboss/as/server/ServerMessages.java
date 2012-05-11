@@ -36,6 +36,7 @@ import javax.xml.stream.Location;
 import javax.xml.stream.XMLStreamException;
 
 import org.jboss.as.controller.OperationFailedException;
+import org.jboss.as.controller.PathAddress;
 import org.jboss.as.server.deployment.DeploymentUnit;
 import org.jboss.as.server.deployment.DeploymentUnitProcessingException;
 import org.jboss.as.server.deployment.MountType;
@@ -44,8 +45,6 @@ import org.jboss.as.server.services.security.VaultReaderException;
 import org.jboss.dmr.ModelNode;
 import org.jboss.invocation.proxy.MethodIdentifier;
 import org.jboss.logging.Cause;
-import org.jboss.logging.LogMessage;
-import org.jboss.logging.Logger;
 import org.jboss.logging.Message;
 import org.jboss.logging.MessageBundle;
 import org.jboss.logging.Messages;
@@ -531,16 +530,16 @@ public interface ServerMessages {
     @Message(id = 18745, value = "Resource is too large to be a valid class file")
     IOException resourceTooLarge();
 
-    @Message(id = 18746, value = "Sub deployment %s in jboss-structure.xml was not found. Available sub deployments: %s")
+    @Message(id = 18746, value = "Sub deployment %s in jboss-deployment-structure.xml was not found. Available sub deployments: %s")
     DeploymentUnitProcessingException subdeploymentNotFound(String path, StringBuilder subdeployments);
 
     @Message(id = 18747, value = "No jboss-deployment-structure.xml file found at %s")
     DeploymentUnitProcessingException deploymentStructureFileNotFound(File file);
 
-    @Message(id = 18748, value = "Error loading jboss-structure.xml from %s")
+    @Message(id = 18748, value = "Error loading jboss-deployment-structure.xml from %s")
     DeploymentUnitProcessingException errorLoadingDeploymentStructureFile(String path, @Cause XMLStreamException cause);
 
-    @Message(id = 18749, value = "Sub deployment '%s' is listed twice in jboss-structure.xml")
+    @Message(id = 18749, value = "Sub deployment '%s' is listed twice in jboss-deployment-structure.xml")
     XMLStreamException duplicateSubdeploymentListing(String name);
 
     @Message(id = 18750, value = "Additional module name '%s' is not valid. Names must start with 'deployment.'")
@@ -602,4 +601,7 @@ public interface ServerMessages {
 
     @Message(id = 18769, value = "Validation for %s is not implemented")
     UnsupportedOperationException attributeValidationUnimplemented(String attribute);
+
+    @Message(id = 18770, value = "Cannot add more than one socket binding group. Add of '%s' attempted, but '%s' already exists")
+    OperationFailedException cannotAddMoreThanOneSocketBindingGroupForServer(PathAddress wanted, PathAddress existing);
 }

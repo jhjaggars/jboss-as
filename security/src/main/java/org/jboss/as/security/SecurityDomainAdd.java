@@ -65,6 +65,7 @@ import static org.jboss.as.security.Constants.URL;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 
@@ -162,11 +163,11 @@ class SecurityDomainAdd extends AbstractAddStepHandler {
         }, OperationContext.Stage.RUNTIME);
     }
 
-    void launchServices(OperationContext context, String securityDomain, ModelNode model) {
+    void launchServices(OperationContext context, String securityDomain, ModelNode model) throws OperationFailedException {
         launchServices(context, securityDomain, model, null, null);
     }
 
-    public void launchServices(OperationContext context, String securityDomain, ModelNode model, ServiceVerificationHandler verificationHandler, List<ServiceController<?>> newControllers) {
+    public void launchServices(OperationContext context, String securityDomain, ModelNode model, ServiceVerificationHandler verificationHandler, List<ServiceController<?>> newControllers) throws OperationFailedException {
         final ApplicationPolicy applicationPolicy = createApplicationPolicy(securityDomain, model);
         final JSSESecurityDomain jsseSecurityDomain = createJSSESecurityDomain(context, securityDomain, model);
         final String cacheType = getAuthenticationCacheType(model);
@@ -381,6 +382,9 @@ class SecurityDomainAdd extends AbstractAddStepHandler {
                 loginStackRef = authModule.get(LOGIN_MODULE_STACK_REF).asString();
             Map<String, Object> options = extractOptions(authModule) ;
             AuthModuleEntry entry = new AuthModuleEntry(code, options, loginStackRef);
+            if (authModule.hasDefined(FLAG)) {
+                entry.setControlFlag(ControlFlag.valueOf(authModule.get(FLAG).asString()));
+            }
             if (loginStackRef != null) {
                 if (!holders.containsKey(loginStackRef)) {
                     throw SecurityMessages.MESSAGES.loginModuleStackIllegalArgument(loginStackRef);
@@ -388,6 +392,11 @@ class SecurityDomainAdd extends AbstractAddStepHandler {
                 entry.setLoginModuleStackHolder(holders.get(loginStackRef));
             }
             authenticationInfo.add(entry);
+
+            String moduleName = authModule.get(MODULE).asString();
+            if(authModule.hasDefined(MODULE) && moduleName != null &&  moduleName.length() > 0 ) {
+                authenticationInfo.setJBossModuleName(moduleName);
+            }
         }
         applicationPolicy.setAuthenticationInfo(authenticationInfo);
         return true;
@@ -461,7 +470,8 @@ class SecurityDomainAdd extends AbstractAddStepHandler {
         return options;
     }
 
-    private JSSESecurityDomain createJSSESecurityDomain(OperationContext context, String securityDomain, ModelNode node) {
+    private JSSESecurityDomain createJSSESecurityDomain(OperationContext context, String securityDomain, ModelNode node)
+            throws OperationFailedException {
         node = peek(node, JSSE, CLASSIC);
         if (node == null)
             return null;
@@ -505,7 +515,7 @@ class SecurityDomainAdd extends AbstractAddStepHandler {
             }
         });
 
-        processKeyManager(node, Constants.KEY_MANAGER, new KeyManagerConfig() {
+        processKeyManager(context, node, Constants.KEY_MANAGER, new KeyManagerConfig() {
             public void setKeyManagerFactoryAlgorithm(String value) {
                 jsseSecurityDomain.setKeyManagerFactoryAlgorithm(value);
             }
@@ -514,7 +524,7 @@ class SecurityDomainAdd extends AbstractAddStepHandler {
             }
         });
 
-         processKeyManager(node, Constants.TRUST_MANAGER, new KeyManagerConfig() {
+         processKeyManager(context, node, Constants.TRUST_MANAGER, new KeyManagerConfig() {
             public void setKeyManagerFactoryAlgorithm(String value) {
                 jsseSecurityDomain.setTrustManagerFactoryAlgorithm(value);
             }
@@ -524,19 +534,19 @@ class SecurityDomainAdd extends AbstractAddStepHandler {
         });
 
         if (node.hasDefined(CLIENT_ALIAS)) {
-            value = node.get(CLIENT_ALIAS).asString();
+            value = context.resolveExpressions(node.get(CLIENT_ALIAS)).asString();
             jsseSecurityDomain.setClientAlias(value);
         }
         if (node.hasDefined(SERVER_ALIAS)) {
-            value = node.get(SERVER_ALIAS).asString();
+            value = context.resolveExpressions(node.get(SERVER_ALIAS)).asString();
             jsseSecurityDomain.setServerAlias(value);
         }
         if (node.hasDefined(CLIENT_AUTH)) {
-            boolean clientAuth = node.get(CLIENT_AUTH).asBoolean();
+            boolean clientAuth = context.resolveExpressions(node.get(CLIENT_AUTH)).asBoolean();
             jsseSecurityDomain.setClientAuth(clientAuth);
         }
         if (node.hasDefined(SERVICE_AUTH_TOKEN)) {
-            value = node.get(SERVICE_AUTH_TOKEN).asString();
+            value = context.resolveExpressions(node.get(SERVICE_AUTH_TOKEN)).asString();
             try {
                 jsseSecurityDomain.setServiceAuthToken(value);
             } catch (Exception e) {
@@ -544,11 +554,11 @@ class SecurityDomainAdd extends AbstractAddStepHandler {
             }
         }
         if (node.hasDefined(CIPHER_SUITES)) {
-            value = node.get(CIPHER_SUITES).asString();
+            value = context.resolveExpressions(node.get(CIPHER_SUITES)).asString();
             jsseSecurityDomain.setCipherSuites(value);
         }
         if (node.hasDefined(PROTOCOLS)) {
-            value = node.get(PROTOCOLS).asString();
+            value = context.resolveExpressions(node.get(PROTOCOLS)).asString();
             jsseSecurityDomain.setProtocols(value);
         }
         if (node.hasDefined(ADDITIONAL_PROPERTIES)) {
@@ -570,7 +580,9 @@ class SecurityDomainAdd extends AbstractAddStepHandler {
         void setKeyStoreProviderArgument(String value);
     }
 
-    private void processKeyStore(OperationContext context, ModelNode node, String name, KeyStoreConfig config) {
+    private void processKeyStore(OperationContext context, ModelNode node, String name, KeyStoreConfig config)
+            throws OperationFailedException{
+
         final ModelNode value = peek(node, name, PASSWORD);
         final ModelNode type = peek(node, name, TYPE);
         final ModelNode url = peek(node, name, URL);
@@ -579,52 +591,56 @@ class SecurityDomainAdd extends AbstractAddStepHandler {
 
         if (value != null) {
             try {
-                config.setKeyStorePassword(value.asString());
+                config.setKeyStorePassword(context.resolveExpressions(value).asString());
             } catch (Exception e) {
                 throw SecurityMessages.MESSAGES.runtimeException(e);
             }
         }
+
         if (type != null) {
-            config.setKeyStoreType(type.asString());
+            config.setKeyStoreType(context.resolveExpressions(type).asString());
         }
+
         if (url != null) {
             try {
-                config.setKeyStoreURL(url.asString());
-            } catch (IOException e) {
+                config.setKeyStoreURL(context.resolveExpressions(url).asString());
+            } catch (Exception e) {
                 throw SecurityMessages.MESSAGES.runtimeException(e);
             }
         }
 
         if (provider != null) {
-            config.setKeyStoreProvider(provider.asString());
+            config.setKeyStoreProvider(context.resolveExpressions(provider).asString());
         }
 
         if (providerArgument != null) {
-            config.setKeyStoreProviderArgument(providerArgument.asString());
+            config.setKeyStoreProviderArgument(context.resolveExpressions(providerArgument).asString());
         }
     }
 
-     private interface KeyManagerConfig {
+    private interface KeyManagerConfig {
         void setKeyManagerFactoryAlgorithm(String value);
         void setKeyManagerFactoryProvider(String value);
     }
 
-    private void processKeyManager(ModelNode node, String name, KeyManagerConfig config) {
+    private void processKeyManager(OperationContext context, ModelNode node, String name, KeyManagerConfig config)
+            throws OperationFailedException {
+
         final ModelNode algorithm = peek(node, name, ALGORITHM);
         final ModelNode provider = peek(node, name, PROVIDER);
 
         if (algorithm != null) {
-            config.setKeyManagerFactoryAlgorithm(algorithm.asString());
+            config.setKeyManagerFactoryAlgorithm(context.resolveExpressions(algorithm).asString());
         }
 
         if (provider != null) {
-            config.setKeyManagerFactoryProvider(provider.asString());
+            config.setKeyManagerFactoryProvider(context.resolveExpressions(provider).asString());
         }
     }
 
 
     private LoginModuleControlFlag getControlFlag(String flag) {
-        switch (ModuleFlag.valueOf(flag.toUpperCase())) {
+        switch (ModuleFlag.valueOf(flag.toUpperCase(Locale.ENGLISH))) {
             case SUFFICIENT:
                 return LoginModuleControlFlag.SUFFICIENT;
             case OPTIONAL:

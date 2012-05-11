@@ -22,10 +22,7 @@
 
 package org.jboss.as.domain.management.security;
 
-import org.jboss.as.domain.management.security.state.PropertyFileFinder;
-import org.jboss.as.domain.management.security.state.PropertyFilePrompt;
-import org.jboss.as.domain.management.security.state.State;
-import org.jboss.as.domain.management.security.state.StateValues;
+import static org.jboss.as.domain.management.DomainManagementMessages.MESSAGES;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -34,7 +31,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
-import static org.jboss.as.domain.management.DomainManagementMessages.MESSAGES;
+import org.jboss.as.domain.management.security.state.PropertyFileFinder;
+import org.jboss.as.domain.management.security.state.PropertyFilePrompt;
+import org.jboss.as.domain.management.security.state.State;
+import org.jboss.as.domain.management.security.state.StateValues;
 
 /**
  * A command line utility to add new users to the mgmt-users.properties files.
@@ -47,8 +47,10 @@ public class AddPropertiesUser {
 
     public static final String SERVER_BASE_DIR = "jboss.server.base.dir";
     public static final String SERVER_CONFIG_DIR = "jboss.server.config.dir";
+    public static final String SERVER_CONFIG_USER_DIR = "jboss.server.config.user.dir";
     public static final String DOMAIN_BASE_DIR = "jboss.domain.base.dir";
     public static final String DOMAIN_CONFIG_DIR = "jboss.domain.config.dir";
+    public static final String DOMAIN_CONFIG_USER_DIR = "jboss.domain.config.user.dir";
 
     public static final String DEFAULT_MANAGEMENT_REALM = "ManagementRealm";
     public static final String DEFAULT_APPLICATION_REALM = "ApplicationRealm";
@@ -56,37 +58,39 @@ public class AddPropertiesUser {
     public static final String APPLICATION_USERS_PROPERTIES = "application-users.properties";
     public static final String APPLICATION_ROLES_PROPERTIES = "application-roles.properties";
     public static final String APPLICATION_USERS_SWITCH = "-a";
-
-
-    private static final char CARRIAGE_RETURN_CHAR = '\r';
+    public static final String DOMAIN_CONFIG_DIR_USERS_SWITCH = "-dc";
+    public static final String SERVER_CONFIG_DIR_USERS_SWITCH = "-sc";
 
     public static final String NEW_LINE = "\n";
     public static final String SPACE = " ";
     private static final Properties argsCliProps = new Properties();
 
-
-    private ConsoleWrapper theConsole;
-
+    private final ConsoleWrapper theConsole;
 
     protected State nextState;
 
     protected AddPropertiesUser() {
         theConsole = new JavaConsole();
+        StateValues stateValues = new StateValues();
+        stateValues.setJbossHome(System.getenv("JBOSS_HOME"));
+
         if (theConsole.getConsole() == null) {
             throw MESSAGES.noConsoleAvailable();
         }
-        nextState = new PropertyFilePrompt(theConsole);
+        nextState = new PropertyFilePrompt(theConsole, stateValues);
     }
 
     protected AddPropertiesUser(ConsoleWrapper console) {
         this.theConsole = console;
-        nextState = new PropertyFilePrompt(theConsole);
+        StateValues stateValues = new StateValues();
+        stateValues.setJbossHome(System.getenv("JBOSS_HOME"));
+        nextState = new PropertyFilePrompt(theConsole,stateValues);
     }
 
     private AddPropertiesUser(final boolean management, final String user, final char[] password, final String realm) {
         boolean silent = false;
         StateValues stateValues = new StateValues();
-
+        stateValues.setJbossHome(System.getenv("JBOSS_HOME"));
         String valueSilent = argsCliProps.getProperty("silent");
 
         if (valueSilent != null) {
@@ -98,7 +102,9 @@ public class AddPropertiesUser {
             stateValues.setHowInteractive(Interactiveness.NON_INTERACTIVE);
         }
 
-        if ((theConsole == null) && (stateValues.isSilent() == false)) {
+        // Silent modes still need to be able to output an error on failure.
+        theConsole = new JavaConsole();
+        if (theConsole.getConsole() == null) {
             throw MESSAGES.noConsoleAvailable();
         }
         stateValues.setUserName(user);
@@ -144,6 +150,10 @@ public class AddPropertiesUser {
                     }
                 } else if (temp.equals(APPLICATION_USERS_SWITCH)) {
                     management = false;
+                } else if (temp.indexOf(DOMAIN_CONFIG_DIR_USERS_SWITCH)>=0) {
+                    System.setProperty(DOMAIN_CONFIG_DIR,temp.substring(3));
+                } else if (temp.indexOf(SERVER_CONFIG_DIR)>=0) {
+                    System.setProperty(SERVER_CONFIG_DIR,temp.substring(3));
                 } else {
                     argsList.add(temp);
                 }

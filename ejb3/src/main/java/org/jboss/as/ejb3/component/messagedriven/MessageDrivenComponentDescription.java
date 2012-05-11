@@ -22,7 +22,7 @@
 package org.jboss.as.ejb3.component.messagedriven;
 
 
-import org.jboss.as.connector.ConnectorServices;
+import org.jboss.as.connector.util.ConnectorServices;
 import org.jboss.as.ee.component.Component;
 import org.jboss.as.ee.component.ComponentConfiguration;
 import org.jboss.as.ee.component.ComponentConfigurator;
@@ -63,7 +63,7 @@ import javax.resource.spi.ResourceAdapter;
 import java.util.Properties;
 import java.util.Set;
 
-import static org.jboss.as.ejb3.EjbMessages.*;
+import static org.jboss.as.ejb3.EjbMessages.MESSAGES;
 
 /**
  * @author <a href="mailto:cdewolf@redhat.com">Carlo de Wolf</a>
@@ -161,7 +161,7 @@ public class MessageDrivenComponentDescription extends EJBComponentDescription {
 
     public void setResourceAdapterName(String resourceAdapterName) {
         if (resourceAdapterName == null || resourceAdapterName.trim().isEmpty()) {
-            throw new IllegalArgumentException("Resource adapter name cannot be null or empty");
+            throw EjbMessages.MESSAGES.stringParamCannotBeNullOrEmpty("Resource adapter name");
         }
         this.resourceAdapterName = resourceAdapterName;
     }

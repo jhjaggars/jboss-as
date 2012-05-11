@@ -22,6 +22,9 @@
 
 package org.jboss.as.host.controller;
 
+import org.jboss.as.controller.OperationStepHandler;
+import org.jboss.as.controller.client.OperationAttachments;
+import org.jboss.as.controller.client.OperationMessageHandler;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.DESCRIBE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.FAILURE_DESCRIPTION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.HOST;
@@ -39,7 +42,9 @@ import static org.jboss.as.host.controller.HostControllerMessages.MESSAGES;
 import java.io.File;
 import java.io.IOException;
 import java.security.AccessController;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
@@ -76,6 +81,7 @@ import org.jboss.as.domain.controller.descriptions.DomainDescriptionProviders;
 import org.jboss.as.domain.controller.operations.coordination.PrepareStepHandler;
 import org.jboss.as.host.controller.RemoteDomainConnectionService.RemoteFileRepository;
 import org.jboss.as.host.controller.ignored.IgnoredDomainResourceRegistry;
+import org.jboss.as.host.controller.mgmt.HostControllerRegistrationHandler;
 import org.jboss.as.host.controller.mgmt.MasterDomainControllerOperationHandlerService;
 import org.jboss.as.host.controller.mgmt.ServerToHostOperationHandlerFactoryService;
 import org.jboss.as.host.controller.operations.LocalHostControllerInfoImpl;
@@ -111,7 +117,7 @@ import org.jboss.threads.JBossThreadFactory;
  *
  * @author Brian Stansberry (c) 2011 Red Hat Inc.
  */
-public class DomainModelControllerService extends AbstractControllerService implements DomainController {
+public class DomainModelControllerService extends AbstractControllerService implements DomainController, HostModelUtil.HostModelRegistrar {
 
     public static final ServiceName SERVICE_NAME = HostControllerService.HC_SERVICE_NAME.append("model", "controller");
 
@@ -244,7 +250,7 @@ public class DomainModelControllerService extends AbstractControllerService impl
             throw MESSAGES.serverNameAlreadyRegistered(pe.getValue());
         }
         ROOT_LOGGER.registeringServer(pe.getValue());
-        ManagementResourceRegistration hostRegistration = modelNodeRegistration.getSubModel(PathAddress.pathAddress(PathElement.pathElement(HOST)));
+        ManagementResourceRegistration hostRegistration = modelNodeRegistration.getSubModel(PathAddress.pathAddress(PathElement.pathElement(HOST, hostControllerInfo.getLocalHostName())));
         hostRegistration.registerProxyController(pe, serverControllerClient);
         serverProxies.put(pe.getValue(), serverControllerClient);
     }
@@ -300,9 +306,7 @@ public class DomainModelControllerService extends AbstractControllerService impl
     @Override
     protected void initModel(Resource rootResource, ManagementResourceRegistration rootRegistration) {
         DomainModelUtil.updateCoreModel(rootResource, environment);
-        HostModelUtil.createHostRegistry(rootRegistration, hostControllerConfigurationPersister, environment, runningModeControl,
-                localFileRepository, hostControllerInfo, new DelegatingServerInventory(), remoteFileRepository, contentRepository,
-                this, extensionRegistry,vaultReader, ignoredRegistry, processState, pathManager);
+        HostModelUtil.createRootRegistry(rootRegistration, environment, ignoredRegistry, this);
         this.modelNodeRegistration = rootRegistration;
     }
 
@@ -319,7 +323,11 @@ public class DomainModelControllerService extends AbstractControllerService impl
             ServerInventoryCallbackService.install(serviceTarget);
 
             // Parse the host.xml and invoke all the ops. The ops should rollback on any Stage.RUNTIME failure
-            ok = boot(hostControllerConfigurationPersister.load(), true);
+            // We run the first op ("add-host") separately to let it set up the host ManagementResourceRegistration
+            List<ModelNode> hostBootOps = hostControllerConfigurationPersister.load();
+            ModelNode addHostOp = hostBootOps.remove(0);
+            ok = boot(Collections.singletonList(addHostOp), true);
+            ok = ok && boot(hostBootOps, true);
 
             final RunningMode currentRunningMode = runningModeControl.getRunningMode();
 
@@ -334,7 +342,7 @@ public class DomainModelControllerService extends AbstractControllerService impl
 
                     if (hostControllerInfo.getRemoteDomainControllerHost() != null) {
                         Future<MasterDomainControllerClient> clientFuture = RemoteDomainConnectionService.install(serviceTarget,
-                                getValue(),
+                                getValue(), extensionRegistry,
                                 hostControllerInfo,
                                 environment.getProductConfig(),
                                 hostControllerInfo.getRemoteDomainControllerSecurityRealm(),
@@ -383,7 +391,14 @@ public class DomainModelControllerService extends AbstractControllerService impl
 
                     if (ok) {
                         ManagementRemotingServices.installManagementChannelServices(serviceTarget, ManagementRemotingServices.MANAGEMENT_ENDPOINT,
-                                new MasterDomainControllerOperationHandlerService(this),
+                                new MasterDomainControllerOperationHandlerService(this, new HostControllerRegistrationHandler.OperationExecutor() {
+
+                                    @Override
+                                    public ModelNode execute(final ModelNode operation, final OperationMessageHandler handler, final ModelController.OperationTransactionControl control, final OperationAttachments attachments, final OperationStepHandler step) {
+                                        return internalExecute(operation, handler, control, attachments, step);
+                                    }
+
+                                }),
                                 DomainModelControllerService.SERVICE_NAME, ManagementRemotingServices.DOMAIN_CHANNEL, null, null);
                         serverInventory = getFuture(inventoryFuture);
                     }
@@ -468,11 +483,19 @@ public class DomainModelControllerService extends AbstractControllerService impl
     @Override
     public void stopLocalHost(int exitCode) {
         final ProcessControllerClient client = injectedProcessControllerConnection.getValue().getClient();
+        processState.setStopping();
         try {
             client.shutdown(exitCode);
         } catch (IOException e) {
             throw MESSAGES.errorClosingDownHost(e);
         }
+    }
+
+    @Override
+    public void registerHostModel(String hostName, ManagementResourceRegistration root) {
+        HostModelUtil.createHostRegistry(hostName, root, hostControllerConfigurationPersister, environment, runningModeControl,
+                localFileRepository, hostControllerInfo, new DelegatingServerInventory(), remoteFileRepository, contentRepository,
+                this, extensionRegistry,vaultReader, ignoredRegistry, processState, pathManager);
     }
 
     private class DelegatingServerInventory implements ServerInventory {

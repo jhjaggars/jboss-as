@@ -21,10 +21,13 @@
  */
 package org.jboss.as.osgi.parser;
 
+import java.util.List;
+import java.util.Locale;
+import java.util.ResourceBundle;
+
 import org.jboss.as.controller.AbstractAddStepHandler;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
-import org.jboss.as.controller.ProcessType;
 import org.jboss.as.controller.ServiceVerificationHandler;
 import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
@@ -32,10 +35,6 @@ import org.jboss.as.osgi.parser.SubsystemState.OSGiCapability;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
 import org.jboss.msc.service.ServiceController;
-
-import java.util.List;
-import java.util.Locale;
-import java.util.ResourceBundle;
 
 /**
  * @author David Bosschaert
@@ -88,7 +87,7 @@ public class OSGiCapabilityAdd extends AbstractAddStepHandler {
         @Override
         public ModelNode getModelDescription(Locale locale) {
             ModelNode node = new ModelNode();
-            ResourceBundle resourceBundle = OSGiSubsystemProviders.getResourceBundle(locale);
+            ResourceBundle resourceBundle = OSGiDescriptionProviders.getResourceBundle(locale);
             node.get(ModelDescriptionConstants.OPERATION_NAME).set(ModelDescriptionConstants.ADD);
             node.get(ModelDescriptionConstants.DESCRIPTION).set(resourceBundle.getString("capability.add"));
             addModelProperties(resourceBundle, node, ModelDescriptionConstants.REQUEST_PROPERTIES);

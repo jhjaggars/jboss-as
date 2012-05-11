@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<definitions targetNamespace="http://www.jboss.org/jbossws/ws-extensions/wssecuritypolicy" name="SecurityService"
+<definitions targetNamespace="http://www.jboss.org/jbossws/ws-extensions/wssecuritypolicy" name="EncryptSecurityService"
 		xmlns:tns="http://www.jboss.org/jbossws/ws-extensions/wssecuritypolicy"
 		xmlns:xsd="http://www.w3.org/2001/XMLSchema"
 		xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
@@ -25,7 +25,7 @@
       <output message="tns:sayHelloResponse"/>
     </operation>
   </portType>
-  <binding name="SecurityServicePortBinding" type="tns:ServiceIface">
+  <binding name="EncryptSecurityServicePortBinding" type="tns:ServiceIface">
     <wsp:PolicyReference URI="#SecurityServiceEncryptThenSignPolicy"/>
     <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
     <operation name="sayHello">
@@ -38,9 +38,9 @@
       </output>
     </operation>
   </binding>
-  <service name="SecurityService">
-    <port name="SecurityServicePort" binding="tns:SecurityServicePortBinding">
-      <soap:address location="http://@jboss.bind.address@:8080/jaxws-samples-wssePolicy-sign-encrypt"/>
+  <service name="EncryptSecurityService">
+    <port name="EncryptSecurityServicePort" binding="tns:EncryptSecurityServicePortBinding">
+      <soap:address location="http://@jboss.bind.address@:8080/jaxws-wsse-sign-encrypt"/>
     </port>
   </service>
   

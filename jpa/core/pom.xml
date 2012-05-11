@@ -30,12 +30,12 @@
     <parent>
         <groupId>org.jboss.as</groupId>
         <artifactId>jboss-as-jpa-parent</artifactId>
-        <version>7.1.2.Final-SNAPSHOT</version>
+        <version>7.2.0.Alpha1-SNAPSHOT</version>
     </parent>
 
     <groupId>org.jboss.as</groupId>
     <artifactId>jboss-as-jpa</artifactId>
-    <version>7.1.2.Final-SNAPSHOT</version>
+    <version>7.2.0.Alpha1-SNAPSHOT</version>
 
     <name>JBoss Application Server: JPA Subsystem</name>
 
@@ -92,6 +92,11 @@
             <artifactId>jbossweb</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.jboss.common</groupId>
+            <artifactId>jboss-common-beans</artifactId>
+        </dependency>
+        
         <!-- External -->
 
         <dependency>

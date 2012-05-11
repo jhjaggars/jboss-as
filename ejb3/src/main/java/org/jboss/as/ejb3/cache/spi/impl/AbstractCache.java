@@ -44,6 +44,11 @@ public abstract class AbstractCache<K extends Serializable, V extends Cacheable<
     }
 
     @Override
+    public K createIdentifier() {
+        return this.backingCache.createIdentifier();
+    }
+
+    @Override
     public V create() {
         return this.backingCache.create().getUnderlyingItem();
     }
@@ -65,6 +70,17 @@ public abstract class AbstractCache<K extends Serializable, V extends Cacheable<
     public V get(K key) throws NoSuchEJBException {
         E entry = this.backingCache.get(key);
         return (entry != null) ? entry.getUnderlyingItem() : null;
+    }
+
+    @Override
+    public boolean contains(K key) {
+        try {
+            return this.backingCache.peek(key) != null;
+        } catch (NoSuchEJBException e) {
+            //the javadoc says that this may be thrown
+            //although it looks like the current impls don't
+            return false;
+        }
     }
 
     /**

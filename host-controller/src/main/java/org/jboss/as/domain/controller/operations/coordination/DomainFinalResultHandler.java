@@ -35,7 +35,6 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OUT
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RESPONSE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RESULT;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SERVER;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SERVER_GROUPS;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.STEPS;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUCCESS;
 import static org.jboss.as.domain.controller.DomainControllerMessages.MESSAGES;
@@ -52,8 +51,10 @@ import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
+import org.jboss.as.domain.controller.DomainControllerLogger;
 import org.jboss.as.domain.controller.ServerIdentity;
 import org.jboss.dmr.ModelNode;
+import org.jboss.dmr.ModelType;
 
 /**
  * Assembles the overall result for a domain operation from individual host and server results.
@@ -83,7 +84,7 @@ public class DomainFinalResultHandler implements OperationStepHandler {
             contextResult.setEmptyObject(); // clear out any old data
             contextResult.set(getDomainResults(operation));
             if (domainOperationContext.getServerResults().size() > 0) {
-                populateServerGroupResults(context, context.getResult());
+                populateServerGroupResults(context);
             } else {
                 // Just make sure there's an 'undefined' server-groups node
                 context.getServerResults();
@@ -155,7 +156,16 @@ public class DomainFinalResultHandler implements OperationStepHandler {
         }
 
         if (hostFailureResults != null) {
-            context.getFailureDescription().get(HOST_FAILURE_DESCRIPTIONS).set(hostFailureResults);
+            //context.getFailureDescription().get(HOST_FAILURE_DESCRIPTIONS).set(hostFailureResults);
+
+            //The following is a workaround for AS7-4597
+            //DomainRolloutStepHandler.pushToServers() puts in a simple string into the failure description, but that might be a red herring.
+            //If there is a failure description and it is not of type OBJECT, then let's not set it for now
+            if (!context.getFailureDescription().isDefined() || context.getFailureDescription().getType() == ModelType.OBJECT) {
+                context.getFailureDescription().get(HOST_FAILURE_DESCRIPTIONS).set(hostFailureResults);
+            } else {
+                DomainControllerLogger.CONTROLLER_LOGGER.debugf("Failure description is not of type OBJECT '%s'", context.getFailureDescription());
+            }
             return false;
         }
         return true;
@@ -203,7 +213,7 @@ public class DomainFinalResultHandler implements OperationStepHandler {
         return result;
     }
 
-    private void populateServerGroupResults(final OperationContext context, final ModelNode result) {
+    private void populateServerGroupResults(final OperationContext context) {
         final Set<String> groupNames = new TreeSet<String>();
         final Map<String, Set<HostServer>> groupToServerMap = new HashMap<String, Set<HostServer>>();
         for (Map.Entry<ServerIdentity, ModelNode> entry : domainOperationContext.getServerResults().entrySet()) {
@@ -227,10 +237,7 @@ public class DomainFinalResultHandler implements OperationStepHandler {
                 serverGroupSuccess = true;
             }
             for (HostServer hostServer : groupToServerMap.get(groupName)) {
-                final ModelNode serverNode = new ModelNode();
-                serverNode.get(HOST).set(hostServer.hostName);
-                serverNode.get(RESPONSE).set(hostServer.result);
-                groupNode.get(hostServer.serverName).set(serverNode);
+                groupNode.get(HOST, hostServer.hostName, hostServer.serverName, RESPONSE).set(hostServer.result);
             }
             context.getServerResults().get(groupName).set(groupNode);
         }

@@ -45,7 +45,6 @@ import org.jboss.as.server.ServerEnvironment;
 import org.jboss.as.server.SystemExiter;
 import org.jboss.as.version.ProductConfig;
 import org.jboss.logmanager.handlers.ConsoleHandler;
-import org.jboss.logmanager.log4j.BridgeRepositorySelector;
 import org.jboss.modules.Module;
 import org.jboss.modules.ModuleIdentifier;
 import org.jboss.msc.service.ServiceActivator;
@@ -74,8 +73,6 @@ public final class Main {
      * @param args the command-line arguments
      */
     public static void main(String[] args) {
-        SecurityActions.setSystemProperty("log4j.defaultInitOverride", "true");
-        new BridgeRepositorySelector().start();
 
         // Make sure our original stdio is properly captured.
         try {
@@ -90,6 +87,10 @@ public final class Main {
             Module.registerURLStreamHandlerFactoryModule(Module.getBootModuleLoader().loadModule(ModuleIdentifier.create("org.jboss.vfs")));
 
             final ParsedOptions options = determineEnvironment(args, new Properties(SecurityActions.getSystemProperties()), SecurityActions.getSystemEnvironment(), ServerEnvironment.LaunchType.APPCLIENT);
+            if(options == null) {
+                //this happens if --version was specified
+                return;
+            }
             ServerEnvironment serverEnvironment = options.environment;
             final List<String> clientArgs = options.clientArguments;
 

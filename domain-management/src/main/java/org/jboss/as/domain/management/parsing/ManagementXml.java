@@ -58,9 +58,16 @@ import static org.jboss.as.controller.parsing.ParseUtils.requireSingleAttribute;
 import static org.jboss.as.controller.parsing.ParseUtils.unexpectedAttribute;
 import static org.jboss.as.controller.parsing.ParseUtils.unexpectedElement;
 import static org.jboss.as.domain.management.DomainManagementLogger.ROOT_LOGGER;
+import static org.jboss.as.domain.management.ModelDescriptionConstants.DEFAULT_DEFAULT_USER;
+import static org.jboss.as.domain.management.ModelDescriptionConstants.DEFAULT_USER;
+import static org.jboss.as.domain.management.ModelDescriptionConstants.LOCAL;
+import static org.jboss.as.domain.management.ModelDescriptionConstants.NAME;
+import static org.jboss.as.domain.management.ModelDescriptionConstants.PLUG_IN;
+import static org.jboss.as.domain.management.ModelDescriptionConstants.PROPERTY;
 
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -73,11 +80,15 @@ import org.jboss.as.controller.parsing.Element;
 import org.jboss.as.controller.parsing.Namespace;
 import org.jboss.as.controller.parsing.ParseUtils;
 import org.jboss.as.domain.management.connections.ldap.LdapConnectionResourceDefinition;
+import org.jboss.as.domain.management.security.AbstractPlugInAuthResourceDefinition;
 import org.jboss.as.domain.management.security.JaasAuthenticationResourceDefinition;
 import org.jboss.as.domain.management.security.KeystoreAttributes;
 import org.jboss.as.domain.management.security.LdapAuthenticationResourceDefinition;
+import org.jboss.as.domain.management.security.LocalAuthenticationResourceDefinition;
+import org.jboss.as.domain.management.security.PlugInAuthenticationResourceDefinition;
 import org.jboss.as.domain.management.security.PropertiesAuthenticationResourceDefinition;
 import org.jboss.as.domain.management.security.PropertiesAuthorizationResourceDefinition;
+import org.jboss.as.domain.management.security.PropertyResourceDefinition;
 import org.jboss.as.domain.management.security.SSLServerIdentityResourceDefinition;
 import org.jboss.as.domain.management.security.SecretServerIdentityResourceDefinition;
 import org.jboss.as.domain.management.security.UserResourceDefinition;
@@ -243,8 +254,13 @@ public class ManagementXml {
                         case DOMAIN_1_0:
                             parseSecurityRealm_1_0(reader, address, expectedNs, list);
                             break;
-                        default:
+                        case DOMAIN_1_1:
+                        case DOMAIN_1_2:
                             parseSecurityRealm_1_1(reader, address, expectedNs, list);
+                            break;
+                        default:
+                            parseSecurityRealm_1_3(reader, address, expectedNs, list);
+                            break;
                     }
                     break;
                 }
@@ -313,8 +329,71 @@ public class ManagementXml {
                     break;
                 }
                 case AUTHORIZATION:
-                    parseAuthorization(reader, expectedNs, realmAddress, list);
+                    parseAuthorization_1_1(reader, expectedNs, realmAddress, list);
                     break;
+                default: {
+                    throw unexpectedElement(reader);
+                }
+            }
+        }
+    }
+
+    private void parseSecurityRealm_1_3(final XMLExtendedStreamReader reader, final ModelNode address, final Namespace expectedNs, final List<ModelNode> list)
+            throws XMLStreamException {
+        requireSingleAttribute(reader, Attribute.NAME.getLocalName());
+        // After double checking the name of the only attribute we can retrieve it.
+        final String realmName = reader.getAttributeValue(0);
+
+        final ModelNode realmAddress = address.clone();
+        realmAddress.add(SECURITY_REALM, realmName);
+        final ModelNode add = new ModelNode();
+        add.get(OP_ADDR).set(realmAddress);
+        add.get(OP).set(ADD);
+        list.add(add);
+
+        while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
+            requireNamespace(reader, expectedNs);
+
+            final Element element = Element.forName(reader.getLocalName());
+            switch (element) {
+                case PLUG_INS:
+                    parsePlugIns(reader, expectedNs, realmAddress, list);
+                    break;
+                case SERVER_IDENTITIES:
+                    parseServerIdentities(reader, expectedNs, realmAddress, list);
+                    break;
+                case AUTHENTICATION: {
+                    parseAuthentication_1_3(reader, expectedNs, realmAddress, list);
+                    break;
+                }
+                case AUTHORIZATION:
+                    parseAuthorization_1_3(reader, expectedNs, realmAddress, list);
+                    break;
+                default: {
+                    throw unexpectedElement(reader);
+                }
+            }
+        }
+    }
+
+    private void parsePlugIns(final XMLExtendedStreamReader reader, final Namespace expectedNs, final ModelNode realmAddress, final List<ModelNode> list)
+            throws XMLStreamException {
+        while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
+            requireNamespace(reader, expectedNs);
+
+            final Element element = Element.forName(reader.getLocalName());
+            switch (element) {
+                case PLUG_IN: {
+                    ModelNode plugIn = new ModelNode();
+                    plugIn.get(OP).set(ADD);
+                    String moduleValue = readStringAttributeElement(reader, Attribute.MODULE.getLocalName());
+                    final ModelNode newAddress = realmAddress.clone();
+                    newAddress.add(PLUG_IN, moduleValue);
+                    plugIn.get(OP_ADDR).set(newAddress);
+
+                    list.add(plugIn);
+                    break;
+                }
                 default: {
                     throw unexpectedElement(reader);
                 }
@@ -538,8 +617,8 @@ public class ManagementXml {
                     throw unexpectedElement(reader);
                 }
             }
-
         }
+        addLegacyLocalAuthentication(realmAddress, list);
     }
 
     private void parseAuthentication_1_1(final XMLExtendedStreamReader reader, final Namespace expectedNs,
@@ -599,8 +678,122 @@ public class ManagementXml {
                     throw unexpectedElement(reader);
                 }
             }
-
         }
+        addLegacyLocalAuthentication(realmAddress, list);
+    }
+
+    private void parseAuthentication_1_3(final XMLExtendedStreamReader reader, final Namespace expectedNs,
+            final ModelNode realmAddress, final List<ModelNode> list) throws XMLStreamException {
+
+        // Only one truststore can be defined.
+        boolean trustStoreFound = false;
+        // Only one local can be defined.
+        boolean localFound = false;
+        // Only one of ldap, properties or users can be defined.
+        boolean usernamePasswordFound = false;
+
+        while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
+            requireNamespace(reader, expectedNs);
+            final Element element = Element.forName(reader.getLocalName());
+
+            switch (element) {
+                case JAAS: {
+                    if (usernamePasswordFound) {
+                        throw unexpectedElement(reader);
+                    }
+                    parseJaasAuthentication(reader, expectedNs, realmAddress, list);
+                    usernamePasswordFound = true;
+                    break;
+                }
+                case LDAP: {
+                    if (usernamePasswordFound) {
+                        throw unexpectedElement(reader);
+                    }
+                    parseLdapAuthentication_1_1(reader, expectedNs, realmAddress, list);
+                    usernamePasswordFound = true;
+                    break;
+                }
+                case PROPERTIES: {
+                    if (usernamePasswordFound) {
+                        throw unexpectedElement(reader);
+                    }
+                    parsePropertiesAuthentication_1_1(reader, realmAddress, list);
+                    usernamePasswordFound = true;
+                    break;
+                }
+                case TRUSTSTORE: {
+                    if (trustStoreFound) {
+                        throw unexpectedElement(reader);
+                    }
+                    parseTruststore(reader, expectedNs, realmAddress, list);
+                    trustStoreFound = true;
+                    break;
+                }
+                case USERS: {
+                    if (usernamePasswordFound) {
+                        throw unexpectedElement(reader);
+                    }
+                    parseUsersAuthentication(reader, expectedNs, realmAddress, list);
+                    usernamePasswordFound = true;
+                    break;
+                }
+                case PLUG_IN: {
+                    if (usernamePasswordFound) {
+                        throw unexpectedElement(reader);
+                    }
+                    ModelNode parentAddress = realmAddress.clone().add(AUTHENTICATION);
+                    parsePlugIn_Authentication(reader, expectedNs, parentAddress, list);
+                    usernamePasswordFound = true;
+                    break;
+                }
+                case LOCAL: {
+                    if (localFound) {
+                        throw unexpectedElement(reader);
+                    }
+                    parseLocalAuthentication(reader, expectedNs, realmAddress, list);
+                    localFound = true;
+                    break;
+                }
+                default: {
+                    throw unexpectedElement(reader);
+                }
+            }
+        }
+    }
+
+    private void parseJaasAuthentication(final XMLExtendedStreamReader reader, final Namespace expectedNs,
+            final ModelNode realmAddress, final List<ModelNode> list) throws XMLStreamException {
+        ModelNode addr = realmAddress.clone().add(AUTHENTICATION, JAAS);
+        ModelNode jaas = Util.getEmptyOperation(ADD, addr);
+        list.add(jaas);
+
+        boolean nameFound = false;
+        final int count = reader.getAttributeCount();
+        for (int i = 0; i < count; i++) {
+            final String value = reader.getAttributeValue(i);
+            if (!isNoNamespaceAttribute(reader, i)) {
+                throw unexpectedAttribute(reader, i);
+            } else {
+                final Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
+                switch (attribute) {
+                    case NAME:
+                        if (nameFound) {
+                            throw unexpectedAttribute(reader, i);
+                        }
+                        nameFound = true;
+                        JaasAuthenticationResourceDefinition.NAME.parseAndSetParameter(value, jaas, reader);
+                        break;
+                    default: {
+                        throw unexpectedAttribute(reader, i);
+                    }
+                }
+            }
+        }
+        if (nameFound == false) {
+            throw missingRequired(reader, Collections.singleton(Attribute.NAME));
+        }
+
+        requireNoContent(reader);
     }
 
     private void parseLdapAuthentication_1_0(final XMLExtendedStreamReader reader, final ModelNode realmAddress, final List<ModelNode> list)
@@ -650,41 +843,6 @@ public class ManagementXml {
 
         if (required.size() > 0)
             throw missingRequired(reader, required);
-
-        requireNoContent(reader);
-    }
-
-    private void parseJaasAuthentication(final XMLExtendedStreamReader reader, final Namespace expectedNs,
-            final ModelNode realmAddress, final List<ModelNode> list) throws XMLStreamException {
-        ModelNode addr = realmAddress.clone().add(AUTHENTICATION, JAAS);
-        ModelNode jaas = Util.getEmptyOperation(ADD, addr);
-        list.add(jaas);
-
-        boolean nameFound = false;
-        final int count = reader.getAttributeCount();
-        for (int i = 0; i < count; i++) {
-            final String value = reader.getAttributeValue(i);
-            if (!isNoNamespaceAttribute(reader, i)) {
-                throw unexpectedAttribute(reader, i);
-            } else {
-                final Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
-                switch (attribute) {
-                    case NAME:
-                        if (nameFound) {
-                            throw unexpectedAttribute(reader, i);
-                        }
-                        nameFound = true;
-                        JaasAuthenticationResourceDefinition.NAME.parseAndSetParameter(value, jaas, reader);
-                        break;
-                    default: {
-                        throw unexpectedAttribute(reader, i);
-                    }
-                }
-            }
-        }
-        if (nameFound == false) {
-            throw missingRequired(reader, Collections.singleton(Attribute.NAME));
-        }
 
         requireNoContent(reader);
     }
@@ -761,6 +919,55 @@ public class ManagementXml {
         if (!choiceFound) {
             throw missingOneOf(reader, EnumSet.of(Element.ADVANCED_FILTER, Element.USERNAME_FILTER));
         }
+    }
+
+    private void addLegacyLocalAuthentication(final ModelNode realmAddress, final List<ModelNode> list) {
+        /*
+         * Before version 1.3 of the domain schema there was no configuration for the local mechanism, however it was always
+         * enabled - this adds an arbitrary add local op to recreate this behaviour in the older schema versions.
+         */
+        ModelNode addr = realmAddress.clone().add(AUTHENTICATION, LOCAL);
+        ModelNode local = Util.getEmptyOperation(ADD, addr);
+        local.get(DEFAULT_USER).set(DEFAULT_DEFAULT_USER);
+        list.add(local);
+    }
+
+    private void parseLocalAuthentication(final XMLExtendedStreamReader reader, final Namespace expectedNs,
+            final ModelNode realmAddress, final List<ModelNode> list) throws XMLStreamException {
+        ModelNode addr = realmAddress.clone().add(AUTHENTICATION, LOCAL);
+        ModelNode local = Util.getEmptyOperation(ADD, addr);
+        list.add(local);
+
+        final int count = reader.getAttributeCount();
+        Set<Attribute> attributesFound = new HashSet<Attribute>(count);
+
+        for (int i = 0; i < count; i++) {
+            final String value = reader.getAttributeValue(i);
+            if (!isNoNamespaceAttribute(reader, i)) {
+                throw unexpectedAttribute(reader, i);
+            } else {
+                final Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
+                if (attributesFound.contains(attribute)) {
+                    throw unexpectedAttribute(reader, i);
+                }
+                attributesFound.add(attribute);
+
+                switch (attribute) {
+                    case DEFAULT_USER:
+                        LocalAuthenticationResourceDefinition.DEFAULT_USER.parseAndSetParameter(value, local, reader);
+                        break;
+                    case ALLOWED_USERS:
+                        LocalAuthenticationResourceDefinition.ALLOWED_USERS.parseAndSetParameter(value, local, reader);
+                        break;
+                    default: {
+                        throw unexpectedAttribute(reader, i);
+                    }
+                }
+            }
+        }
+        // All attributes are optional.
+
+        requireNoContent(reader);
     }
 
     private void parsePropertiesAuthentication_1_0(final XMLExtendedStreamReader reader,
@@ -871,8 +1078,6 @@ public class ManagementXml {
 
     private void parseUser(final XMLExtendedStreamReader reader, final Namespace expectedNs,
                            final ModelNode usersAddress, final List<ModelNode> list) throws XMLStreamException {
-
-
         requireSingleAttribute(reader, Attribute.USERNAME.getLocalName());
         // After double checking the name of the only attribute we can retrieve it.
         final String userName = reader.getAttributeValue(0);
@@ -921,7 +1126,7 @@ public class ManagementXml {
         list.add(op);
     }
 
-    private void parseAuthorization(final XMLExtendedStreamReader reader, final Namespace expectedNs,
+    private void parseAuthorization_1_1(final XMLExtendedStreamReader reader, final Namespace expectedNs,
             final ModelNode realmAddress, final List<ModelNode> list) throws XMLStreamException {
         boolean authzFound = false;
         while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
@@ -934,6 +1139,36 @@ public class ManagementXml {
             switch (element) {
                 case PROPERTIES: {
                     parsePropertiesAuthorization(reader, realmAddress, list);
+                    authzFound = true;
+                    break;
+                }
+                default: {
+                    throw unexpectedElement(reader);
+                }
+            }
+
+        }
+    }
+
+    private void parseAuthorization_1_3(final XMLExtendedStreamReader reader, final Namespace expectedNs,
+            final ModelNode realmAddress, final List<ModelNode> list) throws XMLStreamException {
+        boolean authzFound = false;
+        while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
+            requireNamespace(reader, expectedNs);
+            final Element element = Element.forName(reader.getLocalName());
+            // Only a single element within the authorization element is currently supported.
+            if (authzFound) {
+                throw unexpectedElement(reader);
+            }
+            switch (element) {
+                case PROPERTIES: {
+                    parsePropertiesAuthorization(reader, realmAddress, list);
+                    authzFound = true;
+                    break;
+                }
+                case PLUG_IN: {
+                    ModelNode parentAddress = realmAddress.clone().add(AUTHORIZATION);
+                    parsePlugIn_Authorization(reader, expectedNs, parentAddress, list);
                     authzFound = true;
                     break;
                 }
@@ -982,6 +1217,138 @@ public class ManagementXml {
         requireNoContent(reader);
     }
 
+    private void parsePlugIn_Authentication(final XMLExtendedStreamReader reader, final Namespace expectedNs,
+            final ModelNode parentAddress, final List<ModelNode> list) throws XMLStreamException {
+        ModelNode addr = parentAddress.clone().add(PLUG_IN);
+        ModelNode plugIn = Util.getEmptyOperation(ADD, addr);
+        list.add(plugIn);
+
+        boolean nameFound = false;
+        final int count = reader.getAttributeCount();
+        for (int i = 0; i < count; i++) {
+            final String value = reader.getAttributeValue(i);
+            if (!isNoNamespaceAttribute(reader, i)) {
+                throw unexpectedAttribute(reader, i);
+            } else {
+                final Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
+                switch (attribute) {
+                    case NAME:
+                        PlugInAuthenticationResourceDefinition.NAME.parseAndSetParameter(value, plugIn, reader);
+                        nameFound = true;
+                        break;
+                    case MECHANISM: {
+                        PlugInAuthenticationResourceDefinition.MECHANISM.parseAndSetParameter(value, plugIn, reader);
+                        break;
+                    }
+                    default: {
+                        throw unexpectedAttribute(reader, i);
+                    }
+                }
+            }
+        }
+
+        if (nameFound == false) {
+            throw missingRequired(reader, Collections.singleton(Attribute.NAME));
+        }
+
+        while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
+            requireNamespace(reader, expectedNs);
+            final Element element = Element.forName(reader.getLocalName());
+            switch (element) {
+                case PROPERTIES: {
+                    while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
+                        requireNamespace(reader, expectedNs);
+                        final Element propertyElement = Element.forName(reader.getLocalName());
+                        switch (propertyElement) {
+                            case PROPERTY:
+                                parseProperty(reader, addr, list);
+                                break;
+                            default:
+                                throw unexpectedElement(reader);
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    throw unexpectedElement(reader);
+                }
+            }
+        }
+    }
+
+    private void parsePlugIn_Authorization(final XMLExtendedStreamReader reader, final Namespace expectedNs,
+            final ModelNode parentAddress, final List<ModelNode> list) throws XMLStreamException {
+        ModelNode addr = parentAddress.clone().add(PLUG_IN);
+        ModelNode plugIn = Util.getEmptyOperation(ADD, addr);
+        list.add(plugIn);
+
+        requireSingleAttribute(reader, Attribute.NAME.getLocalName());
+        // After double checking the name of the only attribute we can retrieve it.
+        final String plugInName = reader.getAttributeValue(0);
+        plugIn.get(NAME).set(plugInName);
+
+        while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
+            requireNamespace(reader, expectedNs);
+            final Element element = Element.forName(reader.getLocalName());
+            switch (element) {
+                case PROPERTIES: {
+                    while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
+                        requireNamespace(reader, expectedNs);
+                        final Element propertyElement = Element.forName(reader.getLocalName());
+                        switch (propertyElement) {
+                            case PROPERTY:
+                                parseProperty(reader, addr, list);
+                                break;
+                            default:
+                                throw unexpectedElement(reader);
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    throw unexpectedElement(reader);
+                }
+            }
+        }
+    }
+
+    private void parseProperty(final XMLExtendedStreamReader reader, final ModelNode parentAddress, final List<ModelNode> list)
+            throws XMLStreamException {
+
+        final ModelNode add = new ModelNode();
+        add.get(OP).set(ADD);
+        list.add(add);
+
+        boolean addressFound = false;
+        final int count = reader.getAttributeCount();
+        for (int i = 0; i < count; i++) {
+            final String value = reader.getAttributeValue(i);
+            if (!isNoNamespaceAttribute(reader, i)) {
+                throw unexpectedAttribute(reader, i);
+            } else {
+                final Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
+                switch (attribute) {
+                    case NAME:
+                        add.get(OP_ADDR).set(parentAddress).add(PROPERTY, value);
+                        addressFound = true;
+                        break;
+                    case VALUE: {
+                        PropertyResourceDefinition.VALUE.parseAndSetParameter(value, add, reader);
+                        break;
+                    }
+                    default: {
+                        throw unexpectedAttribute(reader, i);
+                    }
+                }
+            }
+        }
+
+        if (addressFound == false)
+            throw missingRequired(reader, Collections.singleton(Attribute.NAME));
+
+        requireNoContent(reader);
+    }
+
     public void writeManagement(final XMLExtendedStreamWriter writer, final ModelNode management, boolean allowInterfaces)
             throws XMLStreamException {
         boolean hasSecurityRealm = management.hasDefined(SECURITY_REALM);
@@ -1017,6 +1384,10 @@ public class ManagementXml {
             writeAttribute(writer, Attribute.NAME, variable.getName());
 
             ModelNode realm = variable.getValue();
+            if (realm.hasDefined(PLUG_IN)) {
+                writePlugIns(writer, realm.get(PLUG_IN));
+            }
+
             if (realm.hasDefined(SERVER_IDENTITY)) {
                 writeServerIdentities(writer, realm);
             }
@@ -1029,6 +1400,15 @@ public class ManagementXml {
                 writeAuthorization(writer, realm);
             }
             writer.writeEndElement();
+        }
+        writer.writeEndElement();
+    }
+
+    private void writePlugIns(XMLExtendedStreamWriter writer, ModelNode plugIns) throws XMLStreamException {
+        writer.writeStartElement(Element.PLUG_INS.getLocalName());
+        for (Property variable : plugIns.asPropertyList()) {
+            writer.writeEmptyElement(Element.PLUG_IN.getLocalName());
+            writer.writeAttribute(Attribute.MODULE.getLocalName(), variable.getName());
         }
         writer.writeEndElement();
     }
@@ -1071,6 +1451,14 @@ public class ManagementXml {
             KeystoreAttributes.KEYSTORE_PASSWORD.marshallAsAttribute(truststore, writer);
         }
 
+        if (authentication.hasDefined(LOCAL)) {
+            ModelNode local = authentication.require(LOCAL);
+            writer.writeStartElement(Element.LOCAL.getLocalName());
+            LocalAuthenticationResourceDefinition.DEFAULT_USER.marshallAsAttribute(local, writer);
+            LocalAuthenticationResourceDefinition.ALLOWED_USERS.marshallAsAttribute(local, writer);
+            writer.writeEndElement();
+        }
+
         if (authentication.hasDefined(JAAS)) {
             ModelNode jaas = authentication.get(JAAS);
             writer.writeStartElement(Element.JAAS.getLocalName());
@@ -1110,10 +1498,27 @@ public class ManagementXml {
                 UserResourceDefinition.PASSWORD.marshallAsElement(currentUser, writer);
                 writer.writeEndElement();
             }
-
             writer.writeEndElement();
+        } else if (authentication.hasDefined(PLUG_IN)) {
+            writePlugIn_Authentication(writer, authentication.get(PLUG_IN));
         }
 
+        writer.writeEndElement();
+    }
+
+    private void writePlugIn_Authentication(XMLExtendedStreamWriter writer, ModelNode plugIn) throws XMLStreamException {
+        writer.writeStartElement(Element.PLUG_IN.getLocalName());
+        AbstractPlugInAuthResourceDefinition.NAME.marshallAsAttribute(plugIn, writer);
+        PlugInAuthenticationResourceDefinition.MECHANISM.marshallAsAttribute(plugIn, writer);
+        if (plugIn.hasDefined(PROPERTY)) {
+            writer.writeStartElement(PROPERTIES);
+            for (Property current : plugIn.get(PROPERTY).asPropertyList()) {
+                writer.writeEmptyElement(PROPERTY);
+                writer.writeAttribute(Attribute.NAME.getLocalName(), current.getName());
+                PropertyResourceDefinition.VALUE.marshallAsAttribute(current.getValue(), writer);
+            }
+            writer.writeEndElement();
+        }
         writer.writeEndElement();
     }
 
@@ -1125,8 +1530,25 @@ public class ManagementXml {
             writer.writeEmptyElement(Element.PROPERTIES.getLocalName());
             PropertiesAuthorizationResourceDefinition.PATH.marshallAsAttribute(properties, writer);
             PropertiesAuthorizationResourceDefinition.RELATIVE_TO.marshallAsAttribute(properties, writer);
+        } else if (authorization.hasDefined(PLUG_IN)) {
+            writePlugIn_Authorization(writer, authorization.get(PLUG_IN));
         }
 
+        writer.writeEndElement();
+    }
+
+    private void writePlugIn_Authorization(XMLExtendedStreamWriter writer, ModelNode plugIn) throws XMLStreamException {
+        writer.writeStartElement(Element.PLUG_IN.getLocalName());
+        AbstractPlugInAuthResourceDefinition.NAME.marshallAsAttribute(plugIn, writer);
+        if (plugIn.hasDefined(PROPERTY)) {
+            writer.writeStartElement(PROPERTIES);
+            for (Property current : plugIn.get(PROPERTY).asPropertyList()) {
+                writer.writeEmptyElement(PROPERTY);
+                writer.writeAttribute(Attribute.NAME.getLocalName(), current.getName());
+                PropertyResourceDefinition.VALUE.marshallAsAttribute(current.getValue(), writer);
+            }
+            writer.writeEndElement();
+        }
         writer.writeEndElement();
     }
 

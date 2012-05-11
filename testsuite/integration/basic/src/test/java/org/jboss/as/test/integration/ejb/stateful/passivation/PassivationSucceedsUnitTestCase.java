@@ -28,9 +28,6 @@ import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.junit.Arquillian;
 import org.jboss.arquillian.test.api.ArquillianResource;
 import org.jboss.as.arquillian.api.ServerSetup;
-import org.jboss.as.arquillian.api.ServerSetupTask;
-import org.jboss.as.arquillian.container.ManagementClient;
-import org.jboss.dmr.ModelNode;
 import org.jboss.logging.Logger;
 import org.jboss.shrinkwrap.api.Archive;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
@@ -40,65 +37,18 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OUTCOME;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUCCESS;
-
 /**
  * Tests that passivation succeeds, and invocation is possible upon reactivation
  *
  * @author ALR, Stuart Douglas, Ondrej Chaloupka
  */
 @RunWith(Arquillian.class)
-@ServerSetup(PassivationSucceedsUnitTestCase.PassivationSucceedsUnitTestCaseSetup.class)
+@ServerSetup(PassivationSucceedsUnitTestCaseSetup.class)
 public class PassivationSucceedsUnitTestCase {
     private static final Logger log = Logger.getLogger(PassivationSucceedsUnitTestCase.class);
 
     @ArquillianResource
     private InitialContext ctx;
-
-    static class PassivationSucceedsUnitTestCaseSetup implements ServerSetupTask {
-
-        @Override
-        public void setup(final ManagementClient managementClient, final String containerId) throws Exception {
-            ModelNode address = getAddress();
-            ModelNode operation = new ModelNode();
-            operation.get(OP).set("write-attribute");
-            operation.get(OP_ADDR).set(address);
-            operation.get("name").set("max-size");
-            operation.get("value").set(1);
-            ModelNode result = managementClient.getControllerClient().execute(operation);
-            log.info("modelnode operation write attribute max-size=1: " + result);
-            Assert.assertEquals(SUCCESS, result.get(OUTCOME).asString());
-            operation = new ModelNode();
-            operation.get(OP).set("write-attribute");
-            operation.get(OP_ADDR).set(address);
-            operation.get("name").set("idle-timeout");
-            operation.get("value").set(1);
-            result = managementClient.getControllerClient().execute(operation);
-            log.info("modelnode operation write-attribute idle-timeout=1: " + result);
-            Assert.assertEquals(SUCCESS, result.get(OUTCOME).asString());
-
-        }
-
-        @Override
-        public void tearDown(final ManagementClient managementClient, final String containerId) throws Exception {
-            ModelNode address = getAddress();
-            ModelNode operation = new ModelNode();
-            operation.get(OP).set("undefine-attribute");
-            operation.get(OP_ADDR).set(address);
-            operation.get("name").set("max-size");
-            managementClient.getControllerClient().execute(operation);
-            operation = new ModelNode();
-            operation.get(OP).set("undefine-attribute");
-            operation.get(OP_ADDR).set(address);
-            operation.get("name").set("idle-timeout");
-            ModelNode result = managementClient.getControllerClient().execute(operation);
-            Assert.assertEquals(SUCCESS, result.get(OUTCOME).asString());
-        }
-    }
-
 
     @Deployment
     public static Archive<?> deploy() throws Exception {
@@ -109,15 +59,6 @@ public class PassivationSucceedsUnitTestCase {
         jar.addAsManifestResource(PassivationSucceedsUnitTestCase.class.getPackage(), "persistence.xml", "persistence.xml");
         log.info(jar.toString(true));
         return jar;
-    }
-
-
-    private static ModelNode getAddress() {
-        ModelNode address = new ModelNode();
-        address.add("subsystem", "ejb3");
-        address.add("file-passivation-store", "file");
-        address.protect();
-        return address;
     }
 
     @Test
@@ -150,8 +91,8 @@ public class PassivationSucceedsUnitTestCase {
 
         remote1.remove();
         remote2.remove();
-        Assert.assertTrue(PassivationInterceptor.getPostActivateTarget() instanceof TestPassivationBean);
-        Assert.assertTrue(PassivationInterceptor.getPrePassivateTarget() instanceof TestPassivationBean);
+        Assert.assertTrue("invalid: " + PassivationInterceptor.getPrePassivateTarget(), PassivationInterceptor.getPrePassivateTarget() instanceof TestPassivationBean);
+        Assert.assertTrue("invalid: " + PassivationInterceptor.getPostActivateTarget(), PassivationInterceptor.getPostActivateTarget() instanceof TestPassivationBean);
     }
 
     @Test

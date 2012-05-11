@@ -22,16 +22,16 @@
 
 package org.jboss.as.connector.subsystems.resourceadapters;
 
-import static org.jboss.as.connector.pool.Constants.BACKGROUNDVALIDATION;
-import static org.jboss.as.connector.pool.Constants.BACKGROUNDVALIDATIONMILLIS;
-import static org.jboss.as.connector.pool.Constants.BLOCKING_TIMEOUT_WAIT_MILLIS;
-import static org.jboss.as.connector.pool.Constants.IDLETIMEOUTMINUTES;
-import static org.jboss.as.connector.pool.Constants.MAX_POOL_SIZE;
-import static org.jboss.as.connector.pool.Constants.MIN_POOL_SIZE;
-import static org.jboss.as.connector.pool.Constants.POOL_FLUSH_STRATEGY;
-import static org.jboss.as.connector.pool.Constants.POOL_PREFILL;
-import static org.jboss.as.connector.pool.Constants.POOL_USE_STRICT_MIN;
-import static org.jboss.as.connector.pool.Constants.USE_FAST_FAIL;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.BACKGROUNDVALIDATION;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.BACKGROUNDVALIDATIONMILLIS;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.BLOCKING_TIMEOUT_WAIT_MILLIS;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.IDLETIMEOUTMINUTES;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.MAX_POOL_SIZE;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.MIN_POOL_SIZE;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.POOL_FLUSH_STRATEGY;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.POOL_PREFILL;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.POOL_USE_STRICT_MIN;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.USE_FAST_FAIL;
 import static org.jboss.as.connector.subsystems.resourceadapters.Constants.ADMIN_OBJECTS_NAME;
 import static org.jboss.as.connector.subsystems.resourceadapters.Constants.ALLOCATION_RETRY;
 import static org.jboss.as.connector.subsystems.resourceadapters.Constants.ALLOCATION_RETRY_WAIT_MILLIS;
@@ -64,6 +64,7 @@ import static org.jboss.as.connector.subsystems.resourceadapters.Constants.USE_C
 import static org.jboss.as.connector.subsystems.resourceadapters.Constants.USE_JAVA_CONTEXT;
 import static org.jboss.as.connector.subsystems.resourceadapters.Constants.WRAP_XA_RESOURCE;
 import static org.jboss.as.connector.subsystems.resourceadapters.Constants.XA_RESOURCE_TIMEOUT;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ACCESS_TYPE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ADD;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ATTRIBUTES;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.CHILDREN;
@@ -71,6 +72,7 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.DES
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.HEAD_COMMENT_ALLOWED;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.NAMESPACE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OPERATION_NAME;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.READ_ONLY;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REMOVE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REPLY_PROPERTIES;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REQUEST_PROPERTIES;
@@ -139,8 +141,6 @@ public class ResourceAdaptersSubsystemProviders {
             // Should this be an attribute instead
 
             subsystem.get(CHILDREN, Constants.RESOURCEADAPTER_NAME, DESCRIPTION).set(bundle.getString(Constants.RESOURCEADAPTER_NAME));
-            //subsystem.get(CHILDREN, Constants.RESOURCEADAPTER_NAME, MODEL_DESCRIPTION);
-
             return subsystem;
 
         }
@@ -178,112 +178,188 @@ public class ResourceAdaptersSubsystemProviders {
 
     };
 
+    static final DescriptionProvider IRONJACAMAR_DESC = new DescriptionProvider() {
+
+        public ModelNode getModelDescription(final Locale locale) {
+            final ResourceBundle bundle = getResourceBundle(locale);
+
+            final ModelNode subsystem = new ModelNode();
+            subsystem.get(DESCRIPTION).set(bundle.getString("ironjacamar"));
+            subsystem.get(HEAD_COMMENT_ALLOWED).set(true);
+            subsystem.get(TAIL_COMMENT_ALLOWED).set(true);
+            subsystem.get(NAMESPACE).set(Namespace.RESOURCEADAPTERS_1_0.getUriString());
+
+            subsystem.get(CHILDREN, Constants.RESOURCEADAPTER_NAME, DESCRIPTION).set(bundle.getString(Constants.RESOURCEADAPTER_NAME));
+
+            return subsystem;
+
+        }
+    };
+
 
     static DescriptionProvider CONFIG_PROPERTIES_DESC = new DescriptionProvider() {
 
         @Override
         public ModelNode getModelDescription(final Locale locale) {
-            final ResourceBundle bundle = getResourceBundle(locale);
-
-            final ModelNode configPropertiesNode = new ModelNode();
-            configPropertiesNode.get(HEAD_COMMENT_ALLOWED).set(true);
-            configPropertiesNode.get(TAIL_COMMENT_ALLOWED).set(true);
-            configPropertiesNode.get(DESCRIPTION).set(CONFIG_PROPERTIES.getName());
-
-
-            CONFIG_PROPERTY_VALUE.addResourceAttributeDescription(bundle, "config-properties", configPropertiesNode);
-
-            return configPropertiesNode;
+            return getConfigPropertyDesc(locale, false);
         }
     };
+
+    static DescriptionProvider CONFIG_PROPERTIES_RO_DESC = new DescriptionProvider() {
+
+            @Override
+            public ModelNode getModelDescription(final Locale locale) {
+                return getConfigPropertyDesc(locale, true);
+            }
+    };
+
+    private static ModelNode getConfigPropertyDesc(Locale locale, boolean readOnly) {
+        final ResourceBundle bundle = getResourceBundle(locale);
+
+        final ModelNode configPropertiesNode = new ModelNode();
+        configPropertiesNode.get(HEAD_COMMENT_ALLOWED).set(true);
+        configPropertiesNode.get(TAIL_COMMENT_ALLOWED).set(true);
+        configPropertiesNode.get(DESCRIPTION).set(CONFIG_PROPERTIES.getName());
+
+
+        CONFIG_PROPERTY_VALUE.addResourceAttributeDescription(bundle, "config-properties", configPropertiesNode);
+        if (readOnly) {
+            configPropertiesNode.get(ATTRIBUTES, CONFIG_PROPERTY_VALUE.getName(), ACCESS_TYPE, READ_ONLY).set(true);
+        }
+
+        return configPropertiesNode;
+    }
 
     static DescriptionProvider CONNECTION_DEFINITION_DESC = new DescriptionProvider() {
 
         @Override
         public ModelNode getModelDescription(final Locale locale) {
-            final ResourceBundle bundle = getResourceBundle(locale);
-
-            final ModelNode connectionDefinitionNode = new ModelNode();
-            connectionDefinitionNode.get(HEAD_COMMENT_ALLOWED).set(true);
-            connectionDefinitionNode.get(TAIL_COMMENT_ALLOWED).set(true);
-            connectionDefinitionNode.get(DESCRIPTION).set(CONNECTIONDEFINITIONS_NAME);
-
-
-            for (SimpleAttributeDefinition attribute : CONNECTIONDEFINITIONS_NODEATTRIBUTE) {
-                if (attribute == RECOVERLUGIN_PROPERTIES) {
-                    connectionDefinitionNode.get(ATTRIBUTES, RECOVERLUGIN_PROPERTIES.getName(), DESCRIPTION).set(bundle.getString(RECOVERLUGIN_PROPERTIES.getName()));
-                    connectionDefinitionNode.get(ATTRIBUTES, RECOVERLUGIN_PROPERTIES.getName(), TYPE).set(RECOVERLUGIN_PROPERTIES.getType());
-                    connectionDefinitionNode.get(ATTRIBUTES, RECOVERLUGIN_PROPERTIES.getName(), VALUE_TYPE).set(ModelType.STRING);
-                    connectionDefinitionNode.get(ATTRIBUTES, RECOVERLUGIN_PROPERTIES.getName(), REQUIRED).set(false);
-                } else {
-                    attribute.addResourceAttributeDescription(bundle, null, connectionDefinitionNode);
-                }
-            }
-
-            connectionDefinitionNode.get(CHILDREN, Constants.CONFIG_PROPERTIES.getName(), DESCRIPTION).set(bundle.getString(Constants.CONFIG_PROPERTIES.getName()));
-
-            return connectionDefinitionNode;
+            return getConnectionDefinitionDescription(locale, false);
         }
     };
+
+    static DescriptionProvider CONNECTION_DEFINITION_RO_DESC = new DescriptionProvider() {
+
+        @Override
+        public ModelNode getModelDescription(final Locale locale) {
+            return getConnectionDefinitionDescription(locale, true);
+        }
+    };
+
+    private static ModelNode getConnectionDefinitionDescription(Locale locale, boolean readOnly) {
+        final ResourceBundle bundle = getResourceBundle(locale);
+
+        final ModelNode connectionDefinitionNode = new ModelNode();
+        connectionDefinitionNode.get(HEAD_COMMENT_ALLOWED).set(true);
+        connectionDefinitionNode.get(TAIL_COMMENT_ALLOWED).set(true);
+        connectionDefinitionNode.get(DESCRIPTION).set(CONNECTIONDEFINITIONS_NAME);
+
+
+        for (SimpleAttributeDefinition attribute : CONNECTIONDEFINITIONS_NODEATTRIBUTE) {
+            if (attribute == RECOVERLUGIN_PROPERTIES) {
+                connectionDefinitionNode.get(ATTRIBUTES, RECOVERLUGIN_PROPERTIES.getName(), DESCRIPTION).set(bundle.getString(RECOVERLUGIN_PROPERTIES.getName()));
+                connectionDefinitionNode.get(ATTRIBUTES, RECOVERLUGIN_PROPERTIES.getName(), TYPE).set(RECOVERLUGIN_PROPERTIES.getType());
+                connectionDefinitionNode.get(ATTRIBUTES, RECOVERLUGIN_PROPERTIES.getName(), VALUE_TYPE).set(ModelType.STRING);
+                connectionDefinitionNode.get(ATTRIBUTES, RECOVERLUGIN_PROPERTIES.getName(), REQUIRED).set(false);
+            } else {
+                attribute.addResourceAttributeDescription(bundle, null, connectionDefinitionNode);
+            }
+            if (readOnly) {
+                connectionDefinitionNode.get(ATTRIBUTES, attribute.getName(), ACCESS_TYPE, READ_ONLY).set(true);
+            }
+        }
+
+        connectionDefinitionNode.get(CHILDREN, Constants.CONFIG_PROPERTIES.getName(), DESCRIPTION).set(bundle.getString(Constants.CONFIG_PROPERTIES.getName()));
+
+        return connectionDefinitionNode;
+    }
 
     static DescriptionProvider ADMIN_OBJECT_DESC = new DescriptionProvider() {
 
         @Override
         public ModelNode getModelDescription(final Locale locale) {
-            final ResourceBundle bundle = getResourceBundle(locale);
-
-            final ModelNode adminObjectNode = new ModelNode();
-            adminObjectNode.get(HEAD_COMMENT_ALLOWED).set(true);
-            adminObjectNode.get(TAIL_COMMENT_ALLOWED).set(true);
-            adminObjectNode.get(DESCRIPTION).set(ADMIN_OBJECTS_NAME);
-
-
-            for (SimpleAttributeDefinition attribute : ADMIN_OBJECTS_NODEATTRIBUTE) {
-                attribute.addResourceAttributeDescription(bundle, null, adminObjectNode);
-            }
-
-            adminObjectNode.get(CHILDREN, Constants.CONFIG_PROPERTIES.getName(), DESCRIPTION).set(bundle.getString(Constants.CONFIG_PROPERTIES.getName()));
-
-            return adminObjectNode;
+            return getAdminObjectDesc(locale, false);
         }
     };
 
-
-     static final DescriptionProvider RESOURCEADAPTER_DESC = new DescriptionProvider() {
+    static DescriptionProvider ADMIN_OBJECT_RO_DESC = new DescriptionProvider() {
 
         @Override
         public ModelNode getModelDescription(final Locale locale) {
-            final ResourceBundle bundle = getResourceBundle(locale);
-            final ModelNode raNode = new ModelNode();
-            raNode.get(HEAD_COMMENT_ALLOWED).set(true);
-            raNode.get(TAIL_COMMENT_ALLOWED).set(true);
-            raNode.get(DESCRIPTION).set(RESOURCEADAPTER_NAME);
+            return getAdminObjectDesc(locale, false);
+        }
+    };
 
 
+    private static ModelNode getAdminObjectDesc(Locale locale, boolean readOnly) {
+        final ResourceBundle bundle = getResourceBundle(locale);
 
-            raNode.get(ATTRIBUTES, ARCHIVE.getName(), DESCRIPTION).set(bundle.getString(ARCHIVE.getName()));
-            raNode.get(ATTRIBUTES, ARCHIVE.getName(), TYPE).set(ModelType.STRING);
-            raNode.get(ATTRIBUTES, ARCHIVE.getName(), REQUIRED).set(true);
-            raNode.get(ATTRIBUTES, TRANSACTIONSUPPORT.getName(), DESCRIPTION).set(bundle.getString(TRANSACTIONSUPPORT.getName()));
-            raNode.get(ATTRIBUTES, TRANSACTIONSUPPORT.getName(), TYPE).set(ModelType.STRING);
-            raNode.get(ATTRIBUTES, TRANSACTIONSUPPORT.getName(), REQUIRED).set(true);
-            raNode.get(ATTRIBUTES, BOOTSTRAPCONTEXT.getName(), DESCRIPTION).set(bundle.getString(BOOTSTRAPCONTEXT.getName()));
-            raNode.get(ATTRIBUTES, BOOTSTRAPCONTEXT.getName(), TYPE).set(ModelType.STRING);
-            raNode.get(ATTRIBUTES, BOOTSTRAPCONTEXT.getName(), REQUIRED).set(false);
-            raNode.get(ATTRIBUTES, BEANVALIDATIONGROUPS.getName(), DESCRIPTION).set(bundle.getString(BEANVALIDATIONGROUPS.getName()));
-            raNode.get(ATTRIBUTES, BEANVALIDATIONGROUPS.getName(), TYPE).set(ModelType.STRING);
-            raNode.get(ATTRIBUTES, BEANVALIDATIONGROUPS.getName(), REQUIRED).set(false);
+        final ModelNode adminObjectNode = new ModelNode();
+        adminObjectNode.get(HEAD_COMMENT_ALLOWED).set(true);
+        adminObjectNode.get(TAIL_COMMENT_ALLOWED).set(true);
+        adminObjectNode.get(DESCRIPTION).set(ADMIN_OBJECTS_NAME);
 
 
-            raNode.get(CHILDREN, Constants.CONNECTIONDEFINITIONS_NAME, DESCRIPTION).set(bundle.getString(Constants.CONNECTIONDEFINITIONS_NAME));
-            raNode.get(CHILDREN, Constants.ADMIN_OBJECTS_NAME, DESCRIPTION).set(bundle.getString(Constants.ADMIN_OBJECTS_NAME));
-            raNode.get(CHILDREN, Constants.CONFIG_PROPERTIES.getName(), DESCRIPTION).set(bundle.getString(Constants.CONFIG_PROPERTIES.getName()));
+        for (SimpleAttributeDefinition attribute : ADMIN_OBJECTS_NODEATTRIBUTE) {
+            attribute.addResourceAttributeDescription(bundle, null, adminObjectNode);
+            if (readOnly) {
+                adminObjectNode.get(ATTRIBUTES, attribute.getName(), ACCESS_TYPE, READ_ONLY).set(true);
+            }
+        }
+
+        adminObjectNode.get(CHILDREN, Constants.CONFIG_PROPERTIES.getName(), DESCRIPTION).set(bundle.getString(Constants.CONFIG_PROPERTIES.getName()));
+
+        return adminObjectNode;
+    }
 
 
-            return raNode;
+    static final DescriptionProvider RESOURCEADAPTER_DESC = new DescriptionProvider() {
+
+        @Override
+        public ModelNode getModelDescription(final Locale locale) {
+
+            return getRaNodeDesc(locale, false);
+
         }
 
     };
+
+    static final DescriptionProvider RESOURCEADAPTER_RO_DESC = new DescriptionProvider() {
+
+        @Override
+        public ModelNode getModelDescription(final Locale locale) {
+
+            return getRaNodeDesc(locale, true);
+
+        }
+
+    };
+
+    private static ModelNode getRaNodeDesc(Locale locale, boolean readOnly) {
+        final ResourceBundle bundle = getResourceBundle(locale);
+        final ModelNode raNode = new ModelNode();
+        raNode.get(HEAD_COMMENT_ALLOWED).set(true);
+        raNode.get(TAIL_COMMENT_ALLOWED).set(true);
+        raNode.get(DESCRIPTION).set(RESOURCEADAPTER_NAME);
+
+        for (SimpleAttributeDefinition propertyType : RESOURCEADAPTER_ATTRIBUTE) {
+            if (propertyType.getType() == ModelType.LIST) {
+                raNode.get(ATTRIBUTES, propertyType.getName(), DESCRIPTION).set(bundle.getString(propertyType.getName()));
+                raNode.get(ATTRIBUTES, propertyType.getName(), TYPE).set(propertyType.getType());
+                raNode.get(ATTRIBUTES, propertyType.getName(), VALUE_TYPE).set(ModelType.STRING);
+                raNode.get(ATTRIBUTES, propertyType.getName(), REQUIRED).set(false);
+            } else {
+                propertyType.addResourceAttributeDescription(bundle, null, raNode);
+            }
+
+        }
+
+        raNode.get(CHILDREN, Constants.CONNECTIONDEFINITIONS_NAME, DESCRIPTION).set(bundle.getString(Constants.CONNECTIONDEFINITIONS_NAME));
+        raNode.get(CHILDREN, Constants.ADMIN_OBJECTS_NAME, DESCRIPTION).set(bundle.getString(Constants.ADMIN_OBJECTS_NAME));
+        raNode.get(CHILDREN, Constants.CONFIG_PROPERTIES.getName(), DESCRIPTION).set(bundle.getString(Constants.CONFIG_PROPERTIES.getName()));
+
+        return raNode;
+    }
 
     static final DescriptionProvider ADD_RESOURCEADAPTER_DESC = new DescriptionProvider() {
 
@@ -298,21 +374,18 @@ public class ResourceAdaptersSubsystemProviders {
             final ModelNode adminObjectNode = new ModelNode();
             adminObjectNode.get(DESCRIPTION).set(ADMIN_OBJECTS_NAME);
 
-
-            operation.get(REQUEST_PROPERTIES, ARCHIVE.getName(), DESCRIPTION).set(bundle.getString(ARCHIVE.getName()));
-            operation.get(REQUEST_PROPERTIES, ARCHIVE.getName(), TYPE).set(ModelType.STRING);
-            operation.get(REQUEST_PROPERTIES, ARCHIVE.getName(), REQUIRED).set(true);
-            operation.get(REQUEST_PROPERTIES, TRANSACTIONSUPPORT.getName(), DESCRIPTION).set(bundle.getString(TRANSACTIONSUPPORT.getName()));
-            operation.get(REQUEST_PROPERTIES, TRANSACTIONSUPPORT.getName(), TYPE).set(ModelType.STRING);
-            operation.get(REQUEST_PROPERTIES, TRANSACTIONSUPPORT.getName(), REQUIRED).set(true);
-            operation.get(REQUEST_PROPERTIES, BOOTSTRAPCONTEXT.getName(), DESCRIPTION).set(bundle.getString(BOOTSTRAPCONTEXT.getName()));
-            operation.get(REQUEST_PROPERTIES, BOOTSTRAPCONTEXT.getName(), TYPE).set(ModelType.STRING);
-            operation.get(REQUEST_PROPERTIES, BOOTSTRAPCONTEXT.getName(), REQUIRED).set(false);
-            operation.get(REQUEST_PROPERTIES, BEANVALIDATIONGROUPS.getName(), DESCRIPTION).set(bundle.getString(BEANVALIDATIONGROUPS.getName()));
-            operation.get(REQUEST_PROPERTIES, BEANVALIDATIONGROUPS.getName(), TYPE).set(ModelType.STRING);
-            operation.get(REQUEST_PROPERTIES, BEANVALIDATIONGROUPS.getName(), REQUIRED).set(false);
-
-
+            for (SimpleAttributeDefinition propertyType : RESOURCEADAPTER_ATTRIBUTE) {
+                if (propertyType.getType() == ModelType.LIST) {
+                    if (propertyType.getType() == ModelType.LIST) {
+                        operation.get(REQUEST_PROPERTIES, propertyType.getName(), DESCRIPTION).set(bundle.getString(propertyType.getName()));
+                        operation.get(REQUEST_PROPERTIES, propertyType.getName(), TYPE).set(propertyType.getType());
+                        operation.get(REQUEST_PROPERTIES, propertyType.getName(), VALUE_TYPE).set(ModelType.STRING);
+                        operation.get(REQUEST_PROPERTIES, propertyType.getName(), REQUIRED).set(false);
+                    }
+                } else {
+                    propertyType.addOperationParameterDescription(bundle, null, operation);
+                }
+            }
 
             return operation;
         }

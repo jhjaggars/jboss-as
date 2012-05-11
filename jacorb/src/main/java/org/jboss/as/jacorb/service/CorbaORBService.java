@@ -23,15 +23,19 @@
 package org.jboss.as.jacorb.service;
 
 import java.net.InetSocketAddress;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.Properties;
 
 import org.jboss.as.jacorb.JacORBLogger;
 import org.jboss.as.jacorb.JacORBSubsystemConstants;
 import org.jboss.as.jacorb.naming.jndi.CorbaUtils;
+import org.jboss.as.network.NetworkUtils;
 import org.jboss.as.network.SocketBinding;
 import org.jboss.as.server.CurrentServiceContainer;
 import org.jboss.msc.inject.Injector;
 import org.jboss.msc.service.Service;
+import org.jboss.msc.service.ServiceContainer;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.ServiceTarget;
 import org.jboss.msc.service.StartContext;
@@ -102,7 +106,7 @@ public class CorbaORBService implements Service<ORB> {
             String host = properties.getProperty(JacORBSubsystemConstants.ORB_ADDRESS);
             String port = properties.getProperty(JacORBSubsystemConstants.ORB_PORT);
             properties.setProperty(JacORBSubsystemConstants.JACORB_NAME_SERVICE_INIT_REF,
-                    "corbaloc::" + host + ":" + port + "/" + rootContext);
+                    "corbaloc::" + NetworkUtils.formatPossibleIpv6Address(host) + ":" + port + "/" + rootContext);
 
             // export the naming service corbaloc if necessary.
             String exportCorbalocProperty = properties.getProperty(JacORBSubsystemConstants.NAMING_EXPORT_CORBALOC, "on");
@@ -191,7 +195,7 @@ public class CorbaORBService implements Service<ORB> {
     }
 
     public static ORB getCurrent() {
-        return (ORB) CurrentServiceContainer.getServiceContainer().getRequiredService(SERVICE_NAME).getValue();
+        return (ORB) currentServiceContainer().getRequiredService(SERVICE_NAME).getValue();
     }
 
     /**
@@ -241,5 +245,15 @@ public class CorbaORBService implements Service<ORB> {
                 this.context.complete();
             }
         }
+    }
+
+
+    private static ServiceContainer currentServiceContainer() {
+        return AccessController.doPrivileged(new PrivilegedAction<ServiceContainer>() {
+            @Override
+            public ServiceContainer run() {
+                return CurrentServiceContainer.getServiceContainer();
+            }
+        });
     }
 }

@@ -21,8 +21,8 @@
  */
 package org.jboss.as.connector.subsystems.resourceadapters;
 
-import org.jboss.as.connector.ConnectorServices;
-import org.jboss.as.connector.metadata.deployment.InactiveResourceAdapterDeploymentService;
+import org.jboss.as.connector.util.ConnectorServices;
+import org.jboss.as.connector.services.resourceadapters.deployment.InactiveResourceAdapterDeploymentService;
 import org.jboss.as.connector.util.RaServicesFactory;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
@@ -30,7 +30,6 @@ import org.jboss.as.controller.SimpleAttributeDefinition;
 import org.jboss.dmr.ModelNode;
 import org.jboss.jca.common.api.metadata.Defaults;
 import org.jboss.jca.common.api.metadata.common.CommonAdminObject;
-import org.jboss.jca.common.api.metadata.common.CommonConnDef;
 import org.jboss.jca.common.api.metadata.common.CommonPool;
 import org.jboss.jca.common.api.metadata.common.CommonSecurity;
 import org.jboss.jca.common.api.metadata.common.CommonTimeOut;
@@ -40,7 +39,8 @@ import org.jboss.jca.common.api.metadata.common.Extension;
 import org.jboss.jca.common.api.metadata.common.FlushStrategy;
 import org.jboss.jca.common.api.metadata.common.Recovery;
 import org.jboss.jca.common.api.metadata.common.TransactionSupportEnum;
-import org.jboss.jca.common.api.metadata.resourceadapter.ResourceAdapter;
+import org.jboss.jca.common.api.metadata.common.v10.CommonConnDef;
+import org.jboss.jca.common.api.metadata.resourceadapter.v10.ResourceAdapter;
 import org.jboss.jca.common.api.validator.ValidateException;
 import org.jboss.jca.common.metadata.common.CommonPoolImpl;
 import org.jboss.jca.common.metadata.common.CommonSecurityImpl;
@@ -57,16 +57,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.jboss.as.connector.pool.Constants.BACKGROUNDVALIDATION;
-import static org.jboss.as.connector.pool.Constants.BACKGROUNDVALIDATIONMILLIS;
-import static org.jboss.as.connector.pool.Constants.BLOCKING_TIMEOUT_WAIT_MILLIS;
-import static org.jboss.as.connector.pool.Constants.IDLETIMEOUTMINUTES;
-import static org.jboss.as.connector.pool.Constants.MAX_POOL_SIZE;
-import static org.jboss.as.connector.pool.Constants.MIN_POOL_SIZE;
-import static org.jboss.as.connector.pool.Constants.POOL_FLUSH_STRATEGY;
-import static org.jboss.as.connector.pool.Constants.POOL_PREFILL;
-import static org.jboss.as.connector.pool.Constants.POOL_USE_STRICT_MIN;
-import static org.jboss.as.connector.pool.Constants.USE_FAST_FAIL;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.BACKGROUNDVALIDATION;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.BACKGROUNDVALIDATIONMILLIS;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.BLOCKING_TIMEOUT_WAIT_MILLIS;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.IDLETIMEOUTMINUTES;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.MAX_POOL_SIZE;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.MIN_POOL_SIZE;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.POOL_FLUSH_STRATEGY;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.POOL_PREFILL;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.POOL_USE_STRICT_MIN;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.USE_FAST_FAIL;
 import static org.jboss.as.connector.subsystems.resourceadapters.Constants.ALLOCATION_RETRY;
 import static org.jboss.as.connector.subsystems.resourceadapters.Constants.ALLOCATION_RETRY_WAIT_MILLIS;
 import static org.jboss.as.connector.subsystems.resourceadapters.Constants.APPLICATION;
@@ -181,7 +181,7 @@ public class RaOperationUtil {
         }
         Long backgroundValidationMillis = getLongIfSetOrGetDefault(context, operation, BACKGROUNDVALIDATIONMILLIS, null);
         boolean backgroundValidation = getBooleanIfSetOrGetDefault(context, operation, BACKGROUNDVALIDATION, Defaults.BACKGROUND_VALIDATION);
-        boolean useFastFail = getBooleanIfSetOrGetDefault(context, operation, USE_FAST_FAIL, Defaults.USE_FAST_FAIl);
+        boolean useFastFail = getBooleanIfSetOrGetDefault(context, operation, USE_FAST_FAIL, Defaults.USE_FAST_FAIL);
         CommonValidation validation = new CommonValidationImpl(backgroundValidation, backgroundValidationMillis,
                 useFastFail);
         final String recoveryUsername = getResolvedStringIfSetOrGetDefault(context, operation, RECOVERY_USERNAME.getName(), null);
@@ -319,6 +319,6 @@ public class RaOperationUtil {
         final ServiceController<?> RaxmlController = registry.getService(ServiceName.of(ConnectorServices.RA_SERVICE, raName));
         ResourceAdapter raxml = (ResourceAdapter) RaxmlController.getValue();
 
-        RaServicesFactory.createDeploymentService(inactive.getRegistration(), inactive.getConnectorXmlDescriptor(), inactive.getModule(), inactive.getServiceTarget(), inactive.getDeployment(), inactive.getDeployment(), raxml);
+        RaServicesFactory.createDeploymentService(inactive.getRegistration(), inactive.getConnectorXmlDescriptor(), inactive.getModule(), inactive.getServiceTarget(), inactive.getDeployment(), inactive.getDeployment(), raxml, inactive.getResource());
     }
 }

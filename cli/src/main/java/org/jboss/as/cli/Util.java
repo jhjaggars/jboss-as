@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 import org.jboss.as.cli.operation.OperationFormatException;
 import org.jboss.as.cli.operation.OperationRequestAddress;
@@ -42,6 +43,7 @@ public class Util {
     public static final String ACCESS_TYPE = "access-type";
     public static final String ADD = "add";
     public static final String ADDRESS = "address";
+    public static final String ALLOWED = "allowed";
     public static final String ALLOW_RESOURCE_SERVICE_RESTART = "allow-resource-service-restart";
     public static final String ARCHIVE = "archive";
     public static final String ATTRIBUTES = "attributes";
@@ -54,9 +56,11 @@ public class Util {
     public static final String DATASOURCES = "datasources";
     public static final String DEPLOY = "deploy";
     public static final String DEPLOYMENT = "deployment";
+    public static final String DEPLOYMENT_NAME = "deployment-name";
     public static final String DESCRIPTION = "description";
     public static final String DOMAIN_FAILURE_DESCRIPTION = "domain-failure-description";
     public static final String DOMAIN_RESULTS = "domain-results";
+    public static final String DRIVER_MODULE_NAME = "driver-module-name";
     public static final String DRIVER_NAME = "driver-name";
     public static final String ENABLED = "enabled";
     public static final String EXPRESSIONS_ALLOWED = "expressions-allowed";
@@ -64,6 +68,7 @@ public class Util {
     public static final String FULL_REPLACE_DEPLOYMENT = "full-replace-deployment";
     public static final String FALSE = "false";
     public static final String HEAD_COMMENT_ALLOWED = "head-comment-allowed";
+    public static final String HOST = "host";
     public static final String ID = "id";
     public static final String IN_SERIES = "in-series";
     public static final String INCLUDE_DEFAULTS = "include-defaults";
@@ -75,6 +80,7 @@ public class Util {
     public static final String MAX_FAILURE_PERCENTAGE = "max-failure-percentage";
     public static final String MAX_OCCURS = "max-occurs";
     public static final String MIN_OCCURS = "min-occurs";
+    public static final String MODULE_SLOT = "module-slot";
     public static final String NAME = "name";
     public static final String NILLABLE = "nillable";
     public static final String OPERATION = "operation";
@@ -87,6 +93,7 @@ public class Util {
     public static final String PROFILE = "profile";
     public static final String READ_ATTRIBUTE = "read-attribute";
     public static final String READ_CHILDREN_NAMES = "read-children-names";
+    public static final String READ_CHILDREN_RESOURCES = "read-children-resources";
     public static final String READ_CHILDREN_TYPES = "read-children-types";
     public static final String READ_ONLY = "read-only";
     public static final String READ_OPERATION_DESCRIPTION = "read-operation-description";
@@ -107,6 +114,7 @@ public class Util {
     public static final String ROLLOUT_PLAN = "rollout-plan";
     public static final String ROLLOUT_PLANS = "rollout-plans";
     public static final String RUNTIME_NAME = "runtime-name";
+    public static final String SERVER = "server";
     public static final String SERVER_GROUP = "server-group";
     public static final String STATUS = "status";
     public static final String STEP_1 = "step-1";
@@ -119,6 +127,7 @@ public class Util {
     public static final String TAIL_COMMENT_ALLOWED = "tail-comment-allowed";
     public static final String TRUE = "true";
     public static final String TYPE = "type";
+    public static final String UNDEFINE_ATTRIBUTE = "undefine-attribute";
     public static final String VALID = "valid";
     public static final String VALIDATE_ADDRESS = "validate-address";
     public static final String VALUE = "value";
@@ -126,7 +135,7 @@ public class Util {
     public static final String WRITE_ATTRIBUTE = "write-attribute";
 
     public static boolean isWindows() {
-        return SecurityActions.getSystemProperty("os.name").toLowerCase().indexOf("windows") >= 0;
+        return SecurityActions.getSystemProperty("os.name").toLowerCase(Locale.ENGLISH).indexOf("windows") >= 0;
     }
 
     public static boolean isSuccess(ModelNode operationResult) {
@@ -264,7 +273,7 @@ public class Util {
             try {
                 builder.setOperationName(Util.READ_CHILDREN_NAMES);
                 builder.addNode(Util.SERVER_GROUP, serverGroup);
-                builder.addProperty("child-type", Util.DEPLOYMENT);
+                builder.addProperty(Util.CHILD_TYPE, Util.DEPLOYMENT);
                 request = builder.buildRequest();
             } catch (OperationFormatException e) {
                 throw new IllegalStateException("Failed to build operation", e);

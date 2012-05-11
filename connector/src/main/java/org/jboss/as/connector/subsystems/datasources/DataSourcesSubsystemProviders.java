@@ -56,7 +56,6 @@ import static org.jboss.as.connector.subsystems.datasources.Constants.XADATASOUR
 import static org.jboss.as.connector.subsystems.datasources.Constants.XADATASOURCE_PROPERTIES;
 import static org.jboss.as.connector.subsystems.datasources.Constants.XADATASOURCE_PROPERTY_VALUE;
 import static org.jboss.as.connector.subsystems.datasources.Constants.XA_DATASOURCE;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ACCESS_TYPE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ADD;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ATTRIBUTES;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.CHILDREN;
@@ -70,7 +69,6 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.NIL
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OPERATIONS;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OPERATION_NAME;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.PERSISTENT;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.READ_ONLY;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REMOVE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REPLY_PROPERTIES;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REQUEST_PROPERTIES;
@@ -91,22 +89,23 @@ class DataSourcesSubsystemProviders {
             Constants.DATASOURCE_DRIVER,
             Constants.NEW_CONNECTION_SQL, Constants.URL_DELIMITER,
             Constants.URL_SELECTOR_STRATEGY_CLASS_NAME, Constants.USE_JAVA_CONTEXT,
-            Constants.JTA, org.jboss.as.connector.pool.Constants.MAX_POOL_SIZE,
-            org.jboss.as.connector.pool.Constants.MIN_POOL_SIZE, org.jboss.as.connector.pool.Constants.POOL_PREFILL, org.jboss.as.connector.pool.Constants.POOL_USE_STRICT_MIN,
+            Constants.JTA, org.jboss.as.connector.subsystems.common.pool.Constants.MAX_POOL_SIZE,
+            org.jboss.as.connector.subsystems.common.pool.Constants.MIN_POOL_SIZE, org.jboss.as.connector.subsystems.common.pool.Constants.POOL_PREFILL, org.jboss.as.connector.subsystems.common.pool.Constants.POOL_USE_STRICT_MIN,
             Constants.USERNAME, Constants.PASSWORD, Constants.SECURITY_DOMAIN,
             Constants.REAUTHPLUGIN_CLASSNAME, Constants.REAUTHPLUGIN_PROPERTIES,
-            org.jboss.as.connector.pool.Constants.POOL_FLUSH_STRATEGY, Constants.PREPAREDSTATEMENTSCACHESIZE,
+            org.jboss.as.connector.subsystems.common.pool.Constants.POOL_FLUSH_STRATEGY, Constants.ALLOW_MULTIPLE_USERS,
+            Constants.PREPAREDSTATEMENTSCACHESIZE,
             Constants.SHAREPREPAREDSTATEMENTS, Constants.TRACKSTATEMENTS,
             Constants.ALLOCATION_RETRY, Constants.ALLOCATION_RETRY_WAIT_MILLIS,
-            org.jboss.as.connector.pool.Constants.BLOCKING_TIMEOUT_WAIT_MILLIS, org.jboss.as.connector.pool.Constants.IDLETIMEOUTMINUTES,
+            org.jboss.as.connector.subsystems.common.pool.Constants.BLOCKING_TIMEOUT_WAIT_MILLIS, org.jboss.as.connector.subsystems.common.pool.Constants.IDLETIMEOUTMINUTES,
             Constants.QUERYTIMEOUT, Constants.USETRYLOCK, Constants.SETTXQUERYTIMEOUT,
             Constants.TRANSACTION_ISOLATION, Constants.CHECKVALIDCONNECTIONSQL,
             Constants.EXCEPTIONSORTERCLASSNAME, Constants.EXCEPTIONSORTER_PROPERTIES,
             Constants.STALECONNECTIONCHECKERCLASSNAME, Constants.STALECONNECTIONCHECKER_PROPERTIES,
             Constants.VALIDCONNECTIONCHECKERCLASSNAME, Constants.VALIDCONNECTIONCHECKER_PROPERTIES,
-            org.jboss.as.connector.pool.Constants.BACKGROUNDVALIDATIONMILLIS,
-            org.jboss.as.connector.pool.Constants.BACKGROUNDVALIDATION,
-            org.jboss.as.connector.pool.Constants.USE_FAST_FAIL,
+            org.jboss.as.connector.subsystems.common.pool.Constants.BACKGROUNDVALIDATIONMILLIS,
+            org.jboss.as.connector.subsystems.common.pool.Constants.BACKGROUNDVALIDATION,
+            org.jboss.as.connector.subsystems.common.pool.Constants.USE_FAST_FAIL,
             Constants.VALIDATEONMATCH, Constants.SPY,
             Constants.USE_CCM};
 
@@ -114,24 +113,25 @@ class DataSourcesSubsystemProviders {
             Constants.XADATASOURCECLASS, Constants.JNDINAME, Constants.DATASOURCE_DRIVER,
             Constants.NEW_CONNECTION_SQL, Constants.URL_DELIMITER,
             Constants.URL_SELECTOR_STRATEGY_CLASS_NAME, Constants.USE_JAVA_CONTEXT,
-            org.jboss.as.connector.pool.Constants.MAX_POOL_SIZE, org.jboss.as.connector.pool.Constants.MIN_POOL_SIZE,
-            org.jboss.as.connector.pool.Constants.POOL_PREFILL, org.jboss.as.connector.pool.Constants.POOL_USE_STRICT_MIN, Constants.INTERLEAVING,
+            org.jboss.as.connector.subsystems.common.pool.Constants.MAX_POOL_SIZE, org.jboss.as.connector.subsystems.common.pool.Constants.MIN_POOL_SIZE,
+            org.jboss.as.connector.subsystems.common.pool.Constants.POOL_PREFILL, org.jboss.as.connector.subsystems.common.pool.Constants.POOL_USE_STRICT_MIN, Constants.INTERLEAVING,
             Constants.NOTXSEPARATEPOOL, Constants.PAD_XID, Constants.SAME_RM_OVERRIDE,
             Constants.WRAP_XA_RESOURCE, Constants.USERNAME, Constants.PASSWORD,
             Constants.SECURITY_DOMAIN,
             Constants.REAUTHPLUGIN_CLASSNAME, Constants.REAUTHPLUGIN_PROPERTIES,
-            org.jboss.as.connector.pool.Constants.POOL_FLUSH_STRATEGY, Constants.PREPAREDSTATEMENTSCACHESIZE,
+            org.jboss.as.connector.subsystems.common.pool.Constants.POOL_FLUSH_STRATEGY, Constants.ALLOW_MULTIPLE_USERS,
+            Constants.PREPAREDSTATEMENTSCACHESIZE,
             Constants.SHAREPREPAREDSTATEMENTS, Constants.TRACKSTATEMENTS,
             Constants.ALLOCATION_RETRY, Constants.ALLOCATION_RETRY_WAIT_MILLIS,
-            org.jboss.as.connector.pool.Constants.BLOCKING_TIMEOUT_WAIT_MILLIS, org.jboss.as.connector.pool.Constants.IDLETIMEOUTMINUTES,
+            org.jboss.as.connector.subsystems.common.pool.Constants.BLOCKING_TIMEOUT_WAIT_MILLIS, org.jboss.as.connector.subsystems.common.pool.Constants.IDLETIMEOUTMINUTES,
             Constants.QUERYTIMEOUT, Constants.USETRYLOCK, Constants.SETTXQUERYTIMEOUT,
             Constants.TRANSACTION_ISOLATION, Constants.CHECKVALIDCONNECTIONSQL,
             Constants.EXCEPTIONSORTERCLASSNAME, Constants.EXCEPTIONSORTER_PROPERTIES,
             Constants.STALECONNECTIONCHECKERCLASSNAME, Constants.STALECONNECTIONCHECKER_PROPERTIES,
             Constants.VALIDCONNECTIONCHECKERCLASSNAME, Constants.VALIDCONNECTIONCHECKER_PROPERTIES,
-            org.jboss.as.connector.pool.Constants.BACKGROUNDVALIDATIONMILLIS,
-            org.jboss.as.connector.pool.Constants.BACKGROUNDVALIDATION,
-            org.jboss.as.connector.pool.Constants.USE_FAST_FAIL,
+            org.jboss.as.connector.subsystems.common.pool.Constants.BACKGROUNDVALIDATIONMILLIS,
+            org.jboss.as.connector.subsystems.common.pool.Constants.BACKGROUNDVALIDATION,
+            org.jboss.as.connector.subsystems.common.pool.Constants.USE_FAST_FAIL,
             Constants.VALIDATEONMATCH, Constants.XA_RESOURCE_TIMEOUT,
             Constants.SPY, Constants.USE_CCM,
             Constants.RECOVERY_USERNAME, Constants.RECOVERY_PASSWORD,
@@ -596,19 +596,12 @@ class DataSourcesSubsystemProviders {
                     node.get(ATTRIBUTES, propertyType.getName(), VALUE_TYPE).set(ModelType.STRING);
                     node.get(ATTRIBUTES, propertyType.getName(), REQUIRED).set(false);
                 } else {
-                    node.get(ATTRIBUTES, propertyType.getName(), DESCRIPTION).set(bundle.getString(propertyType.getName()));
-
-                    node.get(ATTRIBUTES, propertyType.getName(), TYPE).set(propertyType.getType());
-                    node.get(ATTRIBUTES, propertyType.getName(), REQUIRED).set(!propertyType.isAllowNull());
-                    if (propertyType.getDefaultValue() != null)
-                        node.get(ATTRIBUTES, propertyType.getName(), DEFAULT).set(propertyType.getDefaultValue().toString());
+                    propertyType.addResourceAttributeDescription(bundle,null,node);
                 }
             }
 
             for (SimpleAttributeDefinition propertyType : READONLY_DATASOURCE_ATTRIBUTE) {
-                node.get(ATTRIBUTES, propertyType.getName(), DESCRIPTION).set(bundle.getString(propertyType.getName()));
-                node.get(ATTRIBUTES, propertyType.getName(), TYPE).set(propertyType.getType());
-                node.get(ATTRIBUTES, propertyType.getName(), ACCESS_TYPE, READ_ONLY).set(true);
+                propertyType.addResourceAttributeDescription(bundle,null,node);
             }
 
             node.get(CHILDREN, CONNECTION_PROPERTIES.getName(), DESCRIPTION).set(bundle.getString(CONNECTION_PROPERTIES.getName()));
@@ -634,12 +627,7 @@ class DataSourcesSubsystemProviders {
                     operation.get(REQUEST_PROPERTIES, propertyType.getName(), VALUE_TYPE).set(ModelType.STRING);
                     operation.get(REQUEST_PROPERTIES, propertyType.getName(), REQUIRED).set(false);
                 } else {
-                    operation.get(REQUEST_PROPERTIES, propertyType.getName(), DESCRIPTION).set(
-                            bundle.getString(propertyType.getName()));
-                    operation.get(REQUEST_PROPERTIES, propertyType.getName(), TYPE).set(propertyType.getType());
-                    operation.get(REQUEST_PROPERTIES, propertyType.getName(), REQUIRED).set(!propertyType.isAllowNull());
-                    if (propertyType.getDefaultValue() != null)
-                        operation.get(REQUEST_PROPERTIES, propertyType.getName(), DEFAULT).set(propertyType.getDefaultValue().toString());
+                    propertyType.addOperationParameterDescription(bundle, null, operation);
                 }
             }
             return operation;
@@ -746,19 +734,12 @@ class DataSourcesSubsystemProviders {
                     node.get(ATTRIBUTES, propertyType.getName(), VALUE_TYPE).set(ModelType.STRING);
                     node.get(ATTRIBUTES, propertyType.getName(), REQUIRED).set(false);
                 } else {
-                    node.get(ATTRIBUTES, propertyType.getName(), DESCRIPTION).set(bundle.getString(propertyType.getName()));
-
-                    node.get(ATTRIBUTES, propertyType.getName(), TYPE).set(propertyType.getType());
-                    node.get(ATTRIBUTES, propertyType.getName(), REQUIRED).set(!propertyType.isAllowNull());
-                    if (propertyType.getDefaultValue() != null)
-                        node.get(ATTRIBUTES, propertyType.getName(), DEFAULT).set(propertyType.getDefaultValue().toString());
+                    propertyType.addResourceAttributeDescription(bundle,null,node);
                 }
             }
 
             for (SimpleAttributeDefinition propertyType : READONLY_XA_DATASOURCE_ATTRIBUTE) {
-                node.get(ATTRIBUTES, propertyType.getName(), DESCRIPTION).set(bundle.getString(propertyType.getName()));
-                node.get(ATTRIBUTES, propertyType.getName(), TYPE).set(propertyType.getType());
-                node.get(ATTRIBUTES, propertyType.getName(), ACCESS_TYPE, READ_ONLY).set(true);
+                propertyType.addResourceAttributeDescription(bundle,null,node);
             }
 
             node.get(CHILDREN, XADATASOURCE_PROPERTIES.getName(), DESCRIPTION).set(bundle.getString(XADATASOURCE_PROPERTIES.getName()));
@@ -782,12 +763,7 @@ class DataSourcesSubsystemProviders {
                     operation.get(REQUEST_PROPERTIES, propertyType.getName(), VALUE_TYPE).set(ModelType.STRING);
                     operation.get(REQUEST_PROPERTIES, propertyType.getName(), REQUIRED).set(false);
                 } else {
-                    operation.get(REQUEST_PROPERTIES, propertyType.getName(), DESCRIPTION).set(
-                            bundle.getString(propertyType.getName()));
-                    operation.get(REQUEST_PROPERTIES, propertyType.getName(), TYPE).set(propertyType.getType());
-                    operation.get(REQUEST_PROPERTIES, propertyType.getName(), REQUIRED).set(!propertyType.isAllowNull());
-                    if (propertyType.getDefaultValue() != null)
-                        operation.get(REQUEST_PROPERTIES, propertyType.getName(), DEFAULT).set(propertyType.getDefaultValue().toString());
+                    propertyType.addOperationParameterDescription(bundle, null, operation);
                 }
             }
             return operation;

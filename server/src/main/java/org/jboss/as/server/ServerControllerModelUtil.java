@@ -76,7 +76,6 @@ import org.jboss.as.controller.operations.common.SchemaLocationRemoveHandler;
 import org.jboss.as.controller.operations.common.SnapshotDeleteHandler;
 import org.jboss.as.controller.operations.common.SnapshotListHandler;
 import org.jboss.as.controller.operations.common.SnapshotTakeHandler;
-import org.jboss.as.controller.operations.common.SocketBindingGroupRemoveHandler;
 import org.jboss.as.controller.operations.common.SystemPropertyAddHandler;
 import org.jboss.as.controller.operations.common.SystemPropertyRemoveHandler;
 import org.jboss.as.controller.operations.common.SystemPropertyValueWriteAttributeHandler;
@@ -127,6 +126,7 @@ import org.jboss.as.server.operations.RunningModeReadHandler;
 import org.jboss.as.server.operations.ServerRestartRequiredHandler;
 import org.jboss.as.server.operations.ServerShutdownHandler;
 import org.jboss.as.server.services.net.BindingGroupAddHandler;
+import org.jboss.as.server.services.net.BindingGroupRemoveHandler;
 import org.jboss.as.server.services.net.LocalDestinationOutboundSocketBindingResourceDefinition;
 import org.jboss.as.server.services.net.NetworkInterfaceRuntimeHandler;
 import org.jboss.as.server.services.net.RemoteDestinationOutboundSocketBindingResourceDefinition;
@@ -246,11 +246,11 @@ public class ServerControllerModelUtil {
         root.registerOperationHandler(DeploymentUploadURLHandler.OPERATION_NAME, duuh, duuh, false);
         DeploymentUploadStreamAttachmentHandler dush = new DeploymentUploadStreamAttachmentHandler(contentRepository);
         root.registerOperationHandler(DeploymentUploadStreamAttachmentHandler.OPERATION_NAME, dush, dush, false);
-        final DeploymentReplaceHandler drh = isDomain ? DeploymentReplaceHandler.createForDomainServer(contentRepository, remoteFileRepository)
-                                                      : DeploymentReplaceHandler.createForStandalone(contentRepository);
+        final DeploymentReplaceHandler drh = isDomain ? DeploymentReplaceHandler.createForDomainServer(contentRepository, remoteFileRepository, vaultReader)
+                                                      : DeploymentReplaceHandler.createForStandalone(contentRepository, vaultReader);
         root.registerOperationHandler(DeploymentReplaceHandler.OPERATION_NAME, drh, drh, false);
-        DeploymentFullReplaceHandler dfrh = isDomain ? DeploymentFullReplaceHandler.createForDomainServer(contentRepository, remoteFileRepository)
-                                                     : DeploymentFullReplaceHandler.createForStandalone(contentRepository);
+        DeploymentFullReplaceHandler dfrh = isDomain ? DeploymentFullReplaceHandler.createForDomainServer(contentRepository, remoteFileRepository, vaultReader)
+                                                     : DeploymentFullReplaceHandler.createForStandalone(contentRepository, vaultReader);
         root.registerOperationHandler(DeploymentFullReplaceHandler.OPERATION_NAME, dfrh, dfrh, false);
 
         if (!isDomain) {
@@ -280,13 +280,15 @@ public class ServerControllerModelUtil {
         if (serverEnvironment != null) {
             // Reload op -- does not work on a domain mode server
             if (serverEnvironment.getLaunchType() != ServerEnvironment.LaunchType.DOMAIN)  {
-                ProcessReloadHandler reloadHandler = new ProcessReloadHandler<RunningModeControl>(Services.JBOSS_AS, runningModeControl, ServerDescriptions.getResourceDescriptionResolver("server"));
+                ProcessReloadHandler reloadHandler = new ProcessReloadHandler<RunningModeControl>(Services.JBOSS_AS, runningModeControl,
+                        processState, ServerDescriptions.getResourceDescriptionResolver("server"));
                 root.registerOperationHandler(ProcessReloadHandler.OPERATION_NAME, reloadHandler, reloadHandler);
             }
 
             // The System.exit() based shutdown command is only valid for a server process directly launched from the command line
             if (serverEnvironment.getLaunchType() == ServerEnvironment.LaunchType.STANDALONE) {
-                root.registerOperationHandler(ServerShutdownHandler.OPERATION_NAME, ServerShutdownHandler.INSTANCE, ServerShutdownHandler.INSTANCE, false);
+                ServerShutdownHandler serverShutdownHandler = new ServerShutdownHandler(processState);
+                root.registerOperationHandler(ServerShutdownHandler.OPERATION_NAME, serverShutdownHandler, serverShutdownHandler);
             }
             root.registerReadOnlyAttribute(ServerDescriptionConstants.LAUNCH_TYPE, new LaunchTypeHandler(serverEnvironment.getLaunchType()), Storage.RUNTIME);
 
@@ -338,7 +340,7 @@ public class ServerControllerModelUtil {
         interfaces.registerOperationHandler(SpecifiedInterfaceResolveHandler.OPERATION_NAME, SpecifiedInterfaceResolveHandler.INSTANCE, SpecifiedInterfaceResolveHandler.INSTANCE, runtimeOnlyFlag);
 
         // Sockets
-        ManagementResourceRegistration socketGroup = root.registerSubModel(new SocketBindingGroupResourceDefinition(BindingGroupAddHandler.INSTANCE, SocketBindingGroupRemoveHandler.INSTANCE, false));
+        ManagementResourceRegistration socketGroup = root.registerSubModel(new SocketBindingGroupResourceDefinition(BindingGroupAddHandler.INSTANCE, BindingGroupRemoveHandler.INSTANCE, false));
         socketGroup.registerSubModel(SocketBindingResourceDefinition.INSTANCE);
         // client-socket-binding (for remote destination)
         socketGroup.registerSubModel(RemoteDestinationOutboundSocketBindingResourceDefinition.INSTANCE);
@@ -347,22 +349,26 @@ public class ServerControllerModelUtil {
 
         // Deployments
         ManagementResourceRegistration deployments = root.registerSubModel(PathElement.pathElement(DEPLOYMENT), ServerDescriptionProviders.DEPLOYMENT_PROVIDER);
-        DeploymentAddHandler dah = isDomain ? DeploymentAddHandler.createForDomainServer(contentRepository, remoteFileRepository)
-                                            : DeploymentAddHandler.createForStandalone(contentRepository);
+        DeploymentAddHandler dah = isDomain ? DeploymentAddHandler.createForDomainServer(contentRepository, remoteFileRepository, vaultReader)
+                                            : DeploymentAddHandler.createForStandalone(contentRepository, vaultReader);
         deployments.registerOperationHandler(DeploymentAddHandler.OPERATION_NAME, dah, dah, false);
-        DeploymentRemoveHandler dremh = new DeploymentRemoveHandler(contentRepository);
+        DeploymentRemoveHandler dremh = new DeploymentRemoveHandler(contentRepository, vaultReader);
         deployments.registerOperationHandler(DeploymentRemoveHandler.OPERATION_NAME, dremh, dremh, false);
-        deployments.registerOperationHandler(DeploymentDeployHandler.OPERATION_NAME, DeploymentDeployHandler.INSTANCE, DeploymentDeployHandler.INSTANCE, false);
-        deployments.registerOperationHandler(DeploymentUndeployHandler.OPERATION_NAME, DeploymentUndeployHandler.INSTANCE, DeploymentUndeployHandler.INSTANCE, false);
-        deployments.registerOperationHandler(DeploymentRedeployHandler.OPERATION_NAME, DeploymentRedeployHandler.INSTANCE, DeploymentRedeployHandler.INSTANCE, false);
+        final DeploymentDeployHandler ddhu = new DeploymentDeployHandler(vaultReader);
+        deployments.registerOperationHandler(DeploymentDeployHandler.OPERATION_NAME, ddhu, ddhu, false);
+        final DeploymentUndeployHandler duh = new DeploymentUndeployHandler(vaultReader);
+        deployments.registerOperationHandler(DeploymentUndeployHandler.OPERATION_NAME, duh, duh, false);
+        final DeploymentRedeployHandler drdh = new DeploymentRedeployHandler(vaultReader);
+        deployments.registerOperationHandler(DeploymentRedeployHandler.OPERATION_NAME, drdh, drdh, false);
         deployments.registerMetric(DeploymentStatusHandler.ATTRIBUTE_NAME, DeploymentStatusHandler.INSTANCE);
 
         // The sub-deployments registry
         deployments.registerSubModel(PathElement.pathElement(SUBDEPLOYMENT), ServerDescriptionProviders.SUBDEPLOYMENT_PROVIDER);
 
         // Extensions
-        root.registerSubModel(new ExtensionResourceDefinition(extensionRegistry, parallelBoot));
+        root.registerSubModel(new ExtensionResourceDefinition(extensionRegistry, parallelBoot, false));
         extensionRegistry.setSubsystemParentResourceRegistrations(root, deployments);
+        extensionRegistry.setPathManager(pathManager);
 
         // Util
         root.registerOperationHandler(DeployerChainAddHandler.NAME, DeployerChainAddHandler.INSTANCE, DeployerChainAddHandler.INSTANCE, false, EntryType.PRIVATE);

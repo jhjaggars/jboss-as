@@ -104,6 +104,13 @@
             </patternset>
             <mapper type="flatten"/>
         </unzip>
+        <!-- Copy the JBoss Modules specific schemas to the JBOSS_HOME/docs/schema folder -->
+        <unzip src="${org.jboss.modules:jboss-modules:jar}" dest="${output.dir}/docs/schema/">
+            <patternset>
+                <include name="schema/*.xsd"/>
+            </patternset>
+            <mapper type="flatten"/>
+        </unzip>
 
     </target>
 
@@ -199,6 +206,10 @@
             <maven-resource group="org.jboss.com.sun.httpserver" artifact="httpserver"/>
         </module-def>
 
+        <module-def name="org.jboss.common-beans">
+            <maven-resource group="org.jboss.common" artifact="jboss-common-beans"/>
+        </module-def>
+    	
         <module-def name="org.jboss.common-core">
             <maven-resource group="org.jboss" artifact="jboss-common-core"/>
         </module-def>
@@ -242,8 +253,8 @@
             <maven-resource group="org.jboss.logmanager" artifact="jboss-logmanager"/>
         </module-def>
 
-        <module-def name="org.jboss.logmanager.log4j">
-            <maven-resource group="org.jboss.logmanager" artifact="jboss-logmanager-log4j"/>
+        <module-def name="org.jboss.log4j.logmanager">
+            <maven-resource group="org.jboss.logmanager" artifact="log4j-jboss-logmanager"/>
         </module-def>
 
         <module-def name="org.jboss.remoting3">
@@ -620,9 +631,12 @@
 
         <module-def name="org.hibernate">
             <maven-resource group="org.hibernate" artifact="hibernate-core" />
-            <maven-resource group="org.hibernate.common" artifact="hibernate-commons-annotations" />
             <maven-resource group="org.hibernate" artifact="hibernate-entitymanager" />
             <maven-resource group="org.hibernate" artifact="hibernate-infinispan"/>
+        </module-def>
+
+        <module-def name="org.hibernate.commons-annotations">
+            <maven-resource group="org.hibernate.common" artifact="hibernate-commons-annotations"/>
         </module-def>
 
         <module-def name="org.hibernate.envers">
@@ -1135,9 +1149,8 @@
         </module-def>
 
         <module-def name="org.picketlink">
-            <maven-resource group="org.picketlink" artifact="picketlink-fed" jandex="true"/>
-            <maven-resource group="org.picketlink" artifact="picketlink-bindings" jandex="true"/>
-            <maven-resource group="org.picketlink" artifact="picketlink-bindings-jboss"/>
+            <maven-resource group="org.picketlink" artifact="picketlink-core" jandex="true"/>
+            <maven-resource group="org.picketlink.distribution" artifact="picketlink-jbas7" jandex="true"/>
         </module-def>
 
         <module-def name="org.picketbox">
@@ -1201,7 +1214,7 @@
         </bundle-def>
 
         <bundle-def name="javax.servlet.api" slot="v25">
-            <maven-bundle group="org.jboss.osgi" artifact="javax.servlet.api"/>
+            <maven-bundle group="org.jboss.spec.javax.servlet" artifact="jboss-servlet-api_2.5_spec"/>
         </bundle-def>
 
         <bundle-def name="org.jboss.osgi.logging">

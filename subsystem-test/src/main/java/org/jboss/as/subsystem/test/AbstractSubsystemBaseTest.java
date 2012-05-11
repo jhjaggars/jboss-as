@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 import junit.framework.Assert;
 
@@ -115,7 +114,7 @@ public abstract class AbstractSubsystemBaseTest extends AbstractSubsystemTest {
         Assert.assertNotNull(servicesA);
         //Get the model and the persisted xml from the first controller
         final ModelNode modelA = servicesA.readWholeModel();
-        Assert.assertNotNull(modelA);
+        validateModel(modelA);
 
         // Test marshaling
         final String marshalled = servicesA.getPersistedSubsystemXml();
@@ -152,6 +151,10 @@ public abstract class AbstractSubsystemBaseTest extends AbstractSubsystemTest {
         assertRemoveSubsystemResources(servicesA, getIgnoredChildResourcesForRemovalTest());
     }
 
+    protected void validateModel(ModelNode model) {
+        Assert.assertNotNull(model);
+    }
+
     protected ModelNode createDescribeOperation() {
         final ModelNode address = new ModelNode();
         address.add(ModelDescriptionConstants.SUBSYSTEM, getMainSubsystemName());
@@ -176,13 +179,12 @@ public abstract class AbstractSubsystemBaseTest extends AbstractSubsystemTest {
     protected Set<PathAddress> getIgnoredChildResourcesForRemovalTest() {
         return Collections.<PathAddress>emptySet();
     }
-
-    public static void main(String[] args) {
-        String s = "xmlns=\"urn:jboss:domain:transactions:1.1\"";
-
-        System.out.println(Pattern.compile("xmlns=\"aaa\"").matcher("xmlns=\"aaa\"").matches());
-        System.out.println(Pattern.compile("xmlns=\".*\"").matcher("xmlns=\"xxyyy:xxx:yyy:xxx:1.1\"").matches());
+    protected void testConverter(final ModelNode expected, int major, int minor) throws Exception {
+        KernelServices service = super.installInController(AdditionalInitialization.MANAGEMENT, getSubsystemXml());
+        ModelNode transformed = service.readTransformedModel(major,minor).get(ModelDescriptionConstants.SUBSYSTEM, mainSubsystemName);
+        /*SubsystemTransformer transformer = controllerExtensionRegistry.getTransformerRegistry().getSubsystemTransformer(super.mainSubsystemName, major, minor);
+        ModelNode original = service.readWholeModel().get(ModelDescriptionConstants.SUBSYSTEM, mainSubsystemName);
+        ModelNode transformed = transformer.transformModel(null, original);*/
+        compare(expected, transformed);
     }
-
-
 }

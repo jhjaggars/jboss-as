@@ -22,26 +22,8 @@
 
 package org.jboss.as.connector.subsystems.datasources;
 
-import static org.jboss.as.connector.ConnectorLogger.DS_DEPLOYER_LOGGER;
-import static org.jboss.as.connector.ConnectorMessages.MESSAGES;
-
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
-import java.sql.Driver;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import javax.naming.Reference;
-import javax.resource.ResourceException;
-import javax.resource.spi.ManagedConnectionFactory;
-import javax.sql.DataSource;
-
-import org.jboss.as.connector.registry.DriverRegistry;
-import org.jboss.as.connector.registry.InstalledDriver;
+import org.jboss.as.connector.services.driver.InstalledDriver;
+import org.jboss.as.connector.services.driver.registry.DriverRegistry;
 import org.jboss.as.connector.util.Injection;
 import org.jboss.jca.adapters.jdbc.BaseWrapperManagedConnectionFactory;
 import org.jboss.jca.adapters.jdbc.local.LocalManagedConnectionFactory;
@@ -79,6 +61,23 @@ import org.jboss.msc.service.StopContext;
 import org.jboss.msc.value.InjectedValue;
 import org.jboss.security.SubjectFactory;
 
+import javax.naming.Reference;
+import javax.resource.ResourceException;
+import javax.resource.spi.ManagedConnectionFactory;
+import javax.sql.DataSource;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.sql.Driver;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.jboss.as.connector.logging.ConnectorLogger.DS_DEPLOYER_LOGGER;
+import static org.jboss.as.connector.logging.ConnectorMessages.MESSAGES;
+
 /**
  * Base service for managing a data-source.
  * @author John Bailey
@@ -100,8 +99,14 @@ public abstract class AbstractDataSourceService implements Service<DataSource> {
     protected CommonDeployment deploymentMD;
     private javax.sql.DataSource sqlDataSource;
 
-    protected AbstractDataSourceService(final String jndiName) {
+    /**
+     * The class loader to use. If null the Driver class loader will be used instead.
+     */
+    private final ClassLoader classLoader;
+
+    protected AbstractDataSourceService(final String jndiName, final ClassLoader classLoader) {
         this.jndiName = jndiName;
+        this.classLoader = classLoader;
     }
 
     public synchronized void start(StartContext startContext) throws StartException {
@@ -192,6 +197,13 @@ public abstract class AbstractDataSourceService implements Service<DataSource> {
         }
     }
 
+    private ClassLoader driverClassLoader() {
+        if(classLoader != null) {
+            return classLoader;
+        }
+        return driverValue.getValue().getClass().getClassLoader();
+    }
+
     private static final SetContextLoaderAction CLEAR_ACTION = new SetContextLoaderAction(null);
 
     private static class SetContextLoaderAction implements PrivilegedAction<Void> {
@@ -211,8 +223,8 @@ public abstract class AbstractDataSourceService implements Service<DataSource> {
     protected class AS7DataSourceDeployer extends AbstractDsDeployer {
 
         private final org.jboss.jca.common.api.metadata.ds.DataSource dataSourceConfig;
-
         private final XaDataSource xaDataSourceConfig;
+
         private ServiceContainer serviceContainer;
 
         public AS7DataSourceDeployer(XaDataSource xaDataSourceConfig) {
@@ -251,8 +263,8 @@ public abstract class AbstractDataSourceService implements Service<DataSource> {
                                 moduleName, installedDriver.getDriverClassName(),
                                 installedDriver.getDataSourceClassName(), installedDriver.getXaDataSourceClassName());
                         drivers.put(driverName, driver);
-                        dataSources = new DatasourcesImpl(Arrays.asList(dataSourceConfig), null, drivers);
                     }
+                    dataSources = new DatasourcesImpl(Arrays.asList(dataSourceConfig), null, drivers);
                 } else if (xaDataSourceConfig != null) {
                     String driverName = xaDataSourceConfig.getDriver();
                     InstalledDriver installedDriver = driverRegistry.getValue().getInstalledDriver(driverName);
@@ -264,8 +276,8 @@ public abstract class AbstractDataSourceService implements Service<DataSource> {
                                 installedDriver.getDriverClassName(),
                                 installedDriver.getDataSourceClassName(), installedDriver.getXaDataSourceClassName());
                         drivers.put(driverName, driver);
-                        dataSources = new DatasourcesImpl(null, Arrays.asList(xaDataSourceConfig), drivers);
                     }
+                    dataSources = new DatasourcesImpl(null, Arrays.asList(xaDataSourceConfig), drivers);
                 }
 
                 CommonDeployment c = createObjectsAndInjectValue(new URL("file://DataSourceDeployment"), jndiName,
@@ -281,7 +293,7 @@ public abstract class AbstractDataSourceService implements Service<DataSource> {
 
         @Override
         protected ClassLoader getDeploymentClassLoader(String uniqueId) {
-            return driverValue.getValue().getClass().getClassLoader();
+            return driverClassLoader();
         }
 
         @Override
@@ -354,7 +366,7 @@ public abstract class AbstractDataSourceService implements Service<DataSource> {
 
                 @Override
                 public ClassLoader getClassLoader() {
-                    return driverValue.getValue().getClass().getClassLoader();
+                    return driverClassLoader();
                 }
             });
         }
@@ -473,6 +485,9 @@ public abstract class AbstractDataSourceService implements Service<DataSource> {
                 }
                 if (timeOut.getQueryTimeout() != null) {
                     managedConnectionFactory.setQueryTimeout(timeOut.getQueryTimeout().intValue());
+                }
+                if (timeOut.isSetTxQueryTimeout()) {
+                    managedConnectionFactory.setTransactionQueryTimeout(true);
                 }
             }
 

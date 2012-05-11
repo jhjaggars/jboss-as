@@ -87,6 +87,7 @@ import org.jboss.metadata.web.jboss.ReplicationTrigger;
 import org.jboss.metadata.web.jboss.SnapshotMode;
 import org.jboss.msc.service.StartContext;
 import org.jboss.msc.service.StopContext;
+import org.jboss.msc.value.ImmediateValue;
 import org.jgroups.Channel;
 import org.jgroups.conf.XmlConfigurator;
 
@@ -110,7 +111,7 @@ public class SessionTestUtil {
             Transport transport = container.getCache().getCacheManager().getTransport();
             if (transport != null) {
                 Channel channel = ((org.infinispan.remoting.transport.jgroups.JGroupsTransport) transport).getChannel();
-                this.service = new CoreGroupCommunicationService(Integer.valueOf(0).shortValue());
+                this.service = new CoreGroupCommunicationService(Integer.valueOf(0).shortValue(), null, null);
                 service.setChannel(channel);
                 this.lockManager = new SharedLocalYieldingClusterLockManager("lock", service, service);
             } else {
@@ -174,7 +175,7 @@ public class SessionTestUtil {
     }
 
     public static DistributableSessionManager<?> createManager(JBossWebMetaData metaData, String warName, int maxInactiveInterval, final EmbeddedCacheManager cacheContainer, final String jvmRoute) {
-        final Cache<?, ?> jvmRouteCache = cacheContainer.getCache();
+        final Cache<Address, Map.Entry<String, Void>> jvmRouteCache = cacheContainer.getCache();
         Registry.RegistryEntryProvider<String, Void> provider = new Registry.RegistryEntryProvider<String, Void>() {
             @Override
             public String getKey() {
@@ -185,11 +186,9 @@ public class SessionTestUtil {
                 return null;
             }
         };
-        final RegistryService<String, Void> registry = new RegistryService<String, Void>(provider);
-        registry.getCacheInjector().inject(jvmRouteCache);
+        final RegistryService<String, Void> registry = new RegistryService<String, Void>(new ImmediateValue<Cache<Address, Map.Entry<String, Void>>>(jvmRouteCache), new ImmediateValue<Registry.RegistryEntryProvider<String, Void>>(provider));
         DistributedCacheManagerFactory factory = new DistributedCacheManagerFactory();
-        factory.getCacheContainerInjector().inject(cacheContainer);
-        factory.getCacheConfigurationInjector().inject(jvmRouteCache.getCacheConfiguration());
+        factory.getCacheInjector().inject(cacheContainer.getCache(warName));
         factory.getRegistryInjector().inject(registry);
         factory.getLockManagerInjector().inject(((ExtendedCacheManager) cacheContainer).getLockManager());
         
@@ -205,7 +204,7 @@ public class SessionTestUtil {
         host.addChild(context);
 
         try {
-            DistributableSessionManager<OutgoingDistributableSessionData> manager = new DistributableSessionManager<OutgoingDistributableSessionData>(factory, context, metaData, new ContextClassResolver()) {
+            DistributableSessionManager<OutgoingDistributableSessionData> manager = new DistributableSessionManager<OutgoingDistributableSessionData>(factory, metaData, new ContextClassResolver()) {
                 @Override
                 public void start() throws LifecycleException {
                     try {

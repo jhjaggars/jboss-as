@@ -35,7 +35,7 @@ import javax.security.auth.Subject;
  *
  * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>
  */
-public interface SubjectSupplemental {
+interface SubjectSupplemental {
 
     void supplementSubject(final Subject subject) throws IOException;
 

@@ -25,6 +25,7 @@ package org.jboss.as.jacorb;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Properties;
 
 import org.jboss.as.controller.AbstractAddStepHandler;
@@ -71,10 +72,6 @@ import org.omg.PortableServer.POA;
  * @author <a href="mailto:sguilhen@redhat.com">Stefan Guilhen</a>
  */
 public class JacORBSubsystemAdd extends AbstractAddStepHandler {
-
-    private static final String JACORB_SOCKET_BINDING = "jacorb";
-
-    private static final String JACORB_SSL_SOCKET_BINDING = "jacorb-ssl";
 
     static final JacORBSubsystemAdd INSTANCE = new JacORBSubsystemAdd();
 
@@ -125,8 +122,8 @@ public class JacORBSubsystemAdd extends AbstractAddStepHandler {
 
         context.addStep(new AbstractDeploymentChainStep() {
             public void execute(DeploymentProcessorTarget processorTarget) {
-                processorTarget.addDeploymentProcessor(Phase.DEPENDENCIES, Phase.DEPENDENCIES_JACORB, new JacORBDependencyProcessor());
-                processorTarget.addDeploymentProcessor(Phase.PARSE, Phase.PARSE_JACORB, new JacORBMarkerProcessor());
+                processorTarget.addDeploymentProcessor(JacORBExtension.SUBSYSTEM_NAME, Phase.DEPENDENCIES, Phase.DEPENDENCIES_JACORB, new JacORBDependencyProcessor());
+                processorTarget.addDeploymentProcessor(JacORBExtension.SUBSYSTEM_NAME, Phase.PARSE, Phase.PARSE_JACORB, new JacORBMarkerProcessor());
             }
         }, OperationContext.Stage.RUNTIME);
 
@@ -150,9 +147,11 @@ public class JacORBSubsystemAdd extends AbstractAddStepHandler {
             builder.addDependency(SECURITY_DOMAIN_SERVICE_NAME.append(securityDomain));
 
         // inject the socket bindings that specify the JacORB IIOP and IIOP/SSL ports.
-        builder.addDependency(SocketBinding.JBOSS_BINDING_NAME.append(JACORB_SOCKET_BINDING), SocketBinding.class,
+        String socketBinding = props.getProperty(JacORBSubsystemConstants.ORB_SOCKET_BINDING);
+        builder.addDependency(SocketBinding.JBOSS_BINDING_NAME.append(socketBinding), SocketBinding.class,
                 orbService.getJacORBSocketBindingInjector());
-        builder.addDependency(SocketBinding.JBOSS_BINDING_NAME.append(JACORB_SSL_SOCKET_BINDING), SocketBinding.class,
+        String sslSocketBinding = props.getProperty(JacORBSubsystemConstants.ORB_SSL_SOCKET_BINDING);
+        builder.addDependency(SocketBinding.JBOSS_BINDING_NAME.append(sslSocketBinding), SocketBinding.class,
                 orbService.getJacORBSSLSocketBindingInjector());
         builder.addListener(verificationHandler);
         // set the initial mode and install the service.
@@ -224,7 +223,7 @@ public class JacORBSubsystemAdd extends AbstractAddStepHandler {
                 // check if the property is an SSL config property, in which case the value must be mapped to the JacORB
                 // integer representation.
                 if (JacORBSubsystemDefinitions.SSL_CONFIG_ATTRIBUTES.contains(attrDefinition)) {
-                    SSLConfigValue sslConfigValue = SSLConfigValue.valueOf(value.toUpperCase());
+                    SSLConfigValue sslConfigValue = SSLConfigValue.valueOf(value.toUpperCase(Locale.ENGLISH));
                     if (sslConfigValue != null)
                         value = sslConfigValue.getJacorbValue();
                 }

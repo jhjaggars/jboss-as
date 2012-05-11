@@ -27,6 +27,7 @@ import org.jboss.msc.service.AbstractServiceListener;
 import org.jboss.msc.service.ServiceController;
 import org.jboss.msc.service.ServiceListener;
 import org.jboss.msc.service.ServiceName;
+import org.jboss.msc.service.StartException;
 
 import java.util.HashSet;
 import java.util.Iterator;
@@ -35,6 +36,9 @@ import java.util.Set;
 import static org.jboss.as.controller.ControllerMessages.MESSAGES;
 
 /**
+ * Tracks the status of a service installed by an {@link OperationStepHandler}, recording a failure desription
+ * if the service has a problme starting.
+ *
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
  */
 public final class ServiceVerificationHandler extends AbstractServiceListener<Object> implements ServiceListener<Object>, OperationStepHandler {
@@ -82,26 +86,38 @@ public final class ServiceVerificationHandler extends AbstractServiceListener<Ob
                 if (failedList == null) {
                     failedList = failureDescription.get(MESSAGES.failedServices());
                 }
-                failedList.get(controller.getName().getCanonicalName()).set(controller.getStartException().toString());
+                failedList.get(controller.getName().getCanonicalName()).set(getServiceFailureDescription(controller.getStartException()));
             }
             ModelNode problemList = null;
             for (ServiceController<?> controller : problem) {
-                if (!controller.getImmediateUnavailableDependencies().isEmpty()) {
-                    if (problemList == null) {
-                        problemList = failureDescription.get(MESSAGES.servicesMissingDependencies());
-                    }
-                    final StringBuilder problem = new StringBuilder();
-                    problem.append(controller.getName().getCanonicalName());
-                    for(Iterator<ServiceName> i = controller.getImmediateUnavailableDependencies().iterator(); i.hasNext(); ) {
-                        ServiceName missing = i.next();
-                        problem.append(missing.getCanonicalName());
+                if (problemList == null) {
+                    problemList = failureDescription.get(MESSAGES.servicesMissingDependencies());
+                }
+
+                final StringBuilder problem = new StringBuilder();
+                problem.append(controller.getName().getCanonicalName());
+
+                final StringBuilder missing = new StringBuilder();
+                Set<ServiceName> immediatelyUnavailable = controller.getImmediateUnavailableDependencies();
+                if (!immediatelyUnavailable.isEmpty()) {
+
+                    for(Iterator<ServiceName> i = immediatelyUnavailable.iterator(); i.hasNext(); ) {
+                        ServiceName missingSvc = i.next();
+                        missing.append(missingSvc.getCanonicalName());
                         if(i.hasNext()) {
-                            problem.append(", ");
+                            missing.append(", ");
                         }
                     }
-                    problem.append(MESSAGES.servicesMissing(problem));
-                    problemList.add(problem.toString());
+                } else {
+                    // Record that unknown transitive dependencies are missing.
+                    // TODO this is uninformative so not very nice, but MSC provides no hooks to track from
+                    // a ServiceController back to a missing/failed transitive dependency or from a failed
+                    // dependency down its dependents tree to this service. If that ever changes, update
+                    // this to make use of it
+                    missing.append(MESSAGES.transitiveDependencies());
                 }
+                problem.append(" ").append(MESSAGES.servicesMissing(missing));
+                problemList.add(problem.toString());
             }
             if (context.isRollbackOnRuntimeFailure()) {
                 context.setRollbackOnly();
@@ -146,5 +162,20 @@ public final class ServiceVerificationHandler extends AbstractServiceListener<Ob
                 notifyAll();
             }
         }
+    }
+
+    private static ModelNode getServiceFailureDescription(final StartException exception) {
+        final ModelNode result = new ModelNode();
+        if (exception != null) {
+            StringBuilder sb = new StringBuilder(exception.toString());
+            Throwable cause = exception.getCause();
+            while (cause != null) {
+                sb.append("\n    Caused by: ");
+                sb.append(cause.toString());
+                cause = cause.getCause();
+            }
+            result.set(sb.toString());
+        }
+        return result;
     }
 }

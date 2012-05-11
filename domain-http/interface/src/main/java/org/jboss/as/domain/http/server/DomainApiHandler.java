@@ -40,6 +40,8 @@ import static org.jboss.as.domain.http.server.Constants.OK;
 import static org.jboss.as.domain.http.server.Constants.OPTIONS;
 import static org.jboss.as.domain.http.server.Constants.ORIGIN;
 import static org.jboss.as.domain.http.server.Constants.POST;
+import static org.jboss.as.domain.http.server.Constants.RETRY_AFTER;
+import static org.jboss.as.domain.http.server.Constants.SERVICE_UNAVAILABLE;
 import static org.jboss.as.domain.http.server.Constants.TEXT_HTML;
 import static org.jboss.as.domain.http.server.Constants.UNSUPPORTED_MEDIA_TYPE;
 import static org.jboss.as.domain.http.server.Constants.US_ASCII;
@@ -59,18 +61,21 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.jboss.as.controller.ControlledProcessState;
+import org.jboss.as.controller.ControlledProcessStateService;
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.OperationBuilder;
 import org.jboss.as.domain.http.server.multipart.BoundaryDelimitedInputStream;
 import org.jboss.as.domain.http.server.multipart.MimeHeaderParser;
 import org.jboss.as.domain.http.server.security.SubjectAssociationHandler;
+import org.jboss.as.domain.management.AuthenticationMechanism;
 import org.jboss.as.domain.management.SecurityRealm;
-import org.jboss.as.domain.management.security.DomainCallbackHandler;
 import org.jboss.com.sun.net.httpserver.Authenticator;
 import org.jboss.com.sun.net.httpserver.Filter;
 import org.jboss.com.sun.net.httpserver.Headers;
@@ -120,15 +125,31 @@ class DomainApiHandler implements ManagementHttpHandler {
     }
 
     private final Authenticator authenticator;
+    private final ControlledProcessStateService controlledProcessStateService;
     private ModelControllerClient modelController;
 
 
-    DomainApiHandler(ModelControllerClient modelController, Authenticator authenticator) {
+    DomainApiHandler(final ModelControllerClient modelController, final Authenticator authenticator,
+                     final ControlledProcessStateService controlledProcessStateService) {
         this.modelController = modelController;
         this.authenticator = authenticator;
+        this.controlledProcessStateService = controlledProcessStateService;
     }
 
     private void doHandle(HttpExchange http) throws IOException {
+
+        // AS7-2284 If we are starting or stopping, tell caller the service is unavailable and to try again
+        // later. If "stopping" it's either a reload, in which case trying again will eventually succeed,
+        // or it's a true process stop eventually the server will have stopped.
+        @SuppressWarnings("deprecation")
+        ControlledProcessState.State currentState = controlledProcessStateService.getCurrentState();
+        if (currentState == ControlledProcessState.State.STARTING
+                || currentState == ControlledProcessState.State.STOPPING) {
+            http.getResponseHeaders().add(RETRY_AFTER, "2"); //  2 secs is just a guesstimate
+            http.sendResponseHeaders(SERVICE_UNAVAILABLE, -1);
+            return;
+        }
+
         /**
          *  Request Verification - before the request is handled a set of checks are performed for
          *  CSRF and XSS
@@ -456,7 +477,7 @@ class DomainApiHandler implements ManagementHttpHandler {
             String value = entry.getValue();
             if ("operation".equals(key)) {
                 try {
-                    operation = GetOperation.valueOf(value.toUpperCase().replace('-', '_'));
+                    operation = GetOperation.valueOf(value.toUpperCase(Locale.ENGLISH).replace('-', '_'));
                     value = operation.realOperation();
                 } catch (Exception e) {
                     throw MESSAGES.invalidOperation(e, value);
@@ -553,9 +574,8 @@ class DomainApiHandler implements ManagementHttpHandler {
         if (authenticator != null) {
             context.setAuthenticator(authenticator);
             List<Filter> filters = context.getFilters();
-            if (securityRealm.hasTrustStore() == false) {
-                DomainCallbackHandler callbackHandler = securityRealm.getCallbackHandler();
-                filters.add(new RealmReadinessFilter(callbackHandler, ErrorHandler.getRealmRedirect()));
+            if (securityRealm.getSupportedAuthenticationMechanisms().contains(AuthenticationMechanism.CLIENT_CERT) == false) {
+                filters.add(new RealmReadinessFilter(securityRealm, ErrorHandler.getRealmRedirect()));
             }
         }
     }

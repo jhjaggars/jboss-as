@@ -39,6 +39,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -84,6 +85,7 @@ import org.jboss.as.cli.handlers.CommandCommandHandler;
 import org.jboss.as.cli.handlers.ConnectHandler;
 import org.jboss.as.cli.handlers.DeployHandler;
 import org.jboss.as.cli.handlers.DeploymentInfoHandler;
+import org.jboss.as.cli.handlers.EchoDMRHandler;
 import org.jboss.as.cli.handlers.GenericTypeOperationHandler;
 import org.jboss.as.cli.handlers.HelpHandler;
 import org.jboss.as.cli.handlers.HistoryHandler;
@@ -94,7 +96,6 @@ import org.jboss.as.cli.handlers.PrintWorkingNodeHandler;
 import org.jboss.as.cli.handlers.QuitHandler;
 import org.jboss.as.cli.handlers.ReadAttributeHandler;
 import org.jboss.as.cli.handlers.ReadOperationHandler;
-import org.jboss.as.cli.handlers.EchoDMRHandler;
 import org.jboss.as.cli.handlers.UndeployHandler;
 import org.jboss.as.cli.handlers.VersionHandler;
 import org.jboss.as.cli.handlers.batch.BatchClearHandler;
@@ -107,16 +108,17 @@ import org.jboss.as.cli.handlers.batch.BatchMoveLineHandler;
 import org.jboss.as.cli.handlers.batch.BatchRemoveLineHandler;
 import org.jboss.as.cli.handlers.batch.BatchRunHandler;
 import org.jboss.as.cli.handlers.jca.JDBCDriverNameProvider;
+import org.jboss.as.cli.handlers.jca.JDBCDriverInfoHandler;
 import org.jboss.as.cli.handlers.jca.XADataSourceAddCompositeHandler;
 import org.jboss.as.cli.handlers.jms.CreateJmsResourceHandler;
 import org.jboss.as.cli.handlers.jms.DeleteJmsResourceHandler;
 import org.jboss.as.cli.handlers.module.ASModuleHandler;
 import org.jboss.as.cli.operation.CommandLineParser;
+import org.jboss.as.cli.operation.NodePathFormatter;
 import org.jboss.as.cli.operation.OperationCandidatesProvider;
 import org.jboss.as.cli.operation.OperationFormatException;
 import org.jboss.as.cli.operation.OperationRequestAddress;
 import org.jboss.as.cli.operation.ParsedCommandLine;
-import org.jboss.as.cli.operation.NodePathFormatter;
 import org.jboss.as.cli.operation.impl.DefaultCallbackHandler;
 import org.jboss.as.cli.operation.impl.DefaultOperationCandidatesProvider;
 import org.jboss.as.cli.operation.impl.DefaultOperationRequestAddress;
@@ -209,6 +211,8 @@ class CommandContextImpl implements CommandContext {
         operationHandler = new OperationRequestHandler();
         initCommands();
         config = CliConfigImpl.load(this);
+        defaultControllerHost = config.getDefaultControllerHost();
+        defaultControllerPort = config.getDefaultControllerPort();
         initSSLContext();
     }
 
@@ -305,6 +309,7 @@ class CommandContextImpl implements CommandContext {
         xaDsAddHandler.addValueCompleter(Util.DRIVER_NAME, driverNameCompleter);
         xaDsHandler.addHandler("add", xaDsAddHandler);
         cmdRegistry.registerHandler(xaDsHandler, "xa-data-source");
+        cmdRegistry.registerHandler(new JDBCDriverInfoHandler(this), "jdbc-driver-info");
 
         // JMS
         cmdRegistry.registerHandler(new GenericTypeOperationHandler(this, "/subsystem=messaging/hornetq-server=default/jms-queue", "queue-address"), "jms-queue");
@@ -374,7 +379,7 @@ class CommandContextImpl implements CommandContext {
                         theKeyStore = replacement;
                     }
 
-                    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
+                    KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
                     keyManagerFactory.init(theKeyStore, keyPassword);
                     keyManagers = keyManagerFactory.getKeyManagers();
                 } catch (IOException e) {
@@ -417,57 +422,77 @@ class CommandContextImpl implements CommandContext {
         return terminate;
     }
 
+    private StringBuilder lineBuffer;
+
     @Override
     public void handle(String line) throws CommandLineException {
         if (line.isEmpty() || line.charAt(0) == '#') {
             return; // ignore comments
         }
 
-        resetArgs(line);
-        if (parsedCmd.getFormat() == OperationFormat.INSTANCE) {
-            final ModelNode request = parsedCmd.toOperationRequest(this);
-
-            if (isBatchMode()) {
-                StringBuilder op = new StringBuilder();
-                op.append(getNodePathFormatter().format(parsedCmd.getAddress()));
-                op.append(line.substring(line.indexOf(':')));
-                DefaultBatchedCommand batchedCmd = new DefaultBatchedCommand(op.toString(), request);
-                Batch batch = getBatchManager().getActiveBatch();
-                batch.add(batchedCmd);
-                printLine("#" + batch.size() + " " + batchedCmd.getCommand());
-            } else {
-                set("OP_REQ", request);
-                try {
-                    operationHandler.handle(this);
-                } finally {
-                    set("OP_REQ", null);
-                }
+        if(line.charAt(line.length() - 1) == '\\') {
+            if(lineBuffer == null) {
+                lineBuffer = new StringBuilder();
             }
+            lineBuffer.append(line, 0, line.length() - 1);
+            lineBuffer.append(' ');
+            return;
+        } else if(lineBuffer != null) {
+            lineBuffer.append(line);
+            line = lineBuffer.toString();
+            lineBuffer = null;
+        }
 
-        } else {
-            final String cmdName = parsedCmd.getOperationName();
-            CommandHandler handler = cmdRegistry.getCommandHandler(cmdName.toLowerCase());
-            if (handler != null) {
-                if (isBatchMode() && handler.isBatchMode(this)) {
-                    if (!(handler instanceof OperationCommand)) {
-                        throw new CommandLineException("The command is not allowed in a batch.");
-                    } else {
-                        try {
-                            ModelNode request = ((OperationCommand) handler).buildRequest(this);
-                            BatchedCommand batchedCmd = new DefaultBatchedCommand(line, request);
-                            Batch batch = getBatchManager().getActiveBatch();
-                            batch.add(batchedCmd);
-                            printLine("#" + batch.size() + " " + batchedCmd.getCommand());
-                        } catch (CommandFormatException e) {
-                            throw new CommandFormatException("Failed to add to batch '" + line + "'", e);
+        resetArgs(line);
+        try {
+            if (parsedCmd.getFormat() == OperationFormat.INSTANCE) {
+                final ModelNode request = parsedCmd.toOperationRequest(this);
+
+                if (isBatchMode()) {
+                    StringBuilder op = new StringBuilder();
+                    op.append(getNodePathFormatter().format(parsedCmd.getAddress()));
+                    op.append(line.substring(line.indexOf(':')));
+                    DefaultBatchedCommand batchedCmd = new DefaultBatchedCommand(op.toString(), request);
+                    Batch batch = getBatchManager().getActiveBatch();
+                    batch.add(batchedCmd);
+                    printLine("#" + batch.size() + " " + batchedCmd.getCommand());
+                } else {
+                    set("OP_REQ", request);
+                    try {
+                        operationHandler.handle(this);
+                    } finally {
+                        set("OP_REQ", null);
+                    }
+                }
+            } else {
+                final String cmdName = parsedCmd.getOperationName();
+                CommandHandler handler = cmdRegistry.getCommandHandler(cmdName.toLowerCase());
+                if (handler != null) {
+                    if (isBatchMode() && handler.isBatchMode(this)) {
+                        if (!(handler instanceof OperationCommand)) {
+                            throw new CommandLineException("The command is not allowed in a batch.");
+                        } else {
+                            try {
+                                ModelNode request = ((OperationCommand) handler).buildRequest(this);
+                                BatchedCommand batchedCmd = new DefaultBatchedCommand(line, request);
+                                Batch batch = getBatchManager().getActiveBatch();
+                                batch.add(batchedCmd);
+                                printLine("#" + batch.size() + " " + batchedCmd.getCommand());
+                            } catch (CommandFormatException e) {
+                                throw new CommandFormatException("Failed to add to batch '" + line + "'", e);
+                            }
                         }
+                    } else {
+                        handler.handle(this);
                     }
                 } else {
-                    handler.handle(this);
+                    throw new CommandLineException("Unexpected command '" + line + "'. Type 'help --commands' for the list of supported commands.");
                 }
-            } else {
-                throw new CommandLineException("Unexpected command '" + line + "'. Type 'help --commands' for the list of supported commands.");
             }
+        } finally {
+            // so that getArgumentsString() doesn't return this line
+            // during the tab-completion of the next command
+            cmdLine = null;
         }
     }
 
@@ -482,6 +507,10 @@ class CommandContextImpl implements CommandContext {
 
     @Override
     public String getArgumentsString() {
+        // a little hack to support tab-completion of commands and ops spread across multiple lines
+        if(lineBuffer != null) {
+            return lineBuffer.toString();
+        }
         if (cmdLine != null && parsedCmd.getOperationName() != null) {
             int cmdNameLength = parsedCmd.getOperationName().length();
             if (cmdLine.length() == cmdNameLength) {
@@ -724,7 +753,7 @@ class CommandContextImpl implements CommandContext {
             }
 
             if (response != null && response.length() == 1) {
-                switch (response.toLowerCase().charAt(0)) {
+                switch (response.toLowerCase(Locale.ENGLISH).charAt(0)) {
                     case 'n':
                         return false;
                     case 't':
@@ -844,6 +873,9 @@ class CommandContextImpl implements CommandContext {
     String promptConnectPart;
 
     String getPrompt() {
+        if(lineBuffer != null) {
+            return "> ";
+        }
         StringBuilder buffer = new StringBuilder();
         if (promptConnectPart == null) {
             buffer.append('[');
@@ -1241,7 +1273,7 @@ class CommandContextImpl implements CommandContext {
                     for (X509Certificate current : temporarilyTrusted) {
                         theTrustStore.setCertificateEntry(current.getSubjectX500Principal().getName(), current);
                     }
-                    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance("SunX509");
+                    TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
                     trustManagerFactory.init(theTrustStore);
                     TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
                     for (TrustManager current : trustManagers) {

@@ -121,7 +121,6 @@ public class ModelDescriptionConstants {
     public static final String INTERFACE = "interface";
     public static final String JAAS = "jaas";
     public static final String JVM = "jvm";
-    public static final String JVM_TYPE = "type";
     public static final String LDAP = "ldap";
     public static final String LDAP_CONNECTION = "ldap-connection";
     public static final String LOCAL = "local";
@@ -198,6 +197,7 @@ public class ModelDescriptionConstants {
     public static final String READ_RESOURCE_DESCRIPTION_OPERATION = "read-resource-description";
     public static final String READ_RESOURCE_METRICS = "read-resource-metrics";
     public static final String READ_RESOURCE_OPERATION = "read-resource";
+    public static final String READ_TRANSFORMED_RESOURCE_OPERATION = "read-transformed-resource";
     public static final String RECURSIVE = "recursive";
     public static final String RECURSIVE_DEPTH = "recursive-depth";
     public static final String REDEPLOY = "redeploy";

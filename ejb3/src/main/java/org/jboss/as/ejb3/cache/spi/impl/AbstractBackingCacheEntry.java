@@ -37,7 +37,7 @@ public abstract class AbstractBackingCacheEntry<K extends Serializable, V extend
     private static final long serialVersionUID = 4562025672441864736L;
 
     private volatile long lastUsed = System.currentTimeMillis();
-    private transient volatile boolean inUse;
+    private transient volatile int usageCount;
     private volatile boolean prePassivated;
     private transient volatile boolean invalid;
 
@@ -48,12 +48,18 @@ public abstract class AbstractBackingCacheEntry<K extends Serializable, V extend
 
     @Override
     public boolean isInUse() {
-        return inUse;
+        return usageCount > 0;
     }
 
     @Override
-    public void setInUse(boolean inUse) {
-        this.inUse = inUse;
+    public synchronized void increaseUsageCount() {
+        this.usageCount++;
+        setLastUsed(System.currentTimeMillis());
+    }
+
+    @Override
+    public synchronized void decreaseUsageCount() {
+        this.usageCount--;
         setLastUsed(System.currentTimeMillis());
     }
 

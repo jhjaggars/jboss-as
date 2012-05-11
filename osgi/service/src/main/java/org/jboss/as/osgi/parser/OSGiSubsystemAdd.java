@@ -21,40 +21,38 @@
  */
 package org.jboss.as.osgi.parser;
 
+import static org.jboss.as.osgi.OSGiLogger.LOGGER;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
 import org.jboss.as.controller.AbstractBoottimeAddStepHandler;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.ServiceVerificationHandler;
-import org.jboss.as.controller.descriptions.DescriptionProvider;
-import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
-import org.jboss.as.osgi.deployment.BundleStartTracker;
-import org.jboss.as.osgi.deployment.OSGiDeploymentActivator;
+import org.jboss.as.controller.registry.Resource;
+import org.jboss.as.osgi.deployment.BundleContextBindingProcessor;
+import org.jboss.as.osgi.deployment.BundleDeploymentProcessor;
+import org.jboss.as.osgi.deployment.BundleInstallProcessor;
+import org.jboss.as.osgi.deployment.ModuleRegisterProcessor;
+import org.jboss.as.osgi.deployment.OSGiBundleInfoParseProcessor;
+import org.jboss.as.osgi.deployment.OSGiManifestStructureProcessor;
+import org.jboss.as.osgi.deployment.OSGiXServiceParseProcessor;
+import org.jboss.as.osgi.management.OSGiRuntimeResource;
 import org.jboss.as.osgi.parser.SubsystemState.Activation;
-import org.jboss.as.osgi.service.BundleInstallProviderIntegration;
+import org.jboss.as.osgi.service.BundleInstallIntegration;
 import org.jboss.as.osgi.service.FrameworkBootstrapService;
+import org.jboss.as.osgi.service.PersistentBundlesIntegration;
+import org.jboss.as.osgi.service.PersistentBundlesIntegration.InitialDeploymentTracker;
 import org.jboss.as.server.AbstractDeploymentChainStep;
 import org.jboss.as.server.DeploymentProcessorTarget;
+import org.jboss.as.server.deployment.Phase;
 import org.jboss.dmr.ModelNode;
-import org.jboss.dmr.ModelType;
-import org.jboss.msc.service.AbstractService;
-import org.jboss.msc.service.ServiceBuilder;
-import org.jboss.msc.service.ServiceContainer;
 import org.jboss.msc.service.ServiceController;
-import org.jboss.msc.service.ServiceController.Mode;
 import org.jboss.msc.service.ServiceTarget;
-import org.jboss.msc.service.StartContext;
-import org.jboss.msc.service.StartException;
-import org.jboss.osgi.framework.Services;
-import org.osgi.framework.Bundle;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.ResourceBundle;
-
-import static org.jboss.as.osgi.OSGiLogger.ROOT_LOGGER;
 
 /**
  * OSGi subsystem operation handler.
@@ -71,36 +69,13 @@ class OSGiSubsystemAdd extends AbstractBoottimeAddStepHandler {
     private OSGiRuntimeResource resource;
 
     private OSGiSubsystemAdd() {
-        // Private to ensure a singleton.
     }
 
-    // Can't use the execute() from the base class here because we use a custom resource.
-    public void execute(final OperationContext context, final ModelNode operation) throws OperationFailedException {
+    @Override
+    protected Resource createResource(OperationContext context) {
         resource = new OSGiRuntimeResource();
         context.addResource(PathAddress.EMPTY_ADDRESS, resource);
-
-        // rest of super.execute() method is unchanged below
-        populateModel(operation, resource);
-        final ModelNode model = resource.getModel();
-
-        if (requiresRuntime(context)) {
-            context.addStep(new OperationStepHandler() {
-                public void execute(OperationContext context, ModelNode operation) throws OperationFailedException {
-                    final List<ServiceController<?>> controllers = new ArrayList<ServiceController<?>>();
-                    final ServiceVerificationHandler verificationHandler = new ServiceVerificationHandler();
-                    performRuntime(context, operation, model, verificationHandler, controllers);
-
-                    if(requiresRuntimeVerification()) {
-                        context.addStep(verificationHandler, OperationContext.Stage.VERIFY);
-                    }
-
-                    if (context.completeStep() == OperationContext.ResultAction.ROLLBACK) {
-                        rollbackRuntime(context, operation, model, controllers);
-                    }
-                }
-            }, OperationContext.Stage.RUNTIME);
-        }
-        context.completeStep();
+        return resource;
     }
 
     protected void populateModel(final ModelNode operation, final ModelNode model) {
@@ -112,77 +87,43 @@ class OSGiSubsystemAdd extends AbstractBoottimeAddStepHandler {
     protected void performBoottime(final OperationContext context, final ModelNode operation, final ModelNode model,
             final ServiceVerificationHandler verificationHandler, final List<ServiceController<?>> newControllers) {
 
-        ROOT_LOGGER.activatingSubsystem();
+        LOGGER.infoActivatingSubsystem();
+
+        final ServiceTarget serviceTarget = context.getServiceTarget();
+        final Activation activationMode = getActivationMode(operation);
+        final InitialDeploymentTracker deploymentTracker = new InitialDeploymentTracker(context, activationMode);
 
         context.addStep(new OperationStepHandler() {
             public void execute(OperationContext context, ModelNode operation) throws OperationFailedException {
-                ServiceTarget serviceTarget = context.getServiceTarget();
-                newControllers.add(BundleStartTracker.addService(serviceTarget));
-                newControllers.add(BundleInstallProviderIntegration.addService(serviceTarget));
-                newControllers.add(FrameworkBootstrapService.addService(serviceTarget, verificationHandler));
+                newControllers.add(BundleInstallIntegration.addService(serviceTarget));
+                newControllers.add(FrameworkBootstrapService.addService(serviceTarget, resource, verificationHandler));
+                newControllers.add(PersistentBundlesIntegration.addService(serviceTarget, deploymentTracker));
                 context.completeStep();
             }
         }, OperationContext.Stage.RUNTIME);
 
         context.addStep(new AbstractDeploymentChainStep() {
             protected void execute(DeploymentProcessorTarget processorTarget) {
-                new OSGiDeploymentActivator().activate(processorTarget);
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.STRUCTURE, Phase.STRUCTURE_OSGI_MANIFEST, new OSGiManifestStructureProcessor());
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.PARSE, Phase.PARSE_OSGI_BUNDLE_INFO, new OSGiBundleInfoParseProcessor());
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.PARSE, Phase.PARSE_OSGI_XSERVICE_PROPERTIES, new OSGiXServiceParseProcessor());
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.PARSE, Phase.PARSE_OSGI_DEPLOYMENT, new BundleDeploymentProcessor());
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.INSTALL, Phase.INSTALL_BUNDLE_CONTEXT_BINDING, new BundleContextBindingProcessor());
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.INSTALL, Phase.INSTALL_OSGI_DEPLOYMENT, new BundleInstallProcessor(deploymentTracker));
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.INSTALL, Phase.INSTALL_OSGI_MODULE, new ModuleRegisterProcessor());
             }
         }, OperationContext.Stage.RUNTIME);
 
-        ServiceTarget serviceTarget = context.getServiceTarget();
-        newControllers.add(SubsystemState.addService(serviceTarget, getActivationMode(operation)));
-
-        // This step injects the System Bundle Service into our custom resource
-        context.addStep(new OperationStepHandler() {
-            @Override
-            public void execute(OperationContext context, ModelNode operation) throws OperationFailedException {
-                ServiceBuilder<Void> builder = context.getServiceTarget().addService(
-                        Services.JBOSGI_BASE_NAME.append("OSGiSubsystem").append("initialize"),
-                    new AbstractService<Void>() {
-                        @SuppressWarnings("unchecked")
-                        @Override
-                        public void start(StartContext context) throws StartException {
-                            try {
-                                ServiceContainer ctr = context.getController().getServiceContainer();
-                                ServiceController<Bundle> sc = (ServiceController<Bundle>) ctr.getRequiredService(Services.SYSTEM_BUNDLE);
-                                resource.setBundleContextServiceController(sc);
-                            } finally {
-                                context.getController().setMode(Mode.REMOVE);
-                            }
-                        }
-                    });
-                builder.addDependency(Services.SYSTEM_BUNDLE);
-                builder.setInitialMode(Mode.PASSIVE);
-                builder.install();
-                context.completeStep();
-            }
-        }, OperationContext.Stage.RUNTIME);
-
-        ROOT_LOGGER.debugf("Activated OSGi Subsystem");
+        // Add the subsystem state as a service
+        newControllers.add(SubsystemState.addService(serviceTarget, activationMode));
     }
 
     private Activation getActivationMode(ModelNode operation) {
         Activation activation = SubsystemState.DEFAULT_ACTIVATION;
         if (operation.has(ModelConstants.ACTIVATION)) {
-            activation = Activation.valueOf(operation.get(ModelConstants.ACTIVATION).asString().toUpperCase());
+            activation = Activation.valueOf(operation.get(ModelConstants.ACTIVATION).asString().toUpperCase(Locale.ENGLISH));
         }
         return activation;
     }
 
-    static DescriptionProvider DESCRIPTION = new DescriptionProvider() {
-
-        @Override
-        public ModelNode getModelDescription(Locale locale) {
-            ModelNode node = new ModelNode();
-            ResourceBundle resbundle = OSGiSubsystemProviders.getResourceBundle(locale);
-            node.get(ModelDescriptionConstants.OPERATION_NAME).set(ModelDescriptionConstants.ADD);
-            node.get(ModelDescriptionConstants.DESCRIPTION).set(resbundle.getString("subsystem.add"));
-            node.get(ModelDescriptionConstants.REQUEST_PROPERTIES, ModelConstants.ACTIVATION, ModelDescriptionConstants.DESCRIPTION).set(resbundle.getString("subsystem.activation"));
-            node.get(ModelDescriptionConstants.REQUEST_PROPERTIES, ModelConstants.ACTIVATION, ModelDescriptionConstants.TYPE).set(ModelType.STRING);
-            node.get(ModelDescriptionConstants.REQUEST_PROPERTIES, ModelConstants.ACTIVATION, ModelDescriptionConstants.DEFAULT).set(SubsystemState.DEFAULT_ACTIVATION.toString());
-            node.get(ModelDescriptionConstants.REPLY_PROPERTIES).setEmptyObject();
-            return node;
-        }
-    };
 }

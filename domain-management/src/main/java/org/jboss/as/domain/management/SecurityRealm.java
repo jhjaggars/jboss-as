@@ -21,10 +21,10 @@
  */
 package org.jboss.as.domain.management;
 
-import javax.net.ssl.SSLContext;
+import java.util.Map;
+import java.util.Set;
 
-import org.jboss.as.domain.management.security.DomainCallbackHandler;
-import org.jboss.as.domain.management.security.SubjectSupplemental;
+import javax.net.ssl.SSLContext;
 
 /**
  * Interface to the security realm.
@@ -39,14 +39,28 @@ public interface SecurityRealm {
     String getName();
 
     /**
-     * @return The CallbackHandler for the realm
+     * @return The set of authentication mechanisms supported by this realm.
      */
-    DomainCallbackHandler getCallbackHandler();
+    Set<AuthenticationMechanism> getSupportedAuthenticationMechanisms();
 
     /**
-     * @return The associated SubjectSupplemental (if set) to supplement the contents of the Subject.
+     * @return A Map containing the combined configuration options for the specified mechanisms.
      */
-    SubjectSupplemental getSubjectSupplemental();
+    Map<String, String> getMechanismConfig(final AuthenticationMechanism mechanism);
+
+    /**
+     * @param mechanism - The mechanism being used for authentication.
+     * @return The {@link AuthorizingCallbackHandler} for the specified mechanism.
+     * @throws IllegalArgumentException If the mechanism is not supported by this realm.
+     */
+    AuthorizingCallbackHandler getAuthorizingCallbackHandler(final AuthenticationMechanism mechanism);
+
+    /**
+     * Indicate that all supported mechanisms are ready.
+     *
+     * @return true if all mechanisms are ready to handle requests.
+     */
+    boolean isReady();
 
     /**
      * Used to obtain the SSLContext as configured for this security realm.
@@ -55,14 +69,6 @@ public interface SecurityRealm {
      * @throws IllegalStateException - If no SSL server-identity has been defined.
      */
     SSLContext getSSLContext();
-
-    /**
-     * Identify if a trust store has been configured for authentication, if defined it means CLIENT-CERT type authentication can
-     * occur.
-     *
-     * @return true if a trust store has been configured for authentication.
-     */
-    boolean hasTrustStore();
 
     /**
      * @return A CallbackHandlerFactory for a pre-configured secret.

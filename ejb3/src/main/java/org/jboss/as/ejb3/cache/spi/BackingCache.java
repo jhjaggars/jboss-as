@@ -29,6 +29,7 @@ import javax.ejb.NoSuchEJBException;
 import org.jboss.as.ejb3.cache.AffinitySupport;
 import org.jboss.as.ejb3.cache.Cache;
 import org.jboss.as.ejb3.cache.Cacheable;
+import org.jboss.as.ejb3.cache.IdentifierFactory;
 import org.jboss.as.ejb3.cache.Removable;
 
 /**
@@ -51,7 +52,7 @@ import org.jboss.as.ejb3.cache.Removable;
  * @author Brian Stansberry
  * @author Paul Ferraro
  */
-public interface BackingCache<K extends Serializable, V extends Cacheable<K>, E extends BackingCacheEntry<K, V>> extends Removable<K>, AffinitySupport<K> {
+public interface BackingCache<K extends Serializable, V extends Cacheable<K>, E extends BackingCacheEntry<K, V>> extends Removable<K>, AffinitySupport<K>, IdentifierFactory<K> {
     /**
      * Creates and caches a new instance of <code>C</code>, wrapped by a new <code>T</code>. The new <code>T</code> *is*
      * returned, but is not regarded as being "in use". Callers *must not* attempt to use the underlying <code>C</code> without
@@ -62,7 +63,8 @@ public interface BackingCache<K extends Serializable, V extends Cacheable<K>, E 
     E create();
 
     /**
-     * Get the specified object from cache. This will mark the entry as being in use.
+     * Get the specified object from cache. This will mark the entry as being in use, and increase its usage count.
+     *
      *
      * @param key the identifier of the object
      * @return the object
@@ -81,6 +83,8 @@ public interface BackingCache<K extends Serializable, V extends Cacheable<K>, E 
 
     /**
      * Release the object from use.
+     *
+     * This decreases the objects usage count, it will actually be released when the usage count hits 0.
      *
      * @param key the identifier of the object
      *

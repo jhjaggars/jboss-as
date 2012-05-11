@@ -24,6 +24,8 @@ package org.jboss.as.ejb3.deployment.processors;
 
 import org.jboss.as.ee.metadata.EJBClientDescriptorMetaData;
 import org.jboss.as.ee.structure.Attachments;
+import org.jboss.as.ejb3.EjbLogger;
+import org.jboss.as.ejb3.EjbMessages;
 import org.jboss.as.ejb3.deployment.EjbDeploymentAttachmentKeys;
 import org.jboss.as.ejb3.remote.DescriptorBasedEJBClientContextService;
 import org.jboss.as.ejb3.remote.EJBClientClusterConfig;
@@ -36,6 +38,7 @@ import org.jboss.as.server.deployment.DeploymentPhaseContext;
 import org.jboss.as.server.deployment.DeploymentUnit;
 import org.jboss.as.server.deployment.DeploymentUnitProcessingException;
 import org.jboss.as.server.deployment.DeploymentUnitProcessor;
+import org.jboss.ejb.client.DeploymentNodeSelector;
 import org.jboss.ejb.client.EJBClientConfiguration;
 import org.jboss.logging.Logger;
 import org.jboss.modules.Module;
@@ -43,6 +46,10 @@ import org.jboss.msc.service.ServiceBuilder;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.ServiceRegistry;
 import org.jboss.msc.service.ServiceTarget;
+import org.xnio.Option;
+import org.xnio.OptionMap;
+
+import java.util.Properties;
 
 /**
  * A deployment unit processor which processing only top level deployment units and checks for the presence
@@ -85,9 +92,26 @@ public class EJBClientDescriptorMetaDataProcessor implements DeploymentUnitProce
         // add the service
         final ServiceBuilder serviceBuilder = serviceTarget.addService(ejbClientContextServiceName, service);
         // add the remoting connection reference dependencies
-        for (final String connectionRef : ejbClientDescriptorMetaData.getRemotingReceiverConnectionRefs()) {
+        for (final EJBClientDescriptorMetaData.RemotingReceiverConfiguration remotingReceiverConfiguration : ejbClientDescriptorMetaData.getRemotingReceiverConfigurations()) {
+            final String connectionRef = remotingReceiverConfiguration.getOutboundConnectionRef();
             final ServiceName connectionDependencyService = AbstractOutboundConnectionService.OUTBOUND_CONNECTION_BASE_SERVICE_NAME.append(connectionRef);
             service.addRemotingConnectionDependency(serviceBuilder, connectionDependencyService);
+
+            // setup the channel creation options for each outbound connection reference
+            final Properties channelCreationProps = remotingReceiverConfiguration.getChannelCreationOptions();
+            final OptionMap channelCreationOpts;
+            if (channelCreationProps == null) {
+                channelCreationOpts = OptionMap.EMPTY;
+            } else {
+                // we don't use the deployment CL here since the XNIO project isn't necessarily added as a dep on the deployment's
+                // module CL
+                channelCreationOpts = this.getOptionMapFromProperties(channelCreationProps, this.getClass().getClassLoader());
+            }
+            logger.debug("Channel creation options for connection " + connectionRef + " are " + channelCreationOpts);
+            service.setChannelCreationOptions(connectionRef, channelCreationOpts);
+
+            // setup connection timeout for each outbound connection ref
+            service.setConnectionCreationTimeout(connectionRef, remotingReceiverConfiguration.getConnectionTimeout());
         }
         // if the local receiver is enabled for this context, then add a dependency on the appropriate LocalEjbReceiver
         // service
@@ -115,9 +139,21 @@ public class EJBClientDescriptorMetaDataProcessor implements DeploymentUnitProce
 
     }
 
-    private EJBClientConfiguration createClientConfiguration(final ServiceRegistry serviceRegistry, final ClassLoader classLoader, final EJBClientDescriptorMetaData ejbClientDescriptorMetaData) {
+    private EJBClientConfiguration createClientConfiguration(final ServiceRegistry serviceRegistry, final ClassLoader classLoader, final EJBClientDescriptorMetaData ejbClientDescriptorMetaData) throws DeploymentUnitProcessingException {
 
         final JBossEJBClientXmlConfiguration ejbClientConfig = new JBossEJBClientXmlConfiguration();
+        ejbClientConfig.setInvocationTimeout(ejbClientDescriptorMetaData.getInvocationTimeout());
+        // deployment node selector
+        final String deploymentNodeSelectorClassName = ejbClientDescriptorMetaData.getDeploymentNodeSelector();
+        if (deploymentNodeSelectorClassName != null && !deploymentNodeSelectorClassName.trim().isEmpty()) {
+            try {
+                final Class<?> deploymentNodeSelectorClass = classLoader.loadClass(deploymentNodeSelectorClassName);
+                ejbClientConfig.setDeploymentNodeSelector((DeploymentNodeSelector) deploymentNodeSelectorClass.newInstance());
+            } catch (Exception e) {
+                throw EjbMessages.MESSAGES.failedToCreateDeploymentNodeSelector(e, deploymentNodeSelectorClassName);
+            }
+        }
+
         for (final EJBClientDescriptorMetaData.ClusterConfig clusterMetadata : ejbClientDescriptorMetaData.getClusterConfigs()) {
             final EJBClientClusterConfig clusterConfig = new EJBClientClusterConfig(clusterMetadata, classLoader, serviceRegistry);
             // add it to the client configuration
@@ -133,4 +169,16 @@ public class EJBClientDescriptorMetaDataProcessor implements DeploymentUnitProce
     }
 
 
+    private static OptionMap getOptionMapFromProperties(final Properties properties, final ClassLoader classLoader) {
+        final OptionMap.Builder optionMapBuilder = OptionMap.builder();
+        for (final String propertyName : properties.stringPropertyNames()) {
+            try {
+                final Option<?> option = Option.fromString(propertyName, classLoader);
+                optionMapBuilder.parse(option, properties.getProperty(propertyName), classLoader);
+            } catch (IllegalArgumentException e) {
+                EjbLogger.EJB3_LOGGER.failedToCreateOptionForProperty(propertyName, e.getMessage());
+            }
+        }
+        return optionMapBuilder.getMap();
+    }
 }

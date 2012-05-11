@@ -613,8 +613,9 @@ public class ServerEnvironment extends ProcessEnvironment implements Serializabl
             if (qualifiedHostName == null) {
                 // Give up
                 qualifiedHostName = "unknown-host.unknown-domain";
+            } else {
+                qualifiedHostName = qualifiedHostName.trim().toLowerCase();
             }
-            qualifiedHostName = qualifiedHostName.trim().toLowerCase();
         } else {
             providedProperties.setProperty(QUALIFIED_HOST_NAME, qualifiedHostName);
         }

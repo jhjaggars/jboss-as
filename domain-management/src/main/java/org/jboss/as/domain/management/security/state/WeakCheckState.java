@@ -22,11 +22,13 @@
 
 package org.jboss.as.domain.management.security.state;
 
-import org.jboss.as.domain.management.security.ConsoleWrapper;
+import static org.jboss.as.domain.management.DomainManagementMessages.MESSAGES;
+import static org.jboss.as.domain.management.security.AddPropertiesUser.BAD_USER_NAMES;
 
 import java.util.Arrays;
-import static org.jboss.as.domain.management.security.AddPropertiesUser.BAD_USER_NAMES;
-import static org.jboss.as.domain.management.DomainManagementMessages.MESSAGES;
+import java.util.Locale;
+
+import org.jboss.as.domain.management.security.ConsoleWrapper;
 
 /**
  * State to check the strength of the stateValues selected.
@@ -40,10 +42,10 @@ public class WeakCheckState implements State {
     private StateValues stateValues;
     private static char[] VALID_PUNCTUATION = {'.', '@', '\\', '=', ',','/'};
 
-    public WeakCheckState(ConsoleWrapper theConsole,StateValues stateValues) {
+    public WeakCheckState(ConsoleWrapper theConsole, StateValues stateValues) {
         this.theConsole = theConsole;
         this.stateValues = stateValues;
-        if (theConsole.getConsole() == null) {
+        if ((stateValues != null && stateValues.isSilent() == false) && theConsole.getConsole() == null) {
             throw MESSAGES.noConsoleAvailable();
         }
     }
@@ -69,7 +71,7 @@ public class WeakCheckState implements State {
 
         boolean weakUserName = false;
         for (String current : BAD_USER_NAMES) {
-            if (current.equals(stateValues.getUserName().toLowerCase())) {
+            if (current.equals(stateValues.getUserName().toLowerCase(Locale.ENGLISH))) {
                 weakUserName = true;
                 break;
             }

@@ -41,8 +41,8 @@ import org.jboss.shrinkwrap.api.spec.WebArchive;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.jboss.as.test.integration.ws.wsse.KeystorePasswordCallback;
+import org.jboss.as.test.integration.ws.wsse.POJOEncryptServiceImpl;
 import org.jboss.as.test.integration.ws.wsse.ServiceIface;
-import org.jboss.as.test.integration.ws.wsse.ServiceImpl;
 
 /**
  * Test WS sign + encrypt capability for multiple clients (alice and john)
@@ -67,7 +67,7 @@ public class SignEncryptMultipleClientsTestCase {
 
         WebArchive war = ShrinkWrap.create(WebArchive.class, "jaxws-wsse-sign-encrypt.war").
                 addAsManifestResource(new StringAsset("Dependencies: org.apache.ws.security\n"), "MANIFEST.MF").
-                addClasses(ServiceIface.class, ServiceImpl.class, KeystorePasswordCallback.class).
+                addClasses(ServiceIface.class, POJOEncryptServiceImpl.class, KeystorePasswordCallback.class).
                 addAsResource(ServiceIface.class.getPackage(), "bob.jks", "bob.jks").
                 addAsResource(ServiceIface.class.getPackage(), "bob.properties", "bob.properties").
                 addAsWebInfResource(ServiceIface.class.getPackage(), "wsdl/SecurityService-sign-encrypt.wsdl", "wsdl/SecurityService.wsdl").
@@ -81,8 +81,8 @@ public class SignEncryptMultipleClientsTestCase {
 
     @Test
     public void encryptedAndSignedRequestFromAlice() throws Exception {
-        QName serviceName = new QName("http://www.jboss.org/jbossws/ws-extensions/wssecuritypolicy", "SecurityService");
-        URL wsdlURL = new URL(baseUrl.toString() + "SecurityService?wsdl");
+        QName serviceName = new QName("http://www.jboss.org/jbossws/ws-extensions/wssecuritypolicy", "EncryptSecurityService");
+        URL wsdlURL = new URL(baseUrl.toString() + "EncryptSecurityService?wsdl");
 
         Service service = Service.create(wsdlURL, serviceName);
         ServiceIface proxy = (ServiceIface) service.getPort(ServiceIface.class);
@@ -93,8 +93,8 @@ public class SignEncryptMultipleClientsTestCase {
 
     @Test
     public void encryptedAndSignedRequestFromJohn() throws Exception {
-        QName serviceName = new QName("http://www.jboss.org/jbossws/ws-extensions/wssecuritypolicy", "SecurityService");
-        URL wsdlURL = new URL(baseUrl.toString() + "SecurityService?wsdl");
+        QName serviceName = new QName("http://www.jboss.org/jbossws/ws-extensions/wssecuritypolicy", "EncryptSecurityService");
+        URL wsdlURL = new URL(baseUrl.toString() + "EncryptSecurityService?wsdl");
 
         Service service = Service.create(wsdlURL, serviceName);
         ServiceIface proxy = (ServiceIface) service.getPort(ServiceIface.class);
@@ -109,8 +109,8 @@ public class SignEncryptMultipleClientsTestCase {
      */
     @Test
     public void encryptedAndSignedRequestFromUntrustedMax() throws Exception {
-        QName serviceName = new QName("http://www.jboss.org/jbossws/ws-extensions/wssecuritypolicy", "SecurityService");
-        URL wsdlURL = new URL(baseUrl.toString() + "SecurityService?wsdl");
+        QName serviceName = new QName("http://www.jboss.org/jbossws/ws-extensions/wssecuritypolicy", "EncryptSecurityService");
+        URL wsdlURL = new URL(baseUrl.toString() + "EncryptSecurityService?wsdl");
 
         Service service = Service.create(wsdlURL, serviceName);
         ServiceIface proxy = (ServiceIface) service.getPort(ServiceIface.class);

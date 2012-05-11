@@ -23,18 +23,19 @@ package org.jboss.as.connector.subsystems.datasources;
 
 import static javax.xml.stream.XMLStreamConstants.END_ELEMENT;
 import static javax.xml.stream.XMLStreamConstants.START_ELEMENT;
-import static org.jboss.as.connector.pool.Constants.BACKGROUNDVALIDATION;
-import static org.jboss.as.connector.pool.Constants.BACKGROUNDVALIDATIONMILLIS;
-import static org.jboss.as.connector.pool.Constants.BLOCKING_TIMEOUT_WAIT_MILLIS;
-import static org.jboss.as.connector.pool.Constants.IDLETIMEOUTMINUTES;
-import static org.jboss.as.connector.pool.Constants.MAX_POOL_SIZE;
-import static org.jboss.as.connector.pool.Constants.MIN_POOL_SIZE;
-import static org.jboss.as.connector.pool.Constants.POOL_FLUSH_STRATEGY;
-import static org.jboss.as.connector.pool.Constants.POOL_PREFILL;
-import static org.jboss.as.connector.pool.Constants.POOL_USE_STRICT_MIN;
-import static org.jboss.as.connector.pool.Constants.USE_FAST_FAIL;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.BACKGROUNDVALIDATION;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.BACKGROUNDVALIDATIONMILLIS;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.BLOCKING_TIMEOUT_WAIT_MILLIS;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.IDLETIMEOUTMINUTES;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.MAX_POOL_SIZE;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.MIN_POOL_SIZE;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.POOL_FLUSH_STRATEGY;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.POOL_PREFILL;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.POOL_USE_STRICT_MIN;
+import static org.jboss.as.connector.subsystems.common.pool.Constants.USE_FAST_FAIL;
 import static org.jboss.as.connector.subsystems.datasources.Constants.ALLOCATION_RETRY;
 import static org.jboss.as.connector.subsystems.datasources.Constants.ALLOCATION_RETRY_WAIT_MILLIS;
+import static org.jboss.as.connector.subsystems.datasources.Constants.ALLOW_MULTIPLE_USERS;
 import static org.jboss.as.connector.subsystems.datasources.Constants.CHECKVALIDCONNECTIONSQL;
 import static org.jboss.as.connector.subsystems.datasources.Constants.CONNECTION_PROPERTIES;
 import static org.jboss.as.connector.subsystems.datasources.Constants.CONNECTION_PROPERTY_VALUE;
@@ -113,18 +114,18 @@ import org.jboss.as.connector.util.AbstractParser;
 import org.jboss.as.connector.util.ParserException;
 import org.jboss.dmr.ModelNode;
 import org.jboss.jca.common.CommonBundle;
-import org.jboss.jca.common.api.metadata.common.CommonPool;
-import org.jboss.jca.common.api.metadata.common.CommonXaPool;
 import org.jboss.jca.common.api.metadata.common.Credential;
 import org.jboss.jca.common.api.metadata.common.Recovery;
-import org.jboss.jca.common.api.metadata.ds.DataSource;
 import org.jboss.jca.common.api.metadata.ds.DataSources;
 import org.jboss.jca.common.api.metadata.ds.Driver;
 import org.jboss.jca.common.api.metadata.ds.DsSecurity;
 import org.jboss.jca.common.api.metadata.ds.Statement;
 import org.jboss.jca.common.api.metadata.ds.TimeOut;
 import org.jboss.jca.common.api.metadata.ds.Validation;
-import org.jboss.jca.common.api.metadata.ds.XaDataSource;
+import org.jboss.jca.common.api.metadata.ds.v11.DataSource;
+import org.jboss.jca.common.api.metadata.ds.v11.DsPool;
+import org.jboss.jca.common.api.metadata.ds.v11.DsXaPool;
+import org.jboss.jca.common.api.metadata.ds.v11.XaDataSource;
 import org.jboss.jca.common.api.validator.ValidateException;
 import org.jboss.logging.Messages;
 import org.jboss.staxmapper.XMLExtendedStreamReader;
@@ -730,16 +731,15 @@ public class DsParser extends AbstractParser {
                     if (DataSource.Tag.forName(reader.getLocalName()) == DataSource.Tag.POOL) {
                         return;
                         //it's fine. Do nothing
-
                     } else {
-                        if (CommonPool.Tag.forName(reader.getLocalName()) == CommonPool.Tag.UNKNOWN) {
+                        if (DsPool.Tag.forName(reader.getLocalName()) == DsPool.Tag.UNKNOWN) {
                             throw new ParserException(bundle.unexpectedEndTag(reader.getLocalName()));
                         }
                     }
                     break;
                 }
                 case START_ELEMENT: {
-                    switch (CommonPool.Tag.forName(reader.getLocalName())) {
+                    switch (DsPool.Tag.forName(reader.getLocalName())) {
                         case MAX_POOL_SIZE: {
                             String value = rawElementText(reader);
                             MAX_POOL_SIZE.parseAndSetParameter(value, operation, reader);
@@ -750,7 +750,6 @@ public class DsParser extends AbstractParser {
                             MIN_POOL_SIZE.parseAndSetParameter(value, operation, reader);
                             break;
                         }
-
                         case PREFILL: {
                             String value = rawElementText(reader);
                             POOL_PREFILL.parseAndSetParameter(value, operation, reader);
@@ -766,8 +765,16 @@ public class DsParser extends AbstractParser {
                             POOL_FLUSH_STRATEGY.parseAndSetParameter(value, operation, reader);
                             break;
                         }
-                        default:
+                        case ALLOW_MULTIPLE_USERS: {
+                            ALLOW_MULTIPLE_USERS.parseAndSetParameter("true", operation, reader);
+                            break;
+                        }
+                        case UNKNOWN: {
                             throw new ParserException(bundle.unexpectedElement(reader.getLocalName()));
+                        }
+                        default: {
+                            throw new ParserException(bundle.unexpectedElement(reader.getLocalName()));
+                        }
                     }
                     break;
                 }
@@ -784,19 +791,17 @@ public class DsParser extends AbstractParser {
             switch (reader.nextTag()) {
                 case END_ELEMENT: {
                     if (XaDataSource.Tag.forName(reader.getLocalName()) == XaDataSource.Tag.XA_POOL) {
-
                         return;
                         //it's fine. Do nothing
-
                     } else {
-                        if (CommonXaPool.Tag.forName(reader.getLocalName()) == CommonXaPool.Tag.UNKNOWN) {
+                        if (DsXaPool.Tag.forName(reader.getLocalName()) == DsXaPool.Tag.UNKNOWN) {
                             throw new ParserException(bundle.unexpectedEndTag(reader.getLocalName()));
                         }
                     }
                     break;
                 }
                 case START_ELEMENT: {
-                    switch (CommonXaPool.Tag.forName(reader.getLocalName())) {
+                    switch (DsXaPool.Tag.forName(reader.getLocalName())) {
                         case MAX_POOL_SIZE: {
                             String value = rawElementText(reader);
                             MAX_POOL_SIZE.parseAndSetParameter(value, operation, reader);
@@ -807,7 +812,6 @@ public class DsParser extends AbstractParser {
                             MIN_POOL_SIZE.parseAndSetParameter(value, operation, reader);
                             break;
                         }
-
                         case PREFILL: {
                             String value = rawElementText(reader);
                             POOL_PREFILL.parseAndSetParameter(value, operation, reader);
@@ -821,6 +825,10 @@ public class DsParser extends AbstractParser {
                         case FLUSH_STRATEGY: {
                             String value = rawElementText(reader);
                             POOL_FLUSH_STRATEGY.parseAndSetParameter(value, operation, reader);
+                            break;
+                        }
+                        case ALLOW_MULTIPLE_USERS: {
+                            ALLOW_MULTIPLE_USERS.parseAndSetParameter("true", operation, reader);
                             break;
                         }
                         case INTERLEAVING: {

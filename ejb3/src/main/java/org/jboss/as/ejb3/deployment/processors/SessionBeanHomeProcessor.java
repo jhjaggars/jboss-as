@@ -35,8 +35,10 @@ import org.jboss.as.ee.component.DependencyConfigurator;
 import org.jboss.as.ee.component.ViewConfiguration;
 import org.jboss.as.ee.component.ViewConfigurator;
 import org.jboss.as.ee.component.ViewDescription;
+import org.jboss.as.ee.component.ViewService;
 import org.jboss.as.ee.component.deployers.AbstractComponentConfigProcessor;
 import org.jboss.as.ee.component.interceptors.InterceptorOrder;
+import org.jboss.as.ejb3.EjbLogger;
 import org.jboss.as.ejb3.component.EJBComponentDescription;
 import org.jboss.as.ejb3.component.EJBViewDescription;
 import org.jboss.as.ejb3.component.interceptors.EjbMetadataInterceptorFactory;
@@ -53,6 +55,7 @@ import org.jboss.as.server.deployment.DeploymentUnitProcessingException;
 import org.jboss.as.server.deployment.annotation.CompositeIndex;
 import org.jboss.as.server.deployment.reflect.DeploymentClassIndex;
 import org.jboss.msc.service.ServiceBuilder;
+
 import static org.jboss.as.ejb3.EjbMessages.MESSAGES;
 
 /**
@@ -100,17 +103,18 @@ public class SessionBeanHomeProcessor extends AbstractComponentConfigProcessor {
                         if (ejbObjectView == null) {
                             throw MESSAGES.invalidEjbLocalInterface(componentDescription.getComponentName());
                         }
-                        final ViewDescription createdView = ejbObjectView;
 
                         Method initMethod = resolveInitMethod(ejbComponentDescription, method);
                         final SessionBeanHomeInterceptorFactory factory = new SessionBeanHomeInterceptorFactory(initMethod);
                         //add a dependency on the view to create
-                        componentConfiguration.getStartDependencies().add(new DependencyConfigurator<ComponentStartService>() {
+
+                        configuration.getDependencies().add(new DependencyConfigurator<ViewService>() {
                             @Override
-                            public void configureDependency(final ServiceBuilder<?> serviceBuilder, final ComponentStartService service) throws DeploymentUnitProcessingException {
-                                serviceBuilder.addDependency(createdView.getServiceName(), ComponentView.class, factory.getViewToCreate());
+                            public void configureDependency(final ServiceBuilder<?> serviceBuilder, final ViewService service) throws DeploymentUnitProcessingException {
+                                serviceBuilder.addDependency(ejbObjectView.getServiceName(), ComponentView.class, factory.getViewToCreate());
                             }
                         });
+
                         //add the interceptor
                         configuration.addClientInterceptor(method, ViewDescription.CLIENT_DISPATCHER_INTERCEPTOR_FACTORY, InterceptorOrder.Client.CLIENT_DISPATCHER);
                         configuration.addViewInterceptor(method, factory, InterceptorOrder.View.HOME_METHOD_INTERCEPTOR);
@@ -121,7 +125,7 @@ public class SessionBeanHomeProcessor extends AbstractComponentConfigProcessor {
                         try {
                             ejbObjectClass = classIndex.classIndex(ejbObjectView.getViewClassName()).getModuleClass();
                         } catch (ClassNotFoundException e) {
-                            throw new DeploymentUnitProcessingException("Could not load view class for " + componentDescription.getComponentName(), e);
+                            throw EjbLogger.EJB3_LOGGER.failedToLoadViewClassForComponent(e, componentDescription.getComponentName());
                         }
                         final EjbMetadataInterceptorFactory factory = new EjbMetadataInterceptorFactory(ejbObjectClass, configuration.getViewClass(), null, true, componentDescription instanceof StatelessComponentDescription);
 
@@ -141,7 +145,8 @@ public class SessionBeanHomeProcessor extends AbstractComponentConfigProcessor {
                         configuration.addViewInterceptor(method, InvalidRemoveExceptionMethodInterceptor.FACTORY, InterceptorOrder.View.INVALID_METHOD_EXCEPTION);
                     } else if (method.getName().equals("remove") && method.getParameterTypes().length == 1 && method.getParameterTypes()[0] == Handle.class) {
                         configuration.addClientInterceptor(method, ViewDescription.CLIENT_DISPATCHER_INTERCEPTOR_FACTORY, InterceptorOrder.Client.CLIENT_DISPATCHER);
-                        configuration.addViewInterceptor(method, HomeRemoveInterceptor.FACTORY, InterceptorOrder.View.HOME_METHOD_INTERCEPTOR);                    }
+                        configuration.addViewInterceptor(method, HomeRemoveInterceptor.FACTORY, InterceptorOrder.View.HOME_METHOD_INTERCEPTOR);
+                    }
 
                 }
             }
@@ -191,7 +196,7 @@ public class SessionBeanHomeProcessor extends AbstractComponentConfigProcessor {
             }
         }
         if (initMethod == null) {
-            throw MESSAGES.failToCallEjbCreateForHomeInterface(method,description.getEJBClassName());
+            throw MESSAGES.failToCallEjbCreateForHomeInterface(method, description.getEJBClassName());
         }
         return initMethod;
     }

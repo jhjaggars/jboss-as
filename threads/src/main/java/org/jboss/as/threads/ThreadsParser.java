@@ -52,6 +52,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -871,7 +872,7 @@ public final class ThreadsParser implements XMLStreamConstants, XMLElementReader
                     break;
                 }
                 case UNIT: {
-                    unit = Enum.valueOf(TimeUnit.class, value.toUpperCase());
+                    unit = Enum.valueOf(TimeUnit.class, value.toUpperCase(Locale.ENGLISH));
                     break;
                 }
                 default:
@@ -1204,6 +1205,6 @@ public final class ThreadsParser implements XMLStreamConstants, XMLElementReader
 
     private void writeAttributeLowerCaseValue(final XMLExtendedStreamWriter writer, final Attribute attr, final ModelNode value)
             throws XMLStreamException {
-        writer.writeAttribute(attr.getLocalName(), value.asString().toLowerCase());
+        writer.writeAttribute(attr.getLocalName(), value.asString().toLowerCase(Locale.ENGLISH));
     }
 }

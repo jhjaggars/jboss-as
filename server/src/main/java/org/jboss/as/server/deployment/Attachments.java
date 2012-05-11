@@ -39,6 +39,7 @@ import org.jboss.as.server.deployment.reflect.DeploymentReflectionIndex;
 import org.jboss.as.server.deployment.reflect.ProxyMetadataSource;
 import org.jboss.as.server.moduleservice.ExternalModuleService;
 import org.jboss.as.server.moduleservice.ServiceModuleLoader;
+import org.jboss.as.server.services.security.AbstractVaultReader;
 import org.jboss.jandex.Index;
 import org.jboss.modules.Module;
 import org.jboss.modules.ModuleIdentifier;
@@ -61,6 +62,12 @@ public final class Attachments {
      * A list of service dependencies that must be satisfied before the next deployment phase can begin executing.
      */
     public static final AttachmentKey<AttachmentList<AttachableDependency>> NEXT_PHASE_ATTACHABLE_DEPS = AttachmentKey.createList(AttachableDependency.class);
+
+    /**
+     * A set of subsystem names that should not be processed. Any subsystem whos name is in this list will not have
+     * its deployment unit processors run.
+     */
+    public static final AttachmentKey<Set<String>> EXCLUDED_SUBSYSTEMS = AttachmentKey.create(Set.class);
 
     /**
      * The deployments runtime name
@@ -199,6 +206,8 @@ public final class Attachments {
     // PARSE
     //
 
+    public static final AttachmentKey<AbstractVaultReader> VAULT_READER_ATTACHMENT_KEY = AttachmentKey.create(AbstractVaultReader.class);
+
     //
     // DEPENDENCIES
     //
@@ -221,11 +230,6 @@ public final class Attachments {
      * The module of this deployment unit.
      */
     public static final AttachmentKey<Module> MODULE = AttachmentKey.create(Module.class);
-
-    /**
-     * Information about a modules dependencies used to setup transitive deps
-     */
-    public static final AttachmentKey<AttachmentList<ModuleSpecification>> MODULE_DEPENDENCY_INFORMATION = AttachmentKey.createList(ModuleSpecification.class);
 
     /**
      * The module loader for the deployment

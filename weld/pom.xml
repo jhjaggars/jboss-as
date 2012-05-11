@@ -29,12 +29,12 @@
     <parent>
         <groupId>org.jboss.as</groupId>
         <artifactId>jboss-as-parent</artifactId>
-        <version>7.1.2.Final-SNAPSHOT</version>
+        <version>7.2.0.Alpha1-SNAPSHOT</version>
     </parent>
 
     <groupId>org.jboss.as</groupId>
     <artifactId>jboss-as-weld</artifactId>
-    <version>7.1.2.Final-SNAPSHOT</version>
+    <version>7.2.0.Alpha1-SNAPSHOT</version>
 
     <name>JBoss Application Server: Weld Integration</name>
 
@@ -161,8 +161,18 @@
         </dependency>
 
         <dependency>
+            <groupId>org.jboss.spec.javax.el</groupId>
+            <artifactId>jboss-el-api_2.2_spec</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.jboss.spec.javax.faces</groupId>
             <artifactId>jboss-jsf-api_2.1_spec</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jboss.spec.javax.servlet</groupId>
+            <artifactId>jboss-servlet-api_3.0_spec</artifactId>
         </dependency>
 
         <dependency>

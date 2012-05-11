@@ -56,6 +56,7 @@ import org.jboss.as.server.deployment.DeploymentUnitProcessingException;
 import org.jboss.as.server.deployment.DeploymentUnitProcessor;
 import org.jboss.as.server.deployment.SetupAction;
 import org.jboss.as.web.VirtualHost;
+import org.jboss.as.web.WebDeploymentDefinition;
 import org.jboss.as.web.WebSubsystemServices;
 import org.jboss.as.web.deployment.component.ComponentInstantiator;
 import org.jboss.as.web.ext.WebContextFactory;
@@ -229,7 +230,7 @@ public class WarDeploymentProcessor implements DeploymentUnitProcessor {
                         }
                         break;
                    case SERVLET_INSTANCE:
-                       webContext.addInstanceListener(listener.getListenerClass());
+                        webContext.addInstanceListener(listener.getListenerClass());
                         break;
                     case SERVLET_CONTAINER:
                         webContext.addWrapperListener(listener.getListenerClass());
@@ -297,7 +298,7 @@ public class WarDeploymentProcessor implements DeploymentUnitProcessor {
                     builder.addDependency(DependencyType.OPTIONAL, factoryServiceName, DistributedCacheManagerFactory.class, config.getDistributedCacheManagerFactoryInjector());
 
                     ServiceBuilder<DistributedCacheManagerFactory> factoryBuilder = serviceTarget.addService(factoryServiceName, factoryService);
-                    boolean enabled = factory.addDependencies(deploymentUnit.getServiceRegistry(), serviceTarget, factoryBuilder, metaData);
+                    boolean enabled = factory.addDeploymentDependencies(deploymentServiceName, deploymentUnit.getServiceRegistry(), serviceTarget, factoryBuilder, metaData);
                     factoryBuilder.setInitialMode(enabled ? ServiceController.Mode.ON_DEMAND : ServiceController.Mode.NEVER).install();
                 }
             }
@@ -327,8 +328,8 @@ public class WarDeploymentProcessor implements DeploymentUnitProcessor {
 
         // Process the web related mgmt information
         final ModelNode node = deploymentUnit.getDeploymentSubsystemModel("web");
-        node.get("context-root").set("".equals(pathName) ? "/" : pathName);
-        node.get("virtual-host").set(hostName);
+        node.get(WebDeploymentDefinition.CONTEXT_ROOT.getName()).set("".equals(pathName) ? "/" : pathName);
+        node.get(WebDeploymentDefinition.VIRTUAL_HOST.getName()).set(hostName);
         processManagement(deploymentUnit, metaData);
     }
 

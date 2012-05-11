@@ -22,6 +22,7 @@
 package org.jboss.as.ejb3.component.session;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
 import javax.ejb.EJBException;
 import javax.ejb.EJBLocalObject;
@@ -37,6 +38,7 @@ import org.jboss.as.ee.component.ViewDescription;
 import org.jboss.as.ee.component.interceptors.ComponentDispatcherInterceptor;
 import org.jboss.as.ee.component.interceptors.InterceptorOrder;
 import org.jboss.as.ee.component.serialization.WriteReplaceInterface;
+import org.jboss.as.ejb3.EjbLogger;
 import org.jboss.as.ejb3.EjbMessages;
 import org.jboss.as.ejb3.component.interceptors.GetHomeInterceptorFactory;
 import org.jboss.as.server.deployment.Attachments;
@@ -101,7 +103,11 @@ public abstract class SessionBeanObjectViewConfigurator implements ViewConfigura
                 handleIsIdenticalMethod(componentConfiguration, configuration, index, method);
             }  else {
                 final Method componentMethod = ClassReflectionIndexUtil.findMethod(index, componentConfiguration.getComponentClass(), MethodIdentifier.getIdentifierForMethod(method));
+
                 if (componentMethod != null) {
+                    if(!Modifier.isPublic(componentMethod.getModifiers())) {
+                        throw EjbMessages.MESSAGES.ejbBusinessMethodMustBePublic(componentMethod);
+                    }
                     configuration.addViewInterceptor(method, new ImmediateInterceptorFactory(new ComponentDispatcherInterceptor(componentMethod)), InterceptorOrder.View.COMPONENT_DISPATCHER);
                     configuration.addClientInterceptor(method, ViewDescription.CLIENT_DISPATCHER_INTERCEPTOR_FACTORY, InterceptorOrder.Client.CLIENT_DISPATCHER);
                 } else if(method.getDeclaringClass() != Object.class && method.getDeclaringClass() != WriteReplaceInterface.class) {
@@ -123,7 +129,7 @@ public abstract class SessionBeanObjectViewConfigurator implements ViewConfigura
     private static final InterceptorFactory PRIMARY_KEY_INTERCEPTOR = new ImmediateInterceptorFactory(new Interceptor() {
         @Override
         public Object processInvocation(final InterceptorContext context) throws Exception {
-            throw new EJBException("Cannot call getPrimaryKey on a session bean");
+            throw EjbLogger.EJB3_LOGGER.cannotCallGetPKOnSessionBean();
         }
     });
 

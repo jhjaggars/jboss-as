@@ -21,6 +21,14 @@
  */
 package org.jboss.as.test.integration.security.common;
 
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REMOVE;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUBSYSTEM;
+import static org.jboss.as.security.Constants.SECURITY_DOMAIN;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
@@ -30,6 +38,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.InetAddress;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.security.MessageDigest;
@@ -37,11 +46,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.StatusLine;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
@@ -50,29 +65,27 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.util.EntityUtils;
+import org.jboss.as.arquillian.container.ManagementClient;
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.OperationBuilder;
+import org.jboss.as.network.NetworkUtils;
 import org.jboss.as.test.integration.security.loginmodules.common.Coding;
 import org.jboss.as.test.shared.TestSuiteEnvironment;
 import org.jboss.dmr.ModelNode;
+import org.jboss.logging.Logger;
 import org.jboss.shrinkwrap.api.exporter.ZipExporter;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
 import org.jboss.util.Base64;
 
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REMOVE;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUBSYSTEM;
-import static org.jboss.as.security.Constants.SECURITY_DOMAIN;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 /**
+ * Common utilities for JBoss AS security tests.
+ * 
  * @author Jan Lanik
- *         <p/>
- *         Common utilities for login modules tests.
+ * @author Josef Cacek
  */
 public class Utils {
+
+    private static final Logger LOGGER = Logger.getLogger(Utils.class);
 
    public static String hash(String target, String algorithm, Coding coding) {
       MessageDigest md = null;
@@ -387,4 +400,69 @@ public class Utils {
       return ModelControllerClient.Factory.create(InetAddress.getByName(TestSuiteEnvironment.getServerAddress()), TestSuiteEnvironment.getServerPort(),
          org.jboss.as.arquillian.container.Authentication.getCallbackHandler());
    }
+
+    /**
+     * Returns "secondary.test.address" system property if such exists. If not found, then there is a fallback to
+     * {@link ManagementClient#getMgmtAddress()}. Returned value is formatted to use in URLs (i.e. if it's IPv6 address, then
+     * square brackets are placed around - e.g. "[::1]")
+     * 
+     * @param mgmtClient management client instance (may be <code>null</code>)
+     * @return
+     */
+    public static String getSecondaryTestAddress(final ManagementClient mgmtClient) {
+        String address = System.getProperty("secondary.test.address");
+        if (StringUtils.isBlank(address) && mgmtClient != null) {
+            address = mgmtClient.getMgmtAddress();
+        }
+        return NetworkUtils.formatPossibleIpv6Address(address);
+    }
+
+    /**
+     * Returns response body for the given URL request as a String. It also checks if the returned HTTP status code is the
+     * expected one. If the server returns {@link HttpServletResponse#SC_UNAUTHORIZED} and username is provided, then a new
+     * request is created with the provided credentials (basic authentication).
+     * 
+     * @param url URL to which the request should be made
+     * @param user Username (may be null)
+     * @param pass Password (may be null)
+     * @param expectedStatusCode expected status code returned from the requested server
+     * @return HTTP response body
+     * @throws ClientProtocolException
+     * @throws IOException
+     * @throws URISyntaxException
+     */
+    public static String makeCallWithBasicAuthn(URL url, String user, String pass, int expectedStatusCode)
+            throws ClientProtocolException, IOException, URISyntaxException {
+        LOGGER.info("Requesting URL " + url);
+        final DefaultHttpClient httpClient = new DefaultHttpClient();
+        try {
+            final HttpGet httpGet = new HttpGet(url.toURI());
+            HttpResponse response = httpClient.execute(httpGet);
+            int statusCode = response.getStatusLine().getStatusCode();
+            if (HttpServletResponse.SC_UNAUTHORIZED != statusCode || StringUtils.isEmpty(user)) {
+                assertEquals("Unexpected HTTP response status code.", expectedStatusCode, statusCode);
+                return EntityUtils.toString(response.getEntity());
+            }
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("HTTP response was SC_UNAUTHORIZED, let's authenticate the user " + user);
+            }
+            HttpEntity entity = response.getEntity();
+            if (entity != null)
+                EntityUtils.consume(entity);
+
+            final UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(user, pass);
+            httpClient.getCredentialsProvider().setCredentials(new AuthScope(url.getHost(), url.getPort()), credentials);
+
+            response = httpClient.execute(httpGet);
+            statusCode = response.getStatusLine().getStatusCode();
+            assertEquals("Unexpected status code returned after the authentication.", expectedStatusCode, statusCode);
+            return EntityUtils.toString(response.getEntity());
+        } finally {
+            // When HttpClient instance is no longer needed,
+            // shut down the connection manager to ensure
+            // immediate deallocation of all system resources
+            httpClient.getConnectionManager().shutdown();
+        }
+    }
+
 }

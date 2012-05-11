@@ -385,6 +385,30 @@ public interface DomainManagementMessages {
     String errorHeader();
 
     /**
+     * A message to check if this user is going to be used by a host controller to connect to the master domain controller.
+     *
+     * @return a {@link String} for the message.
+     */
+    @Message(value = "Is this new user going to be used for one AS process to connect to another AS process e.g. slave domain controller?")
+    String serverUser();
+
+    /**
+     * Simple yes/no prompt.
+     *
+     * @return a {@link String} for the message.
+     */
+    @Message(value = "yes/no?")
+    String yesNo();
+
+    /**
+     * To represent this user use the following secret entry in the server-identities.
+     *
+     * @return a {@link String} for the message.
+     */
+    @Message(value = "To represent the user add the following to the server-identities definition <secret value=\"%s\" />")
+    String secretElement(String base64);
+
+    /**
      * Error message if more than one username/password authentication mechanism is defined.
      *
      * @param realmName the name of the security realm
@@ -394,16 +418,6 @@ public interface DomainManagementMessages {
      */
     @Message(id = 15244, value = "Configuration for security realm '%s' includes multiple username/password based authentication mechanisms (%s). Only one is allowed")
     OperationFailedException multipleAuthenticationMechanismsDefined(String realmName, Set<String> mechanisms);
-
-    /**
-     * Creates an exception indicating no authentication mechanism was defined in the security realm.
-     *
-     * @param realmName the security realm name
-     *
-     * @return an {@link OperationFailedException} for the error.
-     */
-    @Message(id = 15245, value = "No authentication mechanism defined in security realm '%s'.")
-    OperationFailedException noAuthenticationDefined(String realmName);
 
     /**
      * Creates an exception indicating that one of {@code attr1} or {@code attr2} is required.
@@ -534,8 +548,73 @@ public interface DomainManagementMessages {
     @Message(value = "Updated user '%s' with roles %s to file '%s'")
     String updatedRoles(String username, String roles, String fileName);
 
+    /**
+     * IOException to indicate the user attempting to use local authentication has been rejected.
+     *
+     * @param userName - The user attempting local authentication.
+     * @return an {@link IOException} for the failure.
+     */
+    @Message(id = 15255, value = "The user '%s' is not allowed in a local authentication.")
+    IOException invalidLocalUser(final String userName);
+
+    /**
+     * StartException to indicate that multiple CallbackHandlerServices are associated for the same mechanism.
+     *
+     * @param mechanismName - the name of the mechanism being registered.
+     * @return an {@link StartException} for the failure.
+     */
+    @Message(id = 15256, value = "Multiple CallbackHanderServices for the same mechanism (%s)")
+    StartException multipleCallbackHandlerForMechanism(final String mechanismName);
+
+    /**
+     * IllegalStateException to indicate a CallbackHandler has been requested for an unsupported mechanism.
+     *
+     * @param mechanism - The name of the mechanism requested.
+     * @param realmName - The name of the realm the mechanism was requested from.
+     * @return an {@link IllegalStateException} for the failure.
+     */
+    @Message(id = 15259, value = "No CallbackHandler available for mechanism %s in realm %s")
+    IllegalStateException noCallbackHandlerForMechanism(final String mechanism, final String realmName);
+
+    /**
+     * IllegalStateException to indicate no plug in providers were loaded for the specified name.
+     *
+     * @param name The name of the module loaded.
+     * @return an {@link IllegalStateException} for the failure.
+     */
+    @Message(id = 15260, value = "No plug in providers found for module name %s")
+    IllegalArgumentException noPlugInProvidersLoaded(final String name);
+
+    /**
+     * IllegalStateException to indicate a failure loading the PlugIn.
+     *
+     * @param name - The name of the plug-in being loaded.
+     * @param error - The error that occurred.
+     * @return an {@link IllegalArgumentException} for the failure.
+     */
+    @Message(id = 15261, value = "Unable to load plug-in for module %s due to error (%s)")
+    IllegalArgumentException unableToLoadPlugInProviders(final String name, final String error);
+
+    /**
+     * IllegalArgumentException to indicate that an AuthenticationPlugIn was not loaded.
+     *
+     * @param name - The name specified.
+     * @return an {@link IllegalArgumentException} for the failure.
+     */
+    @Message(id = 15262, value = "No authentication plug-in found for name %s")
+    IllegalArgumentException noAuthenticationPlugInFound(final String name);
+
+    /**
+     * IllegalStateException to indicate that a plug-in could not be initialised.
+     *
+     * @param name - The name specified.
+     * @return an {@link IllegalArgumentException} for the failure.
+     */
+    @Message(id = 15263, value = "Unable to initialise plug-in %s due to error %s")
+    IllegalStateException unableToInitialisePlugIn(final String name, final String message);
+
     /*
-    * Logging IDs 15200 to 15299 are reserved for domain management, the file DomainManagementLogger also contains messages in
-    * this range commencing 15200.
-    */
+     * Logging IDs 15200 to 15299 are reserved for domain management, the file DomainManagementLogger also contains messages in
+     * this range commencing 15200.
+     */
 }

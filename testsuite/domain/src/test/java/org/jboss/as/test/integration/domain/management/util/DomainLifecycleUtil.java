@@ -18,6 +18,8 @@
  */
 package org.jboss.as.test.integration.domain.management.util;
 
+import static org.jboss.as.arquillian.container.Authentication.getCallbackHandler;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -33,10 +35,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,13 +58,9 @@ import org.jboss.as.network.NetworkUtils;
 import org.jboss.as.test.shared.TestSuiteEnvironment;
 import org.jboss.dmr.ModelNode;
 import org.jboss.remoting3.Channel;
-import org.jboss.remoting3.CloseHandler;
 import org.jboss.remoting3.Connection;
-import org.jboss.remoting3.HandleableCloseable;
 import org.jboss.sasl.util.UsernamePasswordHashUtil;
 import org.xnio.IoUtils;
-
-import static org.jboss.as.arquillian.container.Authentication.getCallbackHandler;
 
 /**
  * Utility for controlling the lifecycle of a domain.
@@ -114,12 +112,12 @@ public class DomainLifecycleUtil {
 
             final String additionalJavaOpts = System.getProperty("jboss.options");
 
-            File modulesJar = new File(jbossHomeDir + "/jboss-modules.jar");
+            File modulesJar = new File(jbossHomeDir + File.separatorChar + "jboss-modules.jar");
             if (modulesJar.exists() == false)
                 throw new IllegalStateException("Cannot find: " + modulesJar);
 
             String javaHome = configuration.getJavaHome();
-            String java = (javaHome != null) ? javaHome + "/bin/java" : "java";
+            String java = (javaHome != null) ? javaHome + File.separatorChar + "bin" + File.separatorChar + "java" : "java";
 
             File domainDir = configuration.getDomainDirectory() != null ? new File(configuration.getDomainDirectory()) : new File(new File(jbossHomeDir), "domain");
             String domainPath = domainDir.getAbsolutePath();
@@ -128,7 +126,7 @@ public class DomainLifecycleUtil {
             if (configuration.getModulePath() != null && !configuration.getModulePath().isEmpty()) {
                 modulePath = configuration.getModulePath();
             } else {
-                modulePath = jbossHomeDir + "/modules";
+                modulePath = jbossHomeDir + File.separatorChar + "modules";
             }
 
             // No point backing up the file in a test scenario, just write what we need.
@@ -388,7 +386,7 @@ public class DomainLifecycleUtil {
     public synchronized DomainClient getDomainClient() {
         return DomainClient.Factory.create(internalGetOrCreateClient());
     }
-
+    
     private synchronized DomainTestClient internalGetOrCreateClient() {
         // Perhaps get rid of the shared client...
         if (domainClient == null) {
@@ -461,7 +459,7 @@ public class DomainLifecycleUtil {
             address.add("host", configuration.getHostName());
             address.add("server", server);
 
-            ControlledProcessState.State status = Enum.valueOf(ControlledProcessState.State.class, readAttribute("server-state", address).asString().toUpperCase());
+            ControlledProcessState.State status = Enum.valueOf(ControlledProcessState.State.class, readAttribute("server-state", address).asString().toUpperCase(Locale.ENGLISH));
             ServerIdentity id = new ServerIdentity(configuration.getHostName(), group, server);
             result.put(id, status);
         }
@@ -477,11 +475,11 @@ public class DomainLifecycleUtil {
         return executeForResult(new OperationBuilder(op).build());
     }
 
-    private ModelNode executeForResult(ModelNode op) {
+    public ModelNode executeForResult(ModelNode op) {
         return executeForResult(new OperationBuilder(op).build());
     }
 
-    private ModelNode executeForResult(Operation op) {
+    public ModelNode executeForResult(Operation op) {
         try {
             ModelNode result = getDomainClient().execute(op);
             if (result.hasDefined("outcome") && "success".equals(result.get("outcome").asString())) {

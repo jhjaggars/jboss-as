@@ -22,15 +22,26 @@
 
 package org.jboss.as.ejb3.remote.protocol.versionone;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.ObjectStreamException;
+import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+
 import org.jboss.as.ee.component.Component;
 import org.jboss.as.ee.component.ComponentView;
 import org.jboss.as.ee.component.interceptors.InvocationType;
+import org.jboss.as.ejb3.EjbLogger;
 import org.jboss.as.ejb3.EjbMessages;
 import org.jboss.as.ejb3.component.entity.EntityBeanComponent;
-import org.jboss.as.ejb3.component.interceptors.AsyncInvocationTask;
-import org.jboss.as.ejb3.component.interceptors.CancellationFlag;
 import org.jboss.as.ejb3.component.session.SessionBeanComponent;
 import org.jboss.as.ejb3.component.stateful.StatefulSessionComponent;
+import org.jboss.as.ejb3.component.stateless.StatelessSessionComponent;
 import org.jboss.as.ejb3.deployment.DeploymentRepository;
 import org.jboss.as.ejb3.deployment.EjbDeploymentInformation;
 import org.jboss.as.security.remoting.RemotingContext;
@@ -48,15 +59,6 @@ import org.jboss.marshalling.Unmarshaller;
 import org.jboss.remoting3.MessageInputStream;
 import org.jboss.remoting3.MessageOutputStream;
 import org.xnio.IoUtils;
-
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
 
 
 /**
@@ -130,9 +132,9 @@ class MethodInvocationMessageHandler extends EJBIdentifierBasedMessageHandler {
             // correct CL for the rest of the unmarshalling of the stream
             classResolver.switchClassLoader(ejbDeploymentInformation.getDeploymentClassLoader());
             // read the Locator
-            final EJBLocator locator;
+            final EJBLocator<?> locator;
             try {
-                locator = (EJBLocator) unmarshaller.readObject();
+                locator = (EJBLocator<?>) unmarshaller.readObject();
             } catch (ClassNotFoundException e) {
                 throw EjbMessages.MESSAGES.classNotFoundException(e);
             }
@@ -186,7 +188,7 @@ class MethodInvocationMessageHandler extends EJBIdentifierBasedMessageHandler {
                         } catch (Throwable t) {
                             // catch Throwable, so that we don't skip invoking the method, just because we
                             // failed to send a notification to the client that the method is an async method
-                            logger.warn("Method " + invokedMethod + " was a async method but the client could not be informed about the same. This will mean that the client might block till the method completes", t);
+                            EjbLogger.EJB3_LOGGER.failedToSendAsyncMethodIndicatorToClient(t, invokedMethod);
                         }
                     }
 
@@ -200,15 +202,19 @@ class MethodInvocationMessageHandler extends EJBIdentifierBasedMessageHandler {
                             // write out the failure
                             MethodInvocationMessageHandler.this.writeException(channelAssociation, MethodInvocationMessageHandler.this.marshallerFactory, invocationId, throwable, attachments);
                         } catch (IOException ioe) {
-                            // we couldn't write out a method invocation failure message. So let's atleast log the
+                            // we couldn't write out a method invocation failure message. So let's at least log the
                             // actual method invocation exception, for debugging/reference
                             logger.error("Error invoking method " + invokedMethod + " on bean named " + beanName
                                     + " for appname " + appName + " modulename " + moduleName + " distinctname " + distinctName, throwable);
                             // now log why we couldn't send back the method invocation failure message
                             logger.error("Could not write method invocation failure for method " + invokedMethod + " on bean named " + beanName
                                     + " for appname " + appName + " modulename " + moduleName + " distinctname " + distinctName + " due to ", ioe);
-                            // close the channel
-                            IoUtils.safeClose(channelAssociation.getChannel());
+                            // close the channel unless this is a NotSerializableException
+                            //as this does not represent a problem with the channel there is no
+                            //need to close it (see AS7-3402)
+                            if(!(ioe instanceof ObjectStreamException)) {
+                                IoUtils.safeClose(channelAssociation.getChannel());
+                            }
                             return;
                         }
                     } finally {
@@ -217,19 +223,27 @@ class MethodInvocationMessageHandler extends EJBIdentifierBasedMessageHandler {
                     // write out the (successful) method invocation result to the channel output stream
                     try {
                         // attach any weak affinity if available
+                        Affinity weakAffinity = null;
                         if (locator instanceof StatefulEJBLocator && componentView.getComponent() instanceof StatefulSessionComponent) {
                             final StatefulSessionComponent statefulSessionComponent = (StatefulSessionComponent) componentView.getComponent();
-                            final Affinity weakAffinity = MethodInvocationMessageHandler.this.getWeakAffinity(statefulSessionComponent, (StatefulEJBLocator) locator);
-                            if (weakAffinity != null) {
-                                attachments.put(Affinity.WEAK_AFFINITY_CONTEXT_KEY, weakAffinity);
-                            }
+                            weakAffinity = MethodInvocationMessageHandler.this.getWeakAffinity(statefulSessionComponent, (StatefulEJBLocator<?>) locator);
+                        } else if (componentView.getComponent() instanceof StatelessSessionComponent) {
+                            final StatelessSessionComponent statelessSessionComponent = (StatelessSessionComponent) componentView.getComponent();
+                            weakAffinity = statelessSessionComponent.getWeakAffinity();
+                        }
+                        if (weakAffinity != null) {
+                            attachments.put(Affinity.WEAK_AFFINITY_CONTEXT_KEY, weakAffinity);
                         }
                         writeMethodInvocationResponse(channelAssociation, invocationId, result, attachments);
                     } catch (IOException ioe) {
                         logger.error("Could not write method invocation result for method " + invokedMethod + " on bean named " + beanName
                                 + " for appname " + appName + " modulename " + moduleName + " distinctname " + distinctName + " due to ", ioe);
-                        // close the channel
-                        IoUtils.safeClose(channelAssociation.getChannel());
+                        // close the channel unless this is a NotSerializableException
+                        //as this does not represent a problem with the channel there is no
+                        //need to close it (see AS7-3402)
+                        if(!(ioe instanceof ObjectStreamException)) {
+                            IoUtils.safeClose(channelAssociation.getChannel());
+                        }
                         return;
                     }
                 }
@@ -239,16 +253,14 @@ class MethodInvocationMessageHandler extends EJBIdentifierBasedMessageHandler {
         }
         // invoke the method and write out the response on a separate thread
         executorService.submit(runnable);
-
-
     }
 
-    private Affinity getWeakAffinity(final StatefulSessionComponent statefulSessionComponent, final StatefulEJBLocator statefulEJBLocator) {
+    private Affinity getWeakAffinity(final StatefulSessionComponent statefulSessionComponent, final StatefulEJBLocator<?> statefulEJBLocator) {
         final SessionID sessionID = statefulEJBLocator.getSessionId();
         return statefulSessionComponent.getCache().getWeakAffinity(sessionID);
     }
 
-    private Object invokeMethod(final ComponentView componentView, final Method method, final Object[] args, final EJBLocator ejbLocator, final Map<String, Object> attachments) throws Throwable {
+    private Object invokeMethod(final ComponentView componentView, final Method method, final Object[] args, final EJBLocator<?> ejbLocator, final Map<String, Object> attachments) throws Throwable {
         final InterceptorContext interceptorContext = new InterceptorContext();
         interceptorContext.setParameters(args);
         interceptorContext.setMethod(method);
@@ -270,35 +282,19 @@ class MethodInvocationMessageHandler extends EJBIdentifierBasedMessageHandler {
         }
         // add the session id to the interceptor context, if it's a stateful ejb locator
         if (ejbLocator instanceof StatefulEJBLocator) {
-            interceptorContext.putPrivateData(SessionID.class, ((StatefulEJBLocator) ejbLocator).getSessionId());
+            interceptorContext.putPrivateData(SessionID.class, ((StatefulEJBLocator<?>) ejbLocator).getSessionId());
         } else if (ejbLocator instanceof EntityEJBLocator) {
-            final Object primaryKey = ((EntityEJBLocator) ejbLocator).getPrimaryKey();
+            final Object primaryKey = ((EntityEJBLocator<?>) ejbLocator).getPrimaryKey();
             interceptorContext.putPrivateData(EntityBeanComponent.PRIMARY_KEY_CONTEXT_KEY, primaryKey);
         }
         if (componentView.isAsynchronous(method)) {
             final Component component = componentView.getComponent();
             if (!(component instanceof SessionBeanComponent)) {
-                logger.warn("Asynchronous invocations are only supported on session beans. Bean class " + component.getComponentClass()
-                        + " is not a session bean, invocation on method " + method + " will have no asynchronous semantics");
+                EjbLogger.EJB3_LOGGER.asyncMethodSupportedOnlyForSessionBeans(component.getComponentClass(), method);
                 // just invoke normally
                 return componentView.invoke(interceptorContext);
             }
-            // it's really a async method invocation on a session bean. So treat it accordingly
-            final SessionBeanComponent sessionBeanComponent = (SessionBeanComponent) componentView.getComponent();
-            final CancellationFlag cancellationFlag = new CancellationFlag();
-            // add the cancellation flag to the interceptor context
-            interceptorContext.putPrivateData(CancellationFlag.class, cancellationFlag);
-
-            final AsyncInvocationTask asyncInvocationTask = new AsyncInvocationTask(cancellationFlag) {
-                @Override
-                protected Object runInvocation() throws Exception {
-                    return componentView.invoke(interceptorContext);
-                }
-            };
-            // invoke
-            sessionBeanComponent.getAsynchronousExecutor().submit(asyncInvocationTask);
-            // wait/block for the bean invocation to complete and get the real result to be returned to the client
-            return asyncInvocationTask.get();
+            return ((Future)componentView.invoke(interceptorContext)).get();
         } else {
             return componentView.invoke(interceptorContext);
         }

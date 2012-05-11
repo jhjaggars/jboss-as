@@ -29,7 +29,7 @@
     <parent>
         <groupId>org.jboss.as</groupId>
         <artifactId>jboss-as-parent</artifactId>
-        <version>7.1.2.Final-SNAPSHOT</version>
+        <version>7.2.0.Alpha1-SNAPSHOT</version>
     </parent>
 
     <groupId>org.jboss.as</groupId>
@@ -105,6 +105,11 @@
         <dependency>
            <groupId>org.jboss.remotingjmx</groupId>
            <artifactId>remoting-jmx</artifactId>
+        </dependency>
+        
+        <dependency>
+           <groupId>org.jboss</groupId>
+           <artifactId>jboss-vfs</artifactId>
         </dependency>
 
         <!-- Test Dependencies -->

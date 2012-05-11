@@ -81,7 +81,7 @@ public class SystemPropertyAddHandler implements OperationStepHandler, Descripti
     public SystemPropertyAddHandler(ProcessEnvironment processEnvironment, boolean useBoottime) {
         this.processEnvironment = processEnvironment;
         this.useBoottime = useBoottime;
-        validator.registerValidator(VALUE, new StringLengthValidator(0, true));
+        validator.registerValidator(VALUE, new StringLengthValidator(0, true, true));
         if (useBoottime) {
             validator.registerValidator(BOOT_TIME, new ModelTypeValidator(ModelType.BOOLEAN, true));
         }
@@ -109,25 +109,11 @@ public class SystemPropertyAddHandler implements OperationStepHandler, Descripti
         }
 
         if (applyToRuntime) {
-            context.addStep(new OperationStepHandler() {
-                public void execute(final OperationContext context, final ModelNode operation) throws OperationFailedException {
-
-                    SecurityActions.setSystemProperty(name, value);
-                    if (processEnvironment != null) {
-                        processEnvironment.systemPropertyUpdated(name, value);
-                    }
-
-                    context.completeStep(new OperationContext.RollbackHandler() {
-                        @Override
-                        public void handleRollback(OperationContext context, ModelNode operation) {
-                            SecurityActions.clearSystemProperty(name);
-                            if (processEnvironment != null) {
-                                processEnvironment.systemPropertyUpdated(name, null);
-                            }
-                        }
-                    });
-                }
-            }, OperationContext.Stage.RUNTIME);
+            final String setValue = value != null ? context.resolveExpressions(operation.require(VALUE)).asString() : null;
+            SecurityActions.setSystemProperty(name, setValue);
+            if (processEnvironment != null) {
+                processEnvironment.systemPropertyUpdated(name, setValue);
+            }
         } else if (reload) {
             context.reloadRequired();
         }
@@ -137,6 +123,12 @@ public class SystemPropertyAddHandler implements OperationStepHandler, Descripti
             public void handleRollback(OperationContext context, ModelNode operation) {
                 if (reload) {
                     context.revertReloadRequired();
+                }
+                if (processEnvironment != null) {
+                    SecurityActions.clearSystemProperty(name);
+                    if (processEnvironment != null) {
+                        processEnvironment.systemPropertyUpdated(name, null);
+                    }
                 }
             }
         });

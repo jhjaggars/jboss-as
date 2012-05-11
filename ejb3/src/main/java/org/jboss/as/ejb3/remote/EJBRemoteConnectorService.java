@@ -28,6 +28,7 @@ import org.jboss.as.ejb3.deployment.DeploymentRepository;
 import org.jboss.as.ejb3.remote.protocol.versionone.ChannelAssociation;
 import org.jboss.as.ejb3.remote.protocol.versionone.VersionOneProtocolChannelReceiver;
 import org.jboss.as.network.ClientMapping;
+import org.jboss.as.network.SocketBinding;
 import org.jboss.as.remoting.AbstractStreamServerService;
 import org.jboss.as.remoting.InjectedSocketBindingStreamServerService;
 import org.jboss.as.server.ServerEnvironment;
@@ -154,6 +155,13 @@ public class EJBRemoteConnectorService implements Service<EJBRemoteConnectorServ
         return this.txSyncRegistry;
     }
 
+    SocketBinding getEJBRemoteConnectorSocketBinding() {
+        if (this.remotingServer == null) {
+            return null;
+        }
+        return this.remotingServer.getSocketBinding();
+    }
+
     private void sendVersionMessage(final ChannelAssociation channelAssociation) throws IOException {
         final DataOutputStream outputStream;
         final MessageOutputStream messageOutputStream;
@@ -272,7 +280,7 @@ public class EJBRemoteConnectorService implements Service<EJBRemoteConnectorServ
                         break;
 
                     default:
-                        throw new RuntimeException("Cannot handle client version " + version);
+                        throw EjbLogger.EJB3_LOGGER.ejbRemoteServiceCannotHandleClientVersion(version);
                 }
 
             } catch (IOException e) {
@@ -314,7 +322,7 @@ public class EJBRemoteConnectorService implements Service<EJBRemoteConnectorServ
     private MarshallerFactory getMarshallerFactory(final String marshallerStrategy) {
         final MarshallerFactory marshallerFactory = Marshalling.getProvidedMarshallerFactory(marshallerStrategy);
         if (marshallerFactory == null) {
-            throw new RuntimeException("Could not find a marshaller factory for " + marshallerStrategy + " marshalling strategy");
+            throw EjbLogger.EJB3_LOGGER.failedToFindMarshallerFactoryForStrategy(marshallerStrategy);
         }
         return marshallerFactory;
     }

@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.jboss.as</groupId>
         <artifactId>jboss-as-ts-integ</artifactId>
-        <version>7.1.2.Final-SNAPSHOT</version>
+        <version>7.2.0.Alpha1-SNAPSHOT</version>
     </parent>
 
     <!-- ********************************************************************************** -->
@@ -15,7 +15,7 @@
     <!-- ********************************************************************************** -->
     <groupId>org.jboss.as</groupId>
     <artifactId>jboss-as-ts-integ-basic</artifactId>
-    <version>7.1.2.Final-SNAPSHOT</version>
+    <version>7.2.0.Alpha1-SNAPSHOT</version>
 
     <name>JBoss Application Server Test Suite: Integration - Basic</name>
 
@@ -23,7 +23,8 @@
         <jbossas.ts.integ.dir>${basedir}/..</jbossas.ts.integ.dir>
         <jbossas.ts.dir>${jbossas.ts.integ.dir}/..</jbossas.ts.dir>
         <jbossas.project.dir>${jbossas.ts.dir}/..</jbossas.project.dir>
-        <version.apacheds>1.5.5</version.apacheds>
+        <version.apacheds>2.0.0-M6</version.apacheds>
+        <version.apacheds.shared>1.0.0-M11</version.apacheds.shared>
     </properties>
 
     <dependencies>
@@ -41,16 +42,35 @@
     
         <dependency>
             <groupId>org.apache.directory.server</groupId>
-            <artifactId>apacheds-server-unit</artifactId>
+            <artifactId>apacheds-core</artifactId>
             <version>${version.apacheds}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.directory.server</groupId>
-            <artifactId>apacheds-bootstrap-partition</artifactId>
+            <artifactId>apacheds-server-config</artifactId>
             <version>${version.apacheds}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.directory.server</groupId>
+            <artifactId>apacheds-protocol-ldap</artifactId>
+            <version>${version.apacheds}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.directory.server</groupId>
+            <artifactId>apacheds-interceptors-hash</artifactId>
+            <version>${version.apacheds}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.directory.shared</groupId>
+            <artifactId>shared-ldap-codec-standalone</artifactId>
+            <version>${version.apacheds.shared}</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <profiles>
@@ -153,6 +173,7 @@
                                         <include>org/jboss/as/test/integration/ejb/management/deployments/*TestCase.java</include>
                                         <include>org/jboss/as/test/integration/ejb/transaction/bmt/lazyenlist</include>
                                         <include>org/jboss/as/test/integration/jaxr/**/*TestCase*.java</include>
+                                        <include>org/jboss/as/test/integration/jca/bootstrap/**/*TestCase*.java</include>
                                         <include>org/jboss/as/test/integration/messaging/**/*TestCase*.java</include>
                                         <include>org/jboss/as/test/integration/management/cli/HelpTestCase.java</include>
                                         <include>org/jboss/as/test/integration/management/cli/JmsTestCase.java</include>
@@ -197,6 +218,7 @@
                                         <exclude>org/jboss/as/test/integration/ejb/management/deployments/*TestCase.java</exclude>
                                         <exclude>org/jboss/as/test/integration/ejb/transaction/bmt/lazyenlist</exclude>
                                         <exclude>org/jboss/as/test/integration/jaxr/**/*TestCase*.java</exclude>
+                                        <exclude>org/jboss/as/test/integration/jca/bootstrap/**/*TestCase*.java</exclude>
                                         <exclude>org/jboss/as/test/integration/messaging/**/*TestCase*.java</exclude>
                                         <exclude>org/jboss/as/test/integration/management/cli/HelpTestCase.java</exclude>
                                         <exclude>org/jboss/as/test/integration/management/cli/JmsTestCase.java</exclude>
@@ -243,6 +265,13 @@
 
                     </plugin>
 
+                    <plugin>
+                    	<groupId>org.apache.felix</groupId>
+                    	<artifactId>maven-bundle-plugin</artifactId>
+                    	<inherited>true</inherited>
+                    	<extensions>true</extensions>
+                    </plugin>
+
                 </plugins>
             </build>
         </profile>
@@ -270,6 +299,7 @@
                                 <phase>test</phase>
                                 <goals><goal>test</goal></goals>
                                 <configuration>
+                                    <redirectTestOutputToFile>false</redirectTestOutputToFile>
                                     <systemPropertyVariables>
                                         <jboss.server.config.file.name>standalone-full.xml</jboss.server.config.file.name>
                                     </systemPropertyVariables>

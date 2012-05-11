@@ -117,7 +117,6 @@ public final class ManagedDeployableContainer extends CommonDeployableContainer<
             cmd.add("-Djboss.home.dir=" + jbossHome);
             cmd.add("-Dorg.jboss.boot.log.file=" + jbossHome + "/standalone/log/boot.log");
             cmd.add("-Dlogging.configuration=file:" + jbossHome + CONFIG_PATH + "logging.properties");
-            cmd.add("-Djboss.modules.dir=" + modulesPath);
             cmd.add("-Djboss.bundles.dir=" + bundlesPath);
             cmd.add("-jar");
             cmd.add(modulesJar.getAbsolutePath());
@@ -128,6 +127,8 @@ public final class ManagedDeployableContainer extends CommonDeployableContainer<
             cmd.add("org.jboss.as.standalone");
             cmd.add("-server-config");
             cmd.add(config.getServerConfig());
+            if (config.isAdminOnly())
+               cmd.add("--admin-only");
 
             // Wait on ports before launching; AS7-4070
             this.waitOnPorts();

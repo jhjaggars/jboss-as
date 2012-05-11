@@ -25,8 +25,8 @@ package org.jboss.as.connector.subsystems.datasources;
 import java.sql.Driver;
 import java.util.List;
 
-import org.jboss.as.connector.ConnectorServices;
-import org.jboss.as.connector.registry.DriverRegistry;
+import org.jboss.as.connector.util.ConnectorServices;
+import org.jboss.as.connector.services.driver.registry.DriverRegistry;
 import org.jboss.as.controller.AbstractAddStepHandler;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
@@ -48,7 +48,7 @@ import org.jboss.msc.service.ServiceRegistry;
 import org.jboss.msc.service.ServiceTarget;
 import org.jboss.security.SubjectFactory;
 
-import static org.jboss.as.connector.ConnectorMessages.MESSAGES;
+import static org.jboss.as.connector.logging.ConnectorMessages.MESSAGES;
 import static org.jboss.as.connector.subsystems.datasources.Constants.DATASOURCE_DRIVER;
 import static org.jboss.as.connector.subsystems.datasources.Constants.JNDINAME;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
@@ -71,7 +71,7 @@ public abstract class AbstractDataSourceAdd extends AbstractAddStepHandler {
         boolean enabled = false;
                 //!operation.hasDefined(ENABLED.getName()) || operation.get(ENABLED.getName()).asBoolean();
 
-        ModelNode node = operation.require(DATASOURCE_DRIVER.getName());
+        ModelNode node = DATASOURCE_DRIVER.resolveModelAttribute(context, model);
 
 
         AbstractDataSourceService dataSourceService = createDataSourceService(dsName);

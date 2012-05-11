@@ -48,7 +48,6 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUB
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SYSTEM_PROPERTY;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.VAULT;
 import static org.jboss.as.controller.parsing.Namespace.DOMAIN_1_0;
-import static org.jboss.as.controller.parsing.Namespace.DOMAIN_1_1;
 import static org.jboss.as.controller.parsing.ParseUtils.isNoNamespaceAttribute;
 import static org.jboss.as.controller.parsing.ParseUtils.missingRequired;
 import static org.jboss.as.controller.parsing.ParseUtils.nextElement;
@@ -73,7 +72,6 @@ import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
 import org.jboss.as.controller.extension.ExtensionRegistry;
 import org.jboss.as.controller.operations.common.Util;
 import org.jboss.as.controller.parsing.Attribute;
-import org.jboss.as.controller.parsing.CommonXml;
 import org.jboss.as.controller.parsing.Element;
 import org.jboss.as.controller.parsing.ExtensionXml;
 import org.jboss.as.controller.parsing.Namespace;
@@ -85,6 +83,7 @@ import org.jboss.as.domain.management.parsing.ManagementXml;
 import org.jboss.as.server.mgmt.HttpManagementResourceDefinition;
 import org.jboss.as.server.mgmt.NativeManagementResourceDefinition;
 import org.jboss.dmr.ModelNode;
+import org.jboss.dmr.ModelType;
 import org.jboss.dmr.Property;
 import org.jboss.modules.ModuleLoader;
 import org.jboss.staxmapper.XMLElementWriter;
@@ -761,6 +760,11 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
                 case DEFAULT_INTERFACE: {
                     SocketBindingGroupResourceDefinition.DEFAULT_INTERFACE.parseAndSetParameter(value, op, reader);
                     required.remove(attribute);
+                    if (op.get(SocketBindingGroupResourceDefinition.DEFAULT_INTERFACE.getName()).getType() != ModelType.EXPRESSION
+                            && !interfaces.contains(value)) {
+                        throw MESSAGES.unknownInterface(value, Attribute.DEFAULT_INTERFACE.getLocalName(),
+                                Element.INTERFACES.getLocalName(), reader.getLocation());
+                    }
                     break;
                 }
                 case PORT_OFFSET: {
@@ -829,6 +833,11 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
                 case DEFAULT_INTERFACE: {
                     SocketBindingGroupResourceDefinition.DEFAULT_INTERFACE.parseAndSetParameter(value, op, reader);
                     required.remove(attribute);
+                    if (op.get(SocketBindingGroupResourceDefinition.DEFAULT_INTERFACE.getName()).getType() != ModelType.EXPRESSION
+                            && !interfaces.contains(value)) {
+                        throw MESSAGES.unknownInterface(value, Attribute.DEFAULT_INTERFACE.getLocalName(),
+                                Element.INTERFACES.getLocalName(), reader.getLocation());
+                    }
                     break;
                 }
                 case PORT_OFFSET: {
@@ -856,7 +865,6 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
             final Element element = Element.forName(reader.getLocalName());
             switch (element) {
                 case SOCKET_BINDING: {
-                    // FIXME JBAS-8825
                     final String bindingName = parseSocketBinding(reader, interfaces, groupAddress, updates);
                     if (!uniqueBindingNames.add(bindingName)) {
                         throw MESSAGES.alreadyDeclared(Element.SOCKET_BINDING.getLocalName(), Element.OUTBOUND_SOCKET_BINDING.getLocalName(),
@@ -865,7 +873,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
                     break;
                 }
                 case OUTBOUND_SOCKET_BINDING: {
-                    final String bindingName = parseOutboundSocketBinding(reader, interfaces, socketBindingGroupName, groupAddress, updates);
+                    final String bindingName = parseOutboundSocketBinding(reader, interfaces, groupAddress, updates);
                     if (!uniqueBindingNames.add(bindingName)) {
                         throw MESSAGES.alreadyDeclared(Element.SOCKET_BINDING.getLocalName(), Element.OUTBOUND_SOCKET_BINDING.getLocalName(),
                                 bindingName, Element.SOCKET_BINDING_GROUP.getLocalName(), socketBindingGroupName, reader.getLocation());

@@ -30,7 +30,7 @@ import java.io.Serializable;
  * @author <a href="mailto:carlo.dewolf@jboss.com">Carlo de Wolf</a>
  * @version $Revision: $
  */
-public interface Cache<K extends Serializable, V extends Identifiable<K>> extends Removable<K>, AffinitySupport<K> {
+public interface Cache<K extends Serializable, V extends Identifiable<K>> extends Removable<K>, AffinitySupport<K>, IdentifierFactory<K> {
     /**
      * Creates and caches a new instance of <code>T</code>.
      *
@@ -47,7 +47,7 @@ public interface Cache<K extends Serializable, V extends Identifiable<K>> extend
 
     /**
      * Get the specified object from cache. This will mark
-     * the object as being in use.
+     * the object as being in use, and increase its usage count.
      *
      * @param key the identifier of the object
      * @return the object, or null if it does not exist
@@ -55,7 +55,14 @@ public interface Cache<K extends Serializable, V extends Identifiable<K>> extend
     V get(K key);
 
     /**
-     * Release the object from use.
+     *
+     * @param key The EJB identifier to check
+     * @return <code>true</code> if the EJB is present in the cache
+     */
+    boolean contains(K key);
+
+    /**
+     * Decreases the objects usage count. If the usage count hits 0 then the object will be released.
      *
      * @param obj the object
      */

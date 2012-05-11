@@ -116,6 +116,8 @@ import org.jboss.as.controller.persistence.ConfigurationPersister;
 import org.jboss.as.controller.persistence.SubsystemMarshallingContext;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
 import org.jboss.as.controller.registry.Resource;
+import org.jboss.as.controller.services.path.PathManager;
+import org.jboss.as.controller.transform.SubsystemTransformer;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
 import org.jboss.dmr.Property;
@@ -1187,6 +1189,7 @@ public class ThreadsSubsystemTestCase {
     static class TestExtensionContext implements ExtensionContext {
         final ManagementResourceRegistration testProfileRegistration;
         ManagementResourceRegistration createdRegistration;
+        SubsystemTransformer modelTransformer;
 
         TestExtensionContext(ManagementResourceRegistration testProfileRegistration) {
             this.testProfileRegistration = testProfileRegistration;
@@ -1208,8 +1211,8 @@ public class ThreadsSubsystemTestCase {
         }
 
         @Override
-        public SubsystemRegistration registerSubsystem(final String name) throws IllegalArgumentException {
-            return registerSubsystem(name, 1, 0);
+        public PathManager getPathManager() {
+            return null;
         }
 
         @Override
@@ -1247,6 +1250,11 @@ public class ThreadsSubsystemTestCase {
                 @Override
                 public void registerXMLElementWriter(XMLElementWriter<SubsystemMarshallingContext> writer) {
                     Assert.assertNotNull(writer);
+                }
+
+                @Override
+                public void registerSubsystemTransformer(SubsystemTransformer subsystemTransformer) {
+
                 }
             };
         }

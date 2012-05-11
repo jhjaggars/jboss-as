@@ -22,6 +22,7 @@
 
 package org.jboss.as.ejb3.remote;
 
+import org.jboss.ejb.client.DeploymentNodeSelector;
 import org.jboss.ejb.client.EJBClientConfiguration;
 import org.xnio.OptionMap;
 
@@ -37,6 +38,8 @@ import java.util.Map;
 public class JBossEJBClientXmlConfiguration implements EJBClientConfiguration {
 
     private final Map<String, ClusterConfiguration> clusterConfigs = new HashMap<String, ClusterConfiguration>();
+    private long invocationTimeout;
+    private DeploymentNodeSelector deploymentNodeSelector = new LocalEJBReceiverPreferringDeploymentNodeSelector();
 
     @Override
     public String getEndpointName() {
@@ -82,11 +85,28 @@ public class JBossEJBClientXmlConfiguration implements EJBClientConfiguration {
 
     @Override
     public long getInvocationTimeout() {
+        return this.invocationTimeout;
+    }
+
+    @Override
+    public long getReconnectTasksTimeout() {
         return 0;
+    }
+
+    @Override
+    public DeploymentNodeSelector getDeploymentNodeSelector() {
+        return this.deploymentNodeSelector;
     }
 
     public void addClusterConfiguration(final EJBClientClusterConfig clusterConfig) {
         this.clusterConfigs.put(clusterConfig.getClusterName(), clusterConfig);
     }
 
+    public void setInvocationTimeout(final long invocationTimeout) {
+        this.invocationTimeout = invocationTimeout;
+    }
+
+    public void setDeploymentNodeSelector(final DeploymentNodeSelector deploymentNodeSelector) {
+        this.deploymentNodeSelector = deploymentNodeSelector;
+    }
 }

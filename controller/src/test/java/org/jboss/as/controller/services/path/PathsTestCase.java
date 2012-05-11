@@ -24,15 +24,11 @@ package org.jboss.as.controller.services.path;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ADD;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.CHILDREN;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.DESCRIPTION;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.FAILED;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.FAILURE_DESCRIPTION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.MIN_OCCURS;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.MODEL_DESCRIPTION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.NAME;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OPERATIONS;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OUTCOME;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.PATH;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.READ_ATTRIBUTE_OPERATION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.READ_CHILDREN_NAMES_OPERATION;
@@ -46,17 +42,18 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REA
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RECURSIVE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RELATIVE_TO;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REMOVE;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RESULT;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.UNDEFINE_ATTRIBUTE_OPERATION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.VALUE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.WRITE_ATTRIBUTE_OPERATION;
 
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import junit.framework.Assert;
 
@@ -85,7 +82,6 @@ import org.junit.Test;
 public class PathsTestCase extends AbstractControllerTestBase {
 
     PathManagerService pathManagerService;
-
 
     @Test
     public void testReadResourceDescription() throws Exception{
@@ -630,10 +626,10 @@ public class PathsTestCase extends AbstractControllerTestBase {
         allCallback1.checkDone();
 
 
-        operation = createOperation(ADD);
+        operation = createOperation(WRITE_ATTRIBUTE_OPERATION);
         operation.get(OP_ADDR).add(PATH, "add1");
-        operation.get(PATH).set("123");
-        operation.get(RELATIVE_TO).set("bad");
+        operation.get(NAME).set(RELATIVE_TO);
+        operation.get(VALUE).set("bad");
 
         //TODO I changed this to fail, not 100% sure that is correct
         executeForFailure(operation);
@@ -793,36 +789,6 @@ public class PathsTestCase extends AbstractControllerTestBase {
         return executeForResult(operation);
     }
 
-    protected ModelNode createOperation(String operationName, String...address) {
-        ModelNode operation = new ModelNode();
-        operation.get(OP).set(operationName);
-        if (address.length > 0) {
-            for (String addr : address) {
-                operation.get(OP_ADDR).add(addr);
-            }
-        } else {
-            operation.get(OP_ADDR).setEmptyList();
-        }
-
-        return operation;
-    }
-
-    public ModelNode executeForResult(ModelNode operation) throws OperationFailedException {
-        ModelNode rsp = getController().execute(operation, null, null, null);
-        if (FAILED.equals(rsp.get(OUTCOME).asString())) {
-            throw new OperationFailedException(rsp.get(FAILURE_DESCRIPTION));
-        }
-        return rsp.get(RESULT);
-    }
-
-    public void executeForFailure(ModelNode operation) throws OperationFailedException {
-        try {
-            executeForResult(operation);
-            Assert.fail("Should have given error");
-        } catch (OperationFailedException expected) {
-        }
-    }
-
     @Override
     protected DescriptionProvider getRootDescriptionProvider() {
         return new DescriptionProvider() {
@@ -856,7 +822,18 @@ public class PathsTestCase extends AbstractControllerTestBase {
         registration.registerOperationHandler(UNDEFINE_ATTRIBUTE_OPERATION, GlobalOperationHandlers.UNDEFINE_ATTRIBUTE, CommonProviders.UNDEFINE_ATTRIBUTE_PROVIDER, true);
         registration.registerOperationHandler(WRITE_ATTRIBUTE_OPERATION, GlobalOperationHandlers.WRITE_ATTRIBUTE, CommonProviders.WRITE_ATTRIBUTE_PROVIDER, true);
 
-        getContainer().addService(PathManagerService.SERVICE_NAME, pathManagerService).install();
+        TestServiceListener listener = new TestServiceListener();
+        listener.reset(1);
+        getContainer().addService(PathManagerService.SERVICE_NAME, pathManagerService)
+                .addListener(listener)
+                .install();
+
+        try {
+            listener.latch.await(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        }
 
         registration.registerSubModel(PathResourceDefinition.createSpecified(pathManagerService));
 
@@ -866,7 +843,7 @@ public class PathsTestCase extends AbstractControllerTestBase {
     private class TestServiceListener extends AbstractServiceListener<Object>{
 
         volatile CountDownLatch latch;
-        LinkedHashMap<Transition, ServiceName> services = new LinkedHashMap<ServiceController.Transition, ServiceName>();
+        Map<Transition, ServiceName> services = Collections.synchronizedMap(new LinkedHashMap<ServiceController.Transition, ServiceName>());
 
 
         void reset(int count) {

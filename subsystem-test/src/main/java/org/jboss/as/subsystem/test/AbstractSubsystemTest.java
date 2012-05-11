@@ -1,5 +1,6 @@
 package org.jboss.as.subsystem.test;
 
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ATTRIBUTES;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.DEPLOYMENT;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.DESCRIPTION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.FAILURE_DESCRIPTION;
@@ -15,6 +16,7 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REA
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.READ_OPERATION_NAMES_OPERATION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.READ_RESOURCE_DESCRIPTION_OPERATION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.READ_RESOURCE_OPERATION;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.READ_TRANSFORMED_RESOURCE_OPERATION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REMOVE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REPLY_PROPERTIES;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REQUEST_PROPERTIES;
@@ -34,6 +36,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Locale;
@@ -74,6 +77,7 @@ import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.descriptions.OverrideDescriptionProvider;
 import org.jboss.as.controller.descriptions.common.CommonProviders;
 import org.jboss.as.controller.extension.ExtensionRegistry;
+import org.jboss.as.controller.extension.SubsystemInformation;
 import org.jboss.as.controller.operations.global.GlobalOperationHandlers;
 import org.jboss.as.controller.operations.validation.OperationValidator;
 import org.jboss.as.controller.parsing.Element;
@@ -93,6 +97,7 @@ import org.jboss.as.controller.registry.OperationEntry.EntryType;
 import org.jboss.as.controller.registry.OperationEntry.Flag;
 import org.jboss.as.controller.registry.Resource;
 import org.jboss.as.controller.services.path.PathManagerService;
+import org.jboss.as.controller.transform.ReadTransformedResourceOperation;
 import org.jboss.as.server.DeployerChainAddHandler;
 import org.jboss.as.server.Services;
 import org.jboss.as.server.controller.descriptions.ServerDescriptionProviders;
@@ -144,6 +149,7 @@ public abstract class AbstractSubsystemTest {
      * instantiations in the same test without having to re-initialize the parsers.
      */
     private ExtensionRegistry extensionParsingRegistry;
+    protected ExtensionRegistry controllerExtensionRegistry;
     private TestParser testParser;
     private boolean addedExtraParsers;
     private XMLMapper xmlMapper;
@@ -204,9 +210,13 @@ public abstract class AbstractSubsystemTest {
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(configURL.openStream()));
         StringWriter writer = new StringWriter();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            writer.write(line);
+        try {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                writer.write(line);
+            }
+        } finally {
+            reader.close();
         }
         return writer.toString();
     }
@@ -253,7 +263,9 @@ public abstract class AbstractSubsystemTest {
 
         StringConfigurationPersister persister = new StringConfigurationPersister(Collections.<ModelNode>emptyList(), testParser);
 
-        ExtensionRegistry outputExtensionRegistry = new ExtensionRegistry(ProcessType.EMBEDDED_SERVER, new RunningModeControl(RunningMode.NORMAL));
+        // Use ProcessType.HOST_CONTROLLER for this ExtensionRegistry so we don't need to provide
+        // a PathManager via the ExtensionContext. All we need the Extension to do here is register the xml writers
+        ExtensionRegistry outputExtensionRegistry = new ExtensionRegistry(ProcessType.HOST_CONTROLLER, new RunningModeControl(RunningMode.NORMAL));
         outputExtensionRegistry.setSubsystemParentResourceRegistrations(MOCK_RESOURCE_REG, MOCK_RESOURCE_REG);
         outputExtensionRegistry.setWriterRegistry(persister);
 
@@ -329,8 +341,9 @@ public abstract class AbstractSubsystemTest {
         }
         allOps.addAll(bootOperations);
         StringConfigurationPersister persister = new StringConfigurationPersister(allOps, testParser);
-        final ExtensionRegistry controllerExtensionRegistry = cloneExtensionRegistry();
+        controllerExtensionRegistry = cloneExtensionRegistry();
         controllerExtensionRegistry.setWriterRegistry(persister);
+        controllerExtensionRegistry.setPathManager(pathManager);
         ModelControllerService svc = new ModelControllerService(mainExtension, controllerInitializer, additionalInit, controllerExtensionRegistry,
                 processState, persister, additionalInit.isValidateOperations());
         ServiceBuilder<ModelController> builder = target.addService(Services.JBOSS_SERVER_CONTROLLER, svc);
@@ -344,13 +357,15 @@ public abstract class AbstractSubsystemTest {
         ModelController controller = svc.getValue();
         processState.setRunning();
 
-        KernelServices kernelServices = new KernelServices(container, controller, persister, new OperationValidator(svc.rootRegistration));
+        KernelServices kernelServices = new KernelServices(container, controller, persister, new OperationValidator(svc.rootRegistration),mainSubsystemName);
         this.kernelServices.add(kernelServices);
         if (svc.error != null) {
             throw svc.error;
         }
 
         validateDescriptionProviders(additionalInit, kernelServices);
+        ManagementResourceRegistration subsystemReg =  svc.rootRegistration.getSubModel(PathAddress.pathAddress(PathElement.pathElement(SUBSYSTEM,mainSubsystemName)));
+        validateModelDescriptions(PathAddress.EMPTY_ADDRESS, subsystemReg);
 
         return kernelServices;
     }
@@ -572,7 +587,7 @@ public abstract class AbstractSubsystemTest {
         final ExtensionRegistry clone = new ExtensionRegistry(extensionParsingRegistry.getProcessType(), new RunningModeControl(RunningMode.NORMAL));
         for (String extension : extensionParsingRegistry.getExtensionModuleNames()) {
             ExtensionParsingContext epc = clone.getExtensionParsingContext(extension, null);
-            for (Map.Entry<String, ExtensionRegistry.SubsystemInformation> entry : extensionParsingRegistry.getAvailableSubsystems(extension).entrySet()) {
+            for (Map.Entry<String, SubsystemInformation> entry : extensionParsingRegistry.getAvailableSubsystems(extension).entrySet()) {
                 for (String namespace : entry.getValue().getXMLNamespaces()) {
                     epc.setSubsystemXmlMapping(entry.getKey(), namespace, null);
                 }
@@ -583,6 +598,47 @@ public abstract class AbstractSubsystemTest {
         }
 
         return clone;
+    }
+
+    public static void validateModelDescriptions(PathAddress address, ManagementResourceRegistration reg) {
+        ModelNode attributes = reg.getModelDescription(PathAddress.EMPTY_ADDRESS).getModelDescription(Locale.getDefault()).get(ATTRIBUTES);
+        Set<String> regAttributeNames = reg.getAttributeNames(PathAddress.EMPTY_ADDRESS);
+        Set<String> attributeNames = new HashSet<String>();
+        if (attributes.isDefined()) {
+            if (attributes.asList().size() != regAttributeNames.size()) {
+                for (Property p : attributes.asPropertyList()) {
+                    attributeNames.add(p.getName());
+                }
+                if (regAttributeNames.size() > attributeNames.size()) {
+                    regAttributeNames.removeAll(attributeNames);
+                    Assert.fail("More attributes defined on resource registration than in description, missing: " + regAttributeNames + " for " + address);
+                } else if (regAttributeNames.size() < attributeNames.size()) {
+                    attributeNames.removeAll(regAttributeNames);
+                    Assert.fail("More attributes defined in description than on resource registration, missing: " + attributeNames + " for " + address);
+                }
+            }
+            if (!attributeNames.containsAll(regAttributeNames)) {
+                for (Property p : attributes.asPropertyList()) {
+                    attributeNames.add(p.getName());
+                }
+                Set<String> missDesc = new HashSet<String>(attributeNames);
+                missDesc.removeAll(regAttributeNames);
+
+                Set<String> missReg = new HashSet<String>(regAttributeNames);
+                missReg.removeAll(attributeNames);
+
+                if (!missReg.isEmpty()) {
+                    Assert.fail("There are different attributes defined on resource registration than in description, registered only on Resource Reg: " + missReg + " for " + address);
+                }
+                if (!missDesc.isEmpty()) {
+                    Assert.fail("There are different attributes defined on resource registration than in description, registered only int description: " + missDesc + " for " + address);
+                }
+            }
+        }
+        for (PathElement pe : reg.getChildAddresses(PathAddress.EMPTY_ADDRESS)) {
+            ManagementResourceRegistration sub = reg.getSubModel(PathAddress.pathAddress(pe));
+            validateModelDescriptions(address.append(pe), sub);
+        }
     }
 
     private void validateDescriptionProviders(AdditionalInitialization additionalInit, KernelServices kernelServices) {
@@ -730,6 +786,7 @@ public abstract class AbstractSubsystemTest {
             this.rootRegistration = rootRegistration;
             rootResource.getModel().get(SUBSYSTEM);
             rootRegistration.registerOperationHandler(READ_RESOURCE_OPERATION, GlobalOperationHandlers.READ_RESOURCE, CommonProviders.READ_RESOURCE_PROVIDER, true);
+            rootRegistration.registerOperationHandler(READ_TRANSFORMED_RESOURCE_OPERATION, new ReadTransformedResourceOperation(), ReadTransformedResourceOperation.DESCRIPTION, true);
             rootRegistration.registerOperationHandler(READ_ATTRIBUTE_OPERATION, GlobalOperationHandlers.READ_ATTRIBUTE, CommonProviders.READ_ATTRIBUTE_PROVIDER, true);
             rootRegistration.registerOperationHandler(READ_RESOURCE_DESCRIPTION_OPERATION, GlobalOperationHandlers.READ_RESOURCE_DESCRIPTION, CommonProviders.READ_RESOURCE_DESCRIPTION_PROVIDER, true);
             rootRegistration.registerOperationHandler(READ_CHILDREN_NAMES_OPERATION, GlobalOperationHandlers.READ_CHILDREN_NAMES, CommonProviders.READ_CHILDREN_NAMES_PROVIDER, true);

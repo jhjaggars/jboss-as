@@ -271,8 +271,9 @@ public class HostControllerEnvironment extends ProcessEnvironment {
             if (qualifiedHostName == null) {
                 // Give up
                 qualifiedHostName = "unknown-host.unknown-domain";
+            } else {
+                qualifiedHostName = qualifiedHostName.trim().toLowerCase();
             }
-            qualifiedHostName = qualifiedHostName.trim().toLowerCase();
         }
         this.qualifiedHostName = qualifiedHostName;
         this.hostControllerName = qualifiedHostName;

@@ -23,6 +23,7 @@
 package org.jboss.as.domain.management.security.state;
 
 import org.jboss.as.domain.management.security.AddPropertiesUser;
+import org.jboss.as.domain.management.security.AddPropertiesUser.Interactiveness;
 
 import java.io.File;
 import java.util.List;
@@ -46,6 +47,7 @@ public class StateValues {
     private List<File> roleFiles;
     private Set<String> knownUsers;
     private Map<String,String> knownRoles;
+    private String jbossHome;
 
     public boolean isSilentOrNonInteractive() {
         return (howInteractive == AddPropertiesUser.Interactiveness.NON_INTERACTIVE) || isSilent();
@@ -58,6 +60,10 @@ public class StateValues {
 
     public boolean isSilent() {
         return (howInteractive == AddPropertiesUser.Interactiveness.SILENT);
+    }
+
+    public boolean isInteractive() {
+        return howInteractive == Interactiveness.INTERACTIVE;
     }
 
     public boolean isExistingUser() {
@@ -138,5 +144,13 @@ public class StateValues {
 
     public void setKnownRoles(Map<String, String> knownRoles) {
         this.knownRoles = knownRoles;
+    }
+
+    public String getJBossHome() {
+        return this.jbossHome;
+    }
+
+    public void setJbossHome(String path) {
+        this.jbossHome = path;
     }
 }

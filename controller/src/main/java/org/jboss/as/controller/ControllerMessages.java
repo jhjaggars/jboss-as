@@ -984,26 +984,12 @@ public interface ControllerMessages {
      * is not a valid multicast address.
      *
      * @param value    the invalid value.
-     * @param name     the name of the attribute.
-     * @param location the location of the error.
+     * @param name     the name of the attribute.\
      *
      * @return a {@link XMLStreamException} for the error.
      */
     @Message(id = 14710, value = "Value %s for attribute %s is not a valid multicast address")
-    XMLStreamException invalidMulticastAddress(String value, String name, @Param Location location);
-
-    /**
-     * Creates an exception indicating the {@code value} for the attribute, represented by the {@code name} parameter,
-     * is not a valid multicast address.
-     *
-     * @param cause    the cause of the error.
-     * @param value    the invalid value.
-     * @param name     the name of the attribute.
-     * @param location the location of the error.
-     *
-     * @return a {@link XMLStreamException} for the error.
-     */
-    XMLStreamException invalidMulticastAddress(@Cause Throwable cause, String value, String name, @Param Location location);
+    OperationFailedException invalidMulticastAddress(String value, String name);
 
     /**
      * Creates an exception indicating an outbound socket binding cannot have both the {@code localTag} and the
@@ -2458,7 +2444,6 @@ public interface ControllerMessages {
 
     @Message(id = 14854, value="Path '%s' is read-only; it cannot be modified")
     OperationFailedException cannotModifyReadOnlyPath(String pathName);
-
     /**
      * An exception indicating the {@code name} may not be {@link ModelType#EXPRESSION}.
      *
@@ -2469,4 +2454,31 @@ public interface ControllerMessages {
     @Message(id = 14855, value = "%s may not be ModelType.EXPRESSION")
     OperationFailedException expressionNotAllowed(String name);
 
+    @Message(id = 14856, value = "PathManager not available on processes of type '%s'")
+    IllegalStateException pathManagerNotAvailable(ProcessType processType);
+
+    /**
+     * Creates an exception indicating the {@code value} for the attribute, represented by the {@code name} parameter,
+     * is not a valid multicast address.
+     *
+     * @param cause    the cause of the error.
+     * @param value    the invalid value.
+     * @param name     the name of the attribute.
+     *
+     * @return a {@link XMLStreamException} for the error.
+     */
+    @Message(id = 14857, value = "Value %s for attribute %s is not a valid multicast address")
+    OperationFailedException unknownMulticastAddress(@Cause UnknownHostException cause, String value, String name);
+
+    @Message(id = 14858, value="Path '%s' cannot be removed, since the following paths depend on it: %s")
+    OperationFailedException cannotRemovePathWithDependencies(String pathName, Set<String> dependencies);
+
+    @Message(id = 14859, value = "Failed to rename temp file %s to %s")
+    ConfigurationPersistenceException failedToRenameTempFile(@Cause Throwable cause, File temp, File file);
+
+    @Message(id = 14860, value = "Invalid locale format:  %s")
+    String invalidLocaleString(String unparsed);
+
+    @Message(id = 14861, value = "<one or more transitive dependencies>")
+    String transitiveDependencies();
 }

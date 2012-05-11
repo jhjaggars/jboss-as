@@ -26,7 +26,6 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.GRO
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.HOST;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.HOST_STATE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.INTERFACE;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.JVM;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.MANAGEMENT;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.MASTER;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.NAME;
@@ -59,7 +58,6 @@ import org.jboss.as.controller.extension.ExtensionRegistry;
 import org.jboss.as.controller.operations.common.InterfaceAddHandler;
 import org.jboss.as.controller.operations.common.InterfaceCriteriaWriteHandler;
 import org.jboss.as.controller.operations.common.InterfaceRemoveHandler;
-import org.jboss.as.controller.operations.common.JVMHandlers;
 import org.jboss.as.controller.operations.common.NamespaceAddHandler;
 import org.jboss.as.controller.operations.common.NamespaceRemoveHandler;
 import org.jboss.as.controller.operations.common.ProcessReloadHandler;
@@ -94,6 +92,8 @@ import org.jboss.as.host.controller.descriptions.HostControllerResourceDescripti
 import org.jboss.as.host.controller.descriptions.HostDescriptionProviders;
 import org.jboss.as.host.controller.descriptions.HostRootDescription;
 import org.jboss.as.host.controller.ignored.IgnoredDomainResourceRegistry;
+import org.jboss.as.host.controller.model.jvm.JvmResourceDefinition;
+import org.jboss.as.host.controller.operations.HostModelRegistrationHandler;
 import org.jboss.as.host.controller.operations.HostShutdownHandler;
 import org.jboss.as.host.controller.operations.HostSpecifiedInterfaceAddHandler;
 import org.jboss.as.host.controller.operations.HostSpecifiedInterfaceRemoveHandler;
@@ -101,7 +101,6 @@ import org.jboss.as.host.controller.operations.HostXmlMarshallingHandler;
 import org.jboss.as.host.controller.operations.IsMasterHandler;
 import org.jboss.as.host.controller.operations.LocalDomainControllerAddHandler;
 import org.jboss.as.host.controller.operations.LocalDomainControllerRemoveHandler;
-import org.jboss.as.host.controller.operations.LocalHostAddHandler;
 import org.jboss.as.host.controller.operations.LocalHostControllerInfoImpl;
 import org.jboss.as.host.controller.operations.RemoteDomainControllerAddHandler;
 import org.jboss.as.host.controller.operations.RemoteDomainControllerRemoveHandler;
@@ -139,22 +138,17 @@ import org.jboss.dmr.ModelType;
  */
 public class HostModelUtil {
 
-    public static void createHostRegistry(final ManagementResourceRegistration root, final HostControllerConfigurationPersister configurationPersister,
-                                          final HostControllerEnvironment environment, final HostRunningModeControl runningModeControl,
-                                          final HostFileRepository localFileRepository,
-                                          final LocalHostControllerInfoImpl hostControllerInfo, final ServerInventory serverInventory,
-                                          final HostFileRepository remoteFileRepository,
-                                          final ContentRepository contentRepository,
-                                          final DomainController domainController,
-                                          final ExtensionRegistry extensionRegistry,
-                                          final AbstractVaultReader vaultReader,
-                                          final IgnoredDomainResourceRegistry ignoredRegistry,
-                                          final ControlledProcessState processState,
-                                          final PathManagerService pathManager) {
+    public static interface HostModelRegistrar {
+        void registerHostModel(final String hostName, final ManagementResourceRegistration root);
+    }
+
+    public static void createRootRegistry(final ManagementResourceRegistration root, final HostControllerEnvironment environment,
+                                          final IgnoredDomainResourceRegistry ignoredDomainResourceRegistry,
+                                          final HostModelRegistrar hostModelRegistrar) {
+
         // Add of the host itself
-        ManagementResourceRegistration hostRegistration = root.registerSubModel(PathElement.pathElement(HOST), HostDescriptionProviders.HOST_ROOT_PROVIDER);
-        LocalHostAddHandler handler = new LocalHostAddHandler(environment, ignoredRegistry);
-        hostRegistration.registerOperationHandler(LocalHostAddHandler.OPERATION_NAME, handler, handler, false, OperationEntry.EntryType.PRIVATE);
+        final HostModelRegistrationHandler hostModelRegistratorHandler = new HostModelRegistrationHandler(environment, ignoredDomainResourceRegistry, hostModelRegistrar);
+        root.registerOperationHandler(HostModelRegistrationHandler.OPERATION_NAME, hostModelRegistratorHandler, hostModelRegistratorHandler, false, OperationEntry.EntryType.PRIVATE);
 
         // Global operations
         EnumSet<OperationEntry.Flag> flags = EnumSet.of(OperationEntry.Flag.READ_ONLY);
@@ -173,6 +167,26 @@ public class HostModelUtil {
 
         // Other root resource operations
         root.registerOperationHandler(CompositeOperationHandler.NAME, CompositeOperationHandler.INSTANCE, CompositeOperationHandler.INSTANCE, false, OperationEntry.EntryType.PRIVATE);
+    }
+
+    public static void createHostRegistry(final String hostName,
+                                          final ManagementResourceRegistration root, final HostControllerConfigurationPersister configurationPersister,
+                                          final HostControllerEnvironment environment, final HostRunningModeControl runningModeControl,
+                                          final HostFileRepository localFileRepository,
+                                          final LocalHostControllerInfoImpl hostControllerInfo, final ServerInventory serverInventory,
+                                          final HostFileRepository remoteFileRepository,
+                                          final ContentRepository contentRepository,
+                                          final DomainController domainController,
+                                          final ExtensionRegistry extensionRegistry,
+                                          final AbstractVaultReader vaultReader,
+                                          final IgnoredDomainResourceRegistry ignoredRegistry,
+                                          final ControlledProcessState processState,
+                                          final PathManagerService pathManager) {
+        // Add of the host itself
+        ManagementResourceRegistration hostRegistration = root.registerSubModel(PathElement.pathElement(HOST, hostName), HostDescriptionProviders.HOST_ROOT_PROVIDER);
+
+        // Global operations
+        EnumSet<OperationEntry.Flag> flags = EnumSet.of(OperationEntry.Flag.READ_ONLY);
 
         // Host root resource operations
         XmlMarshallingHandler xmh = new HostXmlMarshallingHandler(configurationPersister.getHostPersister(), hostControllerInfo);
@@ -200,7 +214,7 @@ public class HostModelUtil {
         hostRegistration.registerOperationHandler(ResolveExpressionOnHostHandler.OPERATION_NAME, ResolveExpressionOnHostHandler.INSTANCE,
                 ResolveExpressionOnHostHandler.INSTANCE, EnumSet.of(OperationEntry.Flag.READ_ONLY, OperationEntry.Flag.DOMAIN_PUSH_TO_SERVERS));
 
-        HostProcessReloadHandler reloadHandler = new HostProcessReloadHandler(HostControllerService.HC_SERVICE_NAME, runningModeControl, HostRootDescription.getResourceDescriptionResolver("host"));
+        HostProcessReloadHandler reloadHandler = new HostProcessReloadHandler(HostControllerService.HC_SERVICE_NAME, runningModeControl, processState, HostRootDescription.getResourceDescriptionResolver("host"));
         hostRegistration.registerOperationHandler(ProcessReloadHandler.OPERATION_NAME, reloadHandler, reloadHandler, EnumSet.of(Flag.HOST_CONTROLLER_ONLY));
         RunningModeReadHandler.createAndRegister(runningModeControl, hostRegistration);
 
@@ -268,8 +282,7 @@ public class HostModelUtil {
         hostRegistration.registerOperationHandler(SnapshotTakeHandler.OPERATION_NAME, snapshotTake, snapshotTake, false);
 
         // Jvms
-        final ManagementResourceRegistration jvms = hostRegistration.registerSubModel(PathElement.pathElement(JVM), CommonProviders.JVM_PROVIDER);
-        JVMHandlers.register(jvms);
+        final ManagementResourceRegistration jvms = hostRegistration.registerSubModel(JvmResourceDefinition.GLOBAL);
 
         //Paths
         hostRegistration.registerSubModel(PathResourceDefinition.createSpecified(pathManager));
@@ -320,7 +333,6 @@ public class HostModelUtil {
         serverSysProps.registerReadWriteAttribute(BOOT_TIME, null, new WriteAttributeHandlers.ModelTypeValidatingHandler(ModelType.BOOLEAN), Storage.CONFIGURATION);
 
         // Server jvm
-        final ManagementResourceRegistration serverVMs = servers.registerSubModel(PathElement.pathElement(JVM), JVMHandlers.SERVER_MODEL_PROVIDER);
-        JVMHandlers.register(serverVMs, true);
+        final ManagementResourceRegistration serverVMs = servers.registerSubModel(JvmResourceDefinition.SERVER);
     }
 }

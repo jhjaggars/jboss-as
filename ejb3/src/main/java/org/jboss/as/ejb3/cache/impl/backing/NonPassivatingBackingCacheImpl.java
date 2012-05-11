@@ -34,6 +34,7 @@ import javax.ejb.NoSuchEJBException;
 import org.jboss.as.ejb3.EjbLogger;
 import org.jboss.as.ejb3.EjbMessages;
 import org.jboss.as.ejb3.cache.Cacheable;
+import org.jboss.as.ejb3.cache.IdentifierFactory;
 import org.jboss.as.ejb3.cache.StatefulObjectFactory;
 import org.jboss.as.ejb3.cache.spi.BackingCache;
 import org.jboss.as.ejb3.cache.spi.BackingCacheEntryFactory;
@@ -61,20 +62,28 @@ public class NonPassivatingBackingCacheImpl<K extends Serializable, V extends Ca
     private final ThreadFactory threadFactory;
     private final Map<K, Future<?>> expirationFutures = new ConcurrentHashMap<K, Future<?>>();
     private final ServerEnvironment environment;
+    private final IdentifierFactory<K> identifierFactory;
 
-    public NonPassivatingBackingCacheImpl(StatefulObjectFactory<V> factory, ThreadFactory threadFactory, StatefulTimeoutInfo timeout, ServerEnvironment environment) {
+    public NonPassivatingBackingCacheImpl(IdentifierFactory<K> identifierFactory, StatefulObjectFactory<V> factory, ThreadFactory threadFactory, StatefulTimeoutInfo timeout, ServerEnvironment environment) {
+        this.identifierFactory = identifierFactory;
         this.factory = factory;
         this.timeout = timeout;
         this.threadFactory = threadFactory;
         this.environment = environment;
     }
 
-    public NonPassivatingBackingCacheImpl(StatefulObjectFactory<V> factory, ScheduledExecutorService executor, StatefulTimeoutInfo timeout, ServerEnvironment environment) {
+    public NonPassivatingBackingCacheImpl(IdentifierFactory<K> identifierFactory, StatefulObjectFactory<V> factory, ScheduledExecutorService executor, StatefulTimeoutInfo timeout, ServerEnvironment environment) {
+        this.identifierFactory = identifierFactory;
         this.factory = factory;
         this.timeout = timeout;
         this.executor = executor;
         this.threadFactory = null;
         this.environment = environment;
+    }
+
+    @Override
+    public K createIdentifier() {
+        return this.identifierFactory.createIdentifier();
     }
 
     @Override
@@ -113,7 +122,7 @@ public class NonPassivatingBackingCacheImpl<K extends Serializable, V extends Ca
     public NonPassivatingBackingCacheEntry<K, V> get(K key) throws NoSuchEJBException {
         NonPassivatingBackingCacheEntry<K, V> entry = cache.get(key);
         if (entry == null) return null;
-        entry.setInUse(true);
+        entry.increaseUsageCount();
         this.scheduleExpiration(key, true);
         return entry;
     }
@@ -133,8 +142,10 @@ public class NonPassivatingBackingCacheImpl<K extends Serializable, V extends Ca
         if (!entry.isInUse()) {
             throw EjbMessages.MESSAGES.cacheEntryNotInUse(key);
         }
-        entry.setInUse(false);
-        this.scheduleExpiration(key, false);
+        entry.decreaseUsageCount();
+        if(!entry.isInUse()) {
+            this.scheduleExpiration(key, false);
+        }
         return entry;
     }
 
@@ -148,7 +159,7 @@ public class NonPassivatingBackingCacheImpl<K extends Serializable, V extends Ca
         this.scheduleExpiration(key, true);
         NonPassivatingBackingCacheEntry<K, V> entry = cache.remove(key);
         if (entry != null && entry.isInUse()) {
-            entry.setInUse(false);
+            entry.decreaseUsageCount();
         }
         if (entry != null) {
             factory.destroyInstance(entry.getUnderlyingItem());

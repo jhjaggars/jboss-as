@@ -35,8 +35,12 @@ public class LocalDataSourceService extends AbstractDataSourceService {
 
     private final InjectedValue<ModifiableDataSource> dataSourceConfig = new InjectedValue<ModifiableDataSource>();
 
+    public LocalDataSourceService(final String jndiName, final ClassLoader classLoader) {
+        super(jndiName, classLoader);
+    }
+
     public LocalDataSourceService(final String jndiName) {
-        super(jndiName);
+        super(jndiName, null);
     }
 
     @Override

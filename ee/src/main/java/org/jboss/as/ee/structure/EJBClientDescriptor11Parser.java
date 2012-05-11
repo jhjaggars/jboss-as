@@ -40,7 +40,7 @@ import java.util.Set;
 import static javax.xml.stream.XMLStreamConstants.*;
 
 /**
- * Parser for urn:jboss:ejb-client:1.0:jboss-ejb-client
+ * Parser for urn:jboss:ejb-client:1.1:jboss-ejb-client
  *
  * @author Jaikiran Pai
  */

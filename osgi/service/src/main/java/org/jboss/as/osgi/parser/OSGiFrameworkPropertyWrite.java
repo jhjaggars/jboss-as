@@ -21,23 +21,22 @@
  */
 package org.jboss.as.osgi.parser;
 
+import java.util.Locale;
+import java.util.ResourceBundle;
+
 import org.jboss.as.controller.AbstractWriteAttributeHandler;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
-import org.jboss.as.controller.ProcessType;
 import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
 
-import java.util.Locale;
-import java.util.ResourceBundle;
-
 /**
  * @author Thomas.Diesler@jboss.com
  * @since 25-Oct-2011
  */
-public class OSGiFrameworkPropertyWrite extends AbstractWriteAttributeHandler {
+public class OSGiFrameworkPropertyWrite extends AbstractWriteAttributeHandler<Object> {
     static final OSGiFrameworkPropertyWrite INSTANCE = new OSGiFrameworkPropertyWrite();
 
     private OSGiFrameworkPropertyWrite() {
@@ -49,7 +48,7 @@ public class OSGiFrameworkPropertyWrite extends AbstractWriteAttributeHandler {
     }
 
     @Override
-    protected boolean applyUpdateToRuntime(OperationContext context, ModelNode operation, String attributeName, ModelNode resolvedValue, ModelNode currentValue, HandbackHolder handbackHolder) throws OperationFailedException {
+    protected boolean applyUpdateToRuntime(OperationContext context, ModelNode operation, String attributeName, ModelNode resolvedValue, ModelNode currentValue, HandbackHolder<Object> handbackHolder) throws OperationFailedException {
         String propName = operation.get(ModelDescriptionConstants.OP_ADDR).asObject().get(ModelConstants.PROPERTY).asString();
         String propValue = resolvedValue.asString();
         SubsystemState subsystemState = SubsystemState.getSubsystemState(context);
@@ -74,7 +73,7 @@ public class OSGiFrameworkPropertyWrite extends AbstractWriteAttributeHandler {
         @Override
         public ModelNode getModelDescription(Locale locale) {
             ModelNode node = new ModelNode();
-            ResourceBundle resbundle = OSGiSubsystemProviders.getResourceBundle(locale);
+            ResourceBundle resbundle = OSGiDescriptionProviders.getResourceBundle(locale);
             node.get(ModelDescriptionConstants.OPERATION_NAME).set(ModelDescriptionConstants.WRITE_ATTRIBUTE_OPERATION);
             node.get(ModelDescriptionConstants.DESCRIPTION).set(resbundle.getString("framework.property.write"));
             node.get(ModelDescriptionConstants.REQUEST_PROPERTIES, ModelConstants.VALUE, ModelDescriptionConstants.DESCRIPTION).set(resbundle.getString("framework.property.value"));

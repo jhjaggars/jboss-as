@@ -22,7 +22,6 @@
 
 package org.jboss.as.ejb3.remote.protocol.versionone;
 
-import org.jboss.remoting3.Channel;
 import org.jboss.remoting3.MessageInputStream;
 
 import java.io.IOException;

@@ -21,8 +21,9 @@
  */
 package org.jboss.as.osgi.service;
 
-import static org.jboss.as.osgi.OSGiLogger.ROOT_LOGGER;
-import static org.jboss.as.osgi.service.FrameworkBootstrapService.SERVICE_BASE_NAME;
+import static org.jboss.as.osgi.OSGiConstants.SERVICE_BASE_NAME;
+import static org.jboss.as.osgi.OSGiLogger.LOGGER;
+import static org.jboss.as.osgi.OSGiMessages.MESSAGES;
 import static org.jboss.osgi.resolver.XResourceConstants.MODULE_IDENTITY_NAMESPACE;
 
 import java.io.File;
@@ -92,12 +93,16 @@ final class ModuleIdentityArtifactProvider extends AbstractService<Void> impleme
     @Override
     public void start(StartContext context) throws StartException {
         BundleContext syscontext = injectedSystemContext.getValue();
-        Dictionary props = new Hashtable();
+        Dictionary<String, Object> props = new Hashtable<String, Object>();
         props.put(Constants.SERVICE_RANKING, Integer.MAX_VALUE);
         registration = syscontext.registerService(ArtifactProviderPlugin.class.getName(), this, props);
         ServerEnvironment serverEnvironment = injectedEnvironment.getValue();
-        modulesDir = serverEnvironment.getModulesDir();
         bundlesDir = serverEnvironment.getBundlesDir();
+        if (bundlesDir.isDirectory() == false)
+            throw MESSAGES.illegalStateArtifactBaseLocation(bundlesDir);
+        modulesDir = new File(bundlesDir.getParent() + File.separator + "modules");
+        if (modulesDir.isDirectory() == false)
+            throw MESSAGES.illegalStateArtifactBaseLocation(modulesDir);
     }
 
     @Override
@@ -150,7 +155,7 @@ final class ModuleIdentityArtifactProvider extends AbstractService<Void> impleme
         String identifierPath = identifier.getName().replace('.', '/') + "/" + identifier.getSlot();
         File entryDir = new File(rootDir + "/" + identifierPath);
         if (entryDir.isDirectory() == false) {
-            ROOT_LOGGER.debugf("Cannot obtain directory: %s", entryDir);
+            LOGGER.tracef("Cannot obtain directory: %s", entryDir);
             return null;
         }
 
@@ -160,17 +165,17 @@ final class ModuleIdentityArtifactProvider extends AbstractService<Void> impleme
             }
         });
         if (files.length == 0) {
-            ROOT_LOGGER.debugf("Cannot find jar in: %s", entryDir);
+            LOGGER.tracef("Cannot find jar in: %s", entryDir);
             return null;
         }
         if (files.length > 1) {
-            ROOT_LOGGER.debugf("Multiple jars in: %s", entryDir);
+            LOGGER.tracef("Multiple jars in: %s", entryDir);
             return null;
         }
 
         File entryFile = new File(entryDir + "/" + files[0]);
         if (entryFile.exists() == false) {
-            ROOT_LOGGER.debugf("File does not exist: %s", entryFile);
+            LOGGER.tracef("File does not exist: %s", entryFile);
             return null;
         }
 

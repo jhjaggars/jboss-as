@@ -23,6 +23,7 @@
 package org.jboss.as.ejb3.deployment.processors;
 
 import java.util.List;
+import java.util.Locale;
 
 import javax.ejb.EJB;
 import javax.ejb.EJBs;
@@ -38,6 +39,7 @@ import org.jboss.as.ee.component.LookupInjectionSource;
 import org.jboss.as.ee.component.MethodInjectionTarget;
 import org.jboss.as.ee.component.OptionalLookupInjectionSource;
 import org.jboss.as.ee.component.ResourceInjectionConfiguration;
+import org.jboss.as.ejb3.EjbLogger;
 import org.jboss.as.ejb3.deployment.EjbDeploymentAttachmentKeys;
 import org.jboss.as.server.deployment.DeploymentPhaseContext;
 import org.jboss.as.server.deployment.DeploymentUnit;
@@ -102,7 +104,7 @@ public class EjbResourceInjectionAnnotationProcessor implements DeploymentUnitPr
                     processClass(deploymentUnit, annotationWrapper, (ClassInfo) annotationTarget, moduleDescription);
                 }
             } else {
-                throw new DeploymentUnitProcessingException("EJBs annotation can only be placed on classes " + annotation.target());
+                throw EjbLogger.EJB3_LOGGER.annotationOnlyAllowedOnClass(EJBs.class.getName(), annotation.target());
             }
         }
     }
@@ -122,22 +124,22 @@ public class EjbResourceInjectionAnnotationProcessor implements DeploymentUnitPr
     private void processMethod(final DeploymentUnit deploymentUnit, final EJBResourceWrapper annotation, final MethodInfo methodInfo, final EEModuleDescription eeModuleDescription) {
         final String methodName = methodInfo.name();
         if (!methodName.startsWith("set") || methodInfo.args().length != 1) {
-            throw new IllegalArgumentException("@EJB injection target is invalid.  Only setter methods are allowed: " + methodInfo);
+            throw EjbLogger.EJB3_LOGGER.onlySetterMethodsAllowedToHaveEJBAnnotation(methodInfo);
         }
         final String methodParamType = methodInfo.args()[0].name().toString();
         final InjectionTarget targetDescription = new MethodInjectionTarget(methodInfo.declaringClass().name().toString(), methodName, methodParamType);
 
-        final String localContextName = isEmpty(annotation.name()) ? methodInfo.declaringClass().name().toString() + "/" + methodName.substring(3, 4).toLowerCase() + methodName.substring(4) : annotation.name();
+        final String localContextName = isEmpty(annotation.name()) ? methodInfo.declaringClass().name().toString() + "/" + methodName.substring(3, 4).toLowerCase(Locale.ENGLISH) + methodName.substring(4) : annotation.name();
         final String beanInterfaceType = isEmpty(annotation.beanInterface()) || annotation.beanInterface().equals(Object.class.getName()) ? methodParamType : annotation.beanInterface();
         process(deploymentUnit, beanInterfaceType, annotation.beanName(), annotation.lookup(), methodInfo.declaringClass(), targetDescription, localContextName, eeModuleDescription);
     }
 
     private void processClass(final DeploymentUnit deploymentUnit, final EJBResourceWrapper annotation, final ClassInfo classInfo, final EEModuleDescription eeModuleDescription) throws DeploymentUnitProcessingException {
         if (isEmpty(annotation.name())) {
-            throw new DeploymentUnitProcessingException("@EJB attribute 'name' is required for class level annotations. Class: " + classInfo.name());
+            throw EjbLogger.EJB3_LOGGER.nameAttributeRequiredForEJBAnnotationOnClass(classInfo.toString());
         }
         if (isEmpty(annotation.beanInterface())) {
-            throw new DeploymentUnitProcessingException("@EJB attribute 'beanInterface' is required for class level annotations. Class: " + classInfo.name());
+            throw EjbLogger.EJB3_LOGGER.beanInterfaceAttributeRequiredForEJBAnnotationOnClass(classInfo.toString());
         }
         process(deploymentUnit, annotation.beanInterface(), annotation.beanName(), annotation.lookup(), classInfo, null, annotation.name(), eeModuleDescription);
     }

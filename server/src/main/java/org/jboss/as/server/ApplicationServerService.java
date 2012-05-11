@@ -22,9 +22,6 @@
 
 package org.jboss.as.server;
 
-import static org.jboss.as.server.ServerLogger.AS_ROOT_LOGGER;
-import static org.jboss.as.server.ServerLogger.CONFIG_LOGGER;
-
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
 import java.util.Iterator;
@@ -56,6 +53,9 @@ import org.jboss.msc.service.StartException;
 import org.jboss.msc.service.StopContext;
 import org.jboss.threads.AsyncFuture;
 
+import static org.jboss.as.server.ServerLogger.AS_ROOT_LOGGER;
+import static org.jboss.as.server.ServerLogger.CONFIG_LOGGER;
+
 /**
  * The root service for an Application Server process.
  *
@@ -71,13 +71,14 @@ final class ApplicationServerService implements Service<AsyncFuture<ServiceConta
     private volatile FutureServiceContainer futureContainer;
     private volatile long startTime;
 
-    ApplicationServerService(final List<ServiceActivator> extraServices, final Bootstrap.Configuration configuration) {
+    ApplicationServerService(final List<ServiceActivator> extraServices, final Bootstrap.Configuration configuration,
+                             final ControlledProcessState processState) {
         this.extraServices = extraServices;
         this.configuration = configuration;
         runningModeControl = configuration.getRunningModeControl();
         startTime = configuration.getStartTime();
         standalone = configuration.getServerEnvironment().isStandalone();
-        processState = new ControlledProcessState(configuration.getServerEnvironment().isStandalone());
+        this.processState = processState;
     }
 
     @Override

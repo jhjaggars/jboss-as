@@ -41,5 +41,5 @@ public interface CacheFactory<K extends Serializable, T extends Identifiable<K>>
      *
      * @return the cache
      */
-    Cache<K, T> createCache(String beanName, StatefulObjectFactory<T> factory, PassivationManager<K, T> passivationManager, StatefulTimeoutInfo timeout);
+    Cache<K, T> createCache(String beanName, IdentifierFactory<K> identifierFactory, StatefulObjectFactory<T> factory, PassivationManager<K, T> passivationManager, StatefulTimeoutInfo timeout);
 }

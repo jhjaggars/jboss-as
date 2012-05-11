@@ -21,24 +21,18 @@
  */
 package org.jboss.as.osgi.parser;
 
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
-
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Dictionary;
-import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Observable;
 import java.util.Observer;
+
+import org.junit.Assert;
+import org.junit.Test;
 
 /**
  * @author David Bosschaert
  */
-@Ignore("[AS7-3556] Replace mocked subsystem model tests with functional tests")
 public class SubsystemStateTestCase {
 
     @Test
@@ -159,16 +153,5 @@ public class SubsystemStateTestCase {
         Assert.assertEquals(id, event.getId());
         Assert.assertEquals(isRemoved, event.isRemoved());
         Assert.assertEquals(type, event.getType());
-    }
-
-    private Map<String, String> map(Dictionary<String, String> d) {
-        Map<String, String> m = new HashMap<String, String>();
-
-        for (Enumeration<String> e = d.keys(); e.hasMoreElements(); ) {
-            String key = e.nextElement();
-            m.put(key, d.get(key));
-        }
-
-        return m;
     }
 }

@@ -79,6 +79,11 @@ public class SerializationGroupMemberContainer<K extends Serializable, V extends
     }
 
     @Override
+    public K createIdentifier() {
+        return this.store.createIdentifier();
+    }
+
+    @Override
     public Affinity getStrictAffinity() {
         return this.store.getStrictAffinity();
     }
@@ -94,8 +99,13 @@ public class SerializationGroupMemberContainer<K extends Serializable, V extends
     }
 
     @Override
-    public MarshallingConfiguration getMarshallingConfiguration() {
-        return this.passivationManager.getMarshallingConfiguration();
+    public int getCurrentMarshallingVersion() {
+        return this.passivationManager.getCurrentMarshallingVersion();
+    }
+
+    @Override
+    public MarshallingConfiguration getMarshallingConfiguration(int version) {
+        return this.passivationManager.getMarshallingConfiguration(version);
     }
 
     @Override

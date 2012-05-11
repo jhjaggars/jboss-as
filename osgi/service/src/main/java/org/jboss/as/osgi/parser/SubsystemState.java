@@ -22,18 +22,8 @@
 
 package org.jboss.as.osgi.parser;
 
-import org.jboss.as.controller.OperationContext;
-import org.jboss.as.osgi.service.FrameworkBootstrapService;
-import org.jboss.modules.ModuleIdentifier;
-import org.jboss.msc.service.Service;
-import org.jboss.msc.service.ServiceBuilder;
-import org.jboss.msc.service.ServiceController;
-import org.jboss.msc.service.ServiceController.Mode;
-import org.jboss.msc.service.ServiceName;
-import org.jboss.msc.service.ServiceTarget;
-import org.jboss.msc.service.StartContext;
-import org.jboss.msc.service.StartException;
-import org.jboss.msc.service.StopContext;
+import static org.jboss.as.osgi.OSGiConstants.FRAMEWORK_BASE_NAME;
+import static org.jboss.as.osgi.OSGiMessages.MESSAGES;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -44,6 +34,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Observable;
 
+import org.jboss.as.controller.OperationContext;
+import org.jboss.msc.service.Service;
+import org.jboss.msc.service.ServiceBuilder;
+import org.jboss.msc.service.ServiceController;
+import org.jboss.msc.service.ServiceController.Mode;
+import org.jboss.msc.service.ServiceName;
+import org.jboss.msc.service.ServiceTarget;
+import org.jboss.msc.service.StartContext;
+import org.jboss.msc.service.StartException;
+import org.jboss.msc.service.StopContext;
+
 /**
  * The OSGi subsystem state.
  *
@@ -51,9 +52,9 @@ import java.util.Observable;
  * @author David Bosschaert
  * @since 13-Oct-2010
  */
-public class SubsystemState  extends Observable implements Serializable, Service<SubsystemState> {
+public class SubsystemState  extends Observable implements Service<SubsystemState> {
 
-    public static final ServiceName SERVICE_NAME = FrameworkBootstrapService.FRAMEWORK_BASE_NAME.append("subsystemstate");
+    public static final ServiceName SERVICE_NAME = FRAMEWORK_BASE_NAME.append("subsystemstate");
     public static final String PROP_JBOSS_OSGI_SYSTEM_MODULES = "org.jboss.osgi.system.modules";
     public static final String PROP_JBOSS_OSGI_SYSTEM_PACKAGES = "org.jboss.osgi.system.packages";
     public static final String PROP_JBOSS_OSGI_SYSTEM_MODULES_EXTRA = "org.jboss.osgi.system.modules.extra";
@@ -124,13 +125,12 @@ public class SubsystemState  extends Observable implements Serializable, Service
     }
 
     public OSGiCapability removeCapability(String id) {
-        ModuleIdentifier identifier = ModuleIdentifier.fromString(id);
         synchronized (capabilities) {
             for (Iterator<OSGiCapability> it = capabilities.iterator(); it.hasNext(); ) {
                 OSGiCapability module = it.next();
-                if (module.getIdentifier().equals(identifier)) {
+                if (module.getIdentifier().equals(id)) {
                     it.remove();
-                    notifyObservers(new ChangeEvent(ChangeType.CAPABILITY, true, identifier.toString()));
+                    notifyObservers(new ChangeEvent(ChangeType.CAPABILITY, true, id));
                     return module;
                 }
             }
@@ -167,9 +167,9 @@ public class SubsystemState  extends Observable implements Serializable, Service
 
         public OSGiCapability(String identifier, Integer startlevel) {
             if (identifier == null)
-                throw new IllegalArgumentException("Null identifier");
+                throw MESSAGES.illegalArgumentNull("identifier");
             this.identifier = identifier;
-            this.startlevel = (startlevel != null ? startlevel : 1);
+            this.startlevel = startlevel;
         }
 
         public String getIdentifier() {
@@ -189,9 +189,13 @@ public class SubsystemState  extends Observable implements Serializable, Service
         public boolean equals(Object obj) {
             if (obj instanceof OSGiCapability == false)
                 return false;
+            OSGiCapability other = (OSGiCapability) obj;
+            return identifier.equals(other.identifier);
+        }
 
-            OSGiCapability om = (OSGiCapability) obj;
-            return identifier == null ? om.identifier == null : identifier.equals(om.identifier);
+        @Override
+        public String toString() {
+            return "OSGiCapability[identifier=" + identifier + ",startlevel=" + startlevel + "]";
         }
     }
 

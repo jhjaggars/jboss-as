@@ -39,6 +39,7 @@ import org.jboss.metadata.merge.JBossAppMetaDataMerger;
 import org.jboss.metadata.parser.jboss.JBossAppMetaDataParser;
 import org.jboss.metadata.parser.spec.EarMetaDataParser;
 import org.jboss.metadata.parser.util.NoopXMLResolver;
+import org.jboss.metadata.property.PropertyReplacer;
 import org.jboss.vfs.VFSUtils;
 import org.jboss.vfs.VirtualFile;
 
@@ -58,10 +59,12 @@ public class EarMetaDataParsingProcessor implements DeploymentUnitProcessor {
         if (!DeploymentTypeMarker.isType(DeploymentType.EAR, deploymentUnit)) {
             return;
         }
+
         final ResourceRoot deploymentRoot = deploymentUnit.getAttachment(org.jboss.as.server.deployment.Attachments.DEPLOYMENT_ROOT);
         final VirtualFile deploymentFile = deploymentRoot.getRoot();
-        EarMetaData earMetaData = handleSpecMetadata(deploymentFile);
-        JBossAppMetaData jbossMetaData = handleJbossMetadata(deploymentFile);
+
+        EarMetaData earMetaData = handleSpecMetadata(deploymentFile, SpecDescriptorPropertyReplacement.propertyReplacer(deploymentUnit));
+        JBossAppMetaData jbossMetaData = handleJbossMetadata(deploymentFile, JBossDescriptorPropertyReplacement.propertyReplacer(deploymentUnit));
         if (earMetaData == null && jbossMetaData == null) {
             return;
         }
@@ -85,7 +88,7 @@ public class EarMetaDataParsingProcessor implements DeploymentUnitProcessor {
 
     }
 
-    private EarMetaData handleSpecMetadata(VirtualFile deploymentFile) throws DeploymentUnitProcessingException {
+    private EarMetaData handleSpecMetadata(VirtualFile deploymentFile, final PropertyReplacer propertyReplacer) throws DeploymentUnitProcessingException {
         final VirtualFile applicationXmlFile = deploymentFile.getChild(APPLICATION_XML);
         if (!applicationXmlFile.exists()) {
             return null;
@@ -96,7 +99,7 @@ public class EarMetaDataParsingProcessor implements DeploymentUnitProcessor {
             final XMLInputFactory inputFactory = XMLInputFactory.newInstance();
             inputFactory.setXMLResolver(NoopXMLResolver.create());
             XMLStreamReader xmlReader = inputFactory.createXMLStreamReader(inputStream);
-            return EarMetaDataParser.INSTANCE.parse(xmlReader);
+            return EarMetaDataParser.INSTANCE.parse(xmlReader, propertyReplacer);
 
         } catch (Exception e) {
             throw MESSAGES.failedToParse(e, applicationXmlFile);
@@ -106,7 +109,7 @@ public class EarMetaDataParsingProcessor implements DeploymentUnitProcessor {
     }
 
 
-    private JBossAppMetaData handleJbossMetadata(VirtualFile deploymentFile) throws DeploymentUnitProcessingException {
+    private JBossAppMetaData handleJbossMetadata(VirtualFile deploymentFile, final PropertyReplacer propertyReplacer) throws DeploymentUnitProcessingException {
         final VirtualFile applicationXmlFile = deploymentFile.getChild(JBOSS_APP_XML);
         if (!applicationXmlFile.exists()) {
             return null;
@@ -117,7 +120,7 @@ public class EarMetaDataParsingProcessor implements DeploymentUnitProcessor {
             final XMLInputFactory inputFactory = XMLInputFactory.newInstance();
             inputFactory.setXMLResolver(NoopXMLResolver.create());
             XMLStreamReader xmlReader = inputFactory.createXMLStreamReader(inputStream);
-            return JBossAppMetaDataParser.INSTANCE.parse(xmlReader);
+            return JBossAppMetaDataParser.INSTANCE.parse(xmlReader, propertyReplacer);
 
         } catch (Exception e) {
             throw MESSAGES.failedToParse(e, applicationXmlFile);

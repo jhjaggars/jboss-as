@@ -35,6 +35,7 @@ import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
 import org.jboss.as.controller.descriptions.common.CommonDescriptions;
 import org.jboss.as.controller.operations.validation.IntRangeValidator;
+import org.jboss.as.controller.operations.validation.MulticastAddressValidator;
 import org.jboss.as.controller.operations.validation.StringLengthValidator;
 import org.jboss.as.controller.registry.AttributeAccess;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
@@ -59,14 +60,16 @@ public abstract class AbstractSocketBindingResourceDefinition extends SimpleReso
             .setFlags(AttributeAccess.Flag.RESTART_ALL_SERVICES).build();
 
     public static final SimpleAttributeDefinition PORT = new SimpleAttributeDefinitionBuilder(ModelDescriptionConstants.PORT, ModelType.INT, true)
-            .setAllowExpression(true).setValidator(new IntRangeValidator(0, 65535, true, true))
+            .setAllowExpression(true)
+            .setValidator(new IntRangeValidator(0, 65535, true, true))
+            .setDefaultValue(new ModelNode(0))
             .setFlags(AttributeAccess.Flag.RESTART_ALL_SERVICES).build();
 
     public static final SimpleAttributeDefinition FIXED_PORT = new SimpleAttributeDefinitionBuilder(ModelDescriptionConstants.FIXED_PORT, ModelType.BOOLEAN, true)
             .setAllowExpression(true).setDefaultValue(new ModelNode().set(false)).build();
 
     public static final SimpleAttributeDefinition MULTICAST_ADDRESS = new SimpleAttributeDefinitionBuilder(ModelDescriptionConstants.MULTICAST_ADDRESS, ModelType.STRING, true)
-            .setAllowExpression(true).setValidator(new StringLengthValidator(1, Integer.MAX_VALUE, true, true))
+            .setAllowExpression(true).setValidator(new MulticastAddressValidator(true, true))
             .setFlags(AttributeAccess.Flag.RESTART_ALL_SERVICES).build();
 
     public static final SimpleAttributeDefinition MULTICAST_PORT = new SimpleAttributeDefinitionBuilder(ModelDescriptionConstants.MULTICAST_PORT, ModelType.INT, true)

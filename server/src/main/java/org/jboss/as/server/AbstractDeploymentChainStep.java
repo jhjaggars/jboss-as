@@ -36,8 +36,13 @@ import org.jboss.dmr.ModelNode;
 public abstract class AbstractDeploymentChainStep implements OperationStepHandler {
 
     private static DeploymentProcessorTarget TARGET = new DeploymentProcessorTarget() {
+        public void addDeploymentProcessor(final String subsystemName, final Phase phase, final int priority, final DeploymentUnitProcessor processor) {
+            DeployerChainAddHandler.addDeploymentProcessor(subsystemName, phase, priority, processor);
+        }
+
+        @Override
         public void addDeploymentProcessor(final Phase phase, final int priority, final DeploymentUnitProcessor processor) {
-            DeployerChainAddHandler.addDeploymentProcessor(phase, priority, processor);
+            addDeploymentProcessor("", phase, priority, processor);
         }
     };
 

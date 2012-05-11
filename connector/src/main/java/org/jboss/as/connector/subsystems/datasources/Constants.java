@@ -24,7 +24,6 @@ package org.jboss.as.connector.subsystems.datasources;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.SimpleAttributeDefinition;
 import org.jboss.as.controller.client.helpers.MeasurementUnit;
-import org.jboss.as.controller.operations.validation.EnumValidator;
 import org.jboss.as.controller.operations.validation.ParameterValidator;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
@@ -33,14 +32,15 @@ import org.jboss.jca.common.api.metadata.common.CommonSecurity;
 import org.jboss.jca.common.api.metadata.common.CommonXaPool;
 import org.jboss.jca.common.api.metadata.common.Credential;
 import org.jboss.jca.common.api.metadata.common.Recovery;
-import org.jboss.jca.common.api.metadata.ds.DataSource;
 import org.jboss.jca.common.api.metadata.ds.Driver;
 import org.jboss.jca.common.api.metadata.ds.Statement;
 import org.jboss.jca.common.api.metadata.ds.TimeOut;
 import org.jboss.jca.common.api.metadata.ds.Validation;
-import org.jboss.jca.common.api.metadata.ds.XaDataSource;
+import org.jboss.jca.common.api.metadata.ds.v11.DataSource;
+import org.jboss.jca.common.api.metadata.ds.v11.DsPool;
+import org.jboss.jca.common.api.metadata.ds.v11.XaDataSource;
 
-import static org.jboss.as.connector.ConnectorMessages.MESSAGES;
+import static org.jboss.as.connector.logging.ConnectorMessages.MESSAGES;
 
 /**
  * @author @author <a href="mailto:stefano.maestri@redhat.com">Stefano
@@ -103,6 +103,8 @@ class Constants {
     private static final String ALLOCATION_RETRY_NAME = "allocation-retry";
 
     private static final String ALLOCATION_RETRY_WAIT_MILLIS_NAME = "allocation-retry-wait-millis";
+
+    private static final String ALLOW_MULTIPLE_USERS_NAME = "allow-multiple-users";
 
     private static final String SETTXQUERYTIMEOUT_NAME = "set-tx-query-timeout";
 
@@ -248,6 +250,7 @@ class Constants {
 
     static SimpleAttributeDefinition ALLOCATION_RETRY_WAIT_MILLIS = new SimpleAttributeDefinition(ALLOCATION_RETRY_WAIT_MILLIS_NAME, TimeOut.Tag.ALLOCATION_RETRY_WAIT_MILLIS.getLocalName(),  new ModelNode(), ModelType.LONG, true, true, MeasurementUnit.NONE);
 
+    static SimpleAttributeDefinition ALLOW_MULTIPLE_USERS = new SimpleAttributeDefinition(ALLOW_MULTIPLE_USERS_NAME, DsPool.Tag.ALLOW_MULTIPLE_USERS.getLocalName(),  new ModelNode(), ModelType.BOOLEAN, true, false, MeasurementUnit.NONE);
 
     static SimpleAttributeDefinition QUERYTIMEOUT = new SimpleAttributeDefinition(QUERYTIMEOUT_NAME, TimeOut.Tag.QUERY_TIMEOUT.getLocalName(),  new ModelNode(), ModelType.LONG, true, true, MeasurementUnit.NONE);
 

@@ -21,7 +21,11 @@
  */
 package org.jboss.as.test.integration.domain.suites;
 
-import java.util.*;
+import java.io.File;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
 
 import org.jboss.as.test.integration.domain.DomainTestSupport;
 import org.jboss.as.test.integration.domain.management.cli.BasicOpsTestCase;
@@ -32,7 +36,6 @@ import org.jboss.as.test.integration.domain.management.cli.JmsTestCase;
 import org.jboss.as.test.integration.domain.management.cli.RolloutPlanTestCase;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
 
@@ -62,7 +65,7 @@ public class CLITestSuite {
     @BeforeClass
     public static void initSuite() throws Exception {
         domainSupport = new DomainTestSupport(CLITestSuite.class.getSimpleName(),
-                "domain-configs/domain-standard.xml", "host-configs/host-master.xml", "host-configs/host-slave.xml");
+                "domain-configs"+ File.separatorChar+"domain-standard.xml", "host-configs"+File.separatorChar+"host-master.xml", "host-configs"+File.separatorChar+"host-slave.xml");
         domainSupport.start();
 
         hostServers.put("master", new String[]{"main-one", "main-two", "other-one"});
@@ -120,10 +123,10 @@ public class CLITestSuite {
         portOffsets.put(serverName, portOffset);
         serverStatus.put(serverName, status);
     }
-    
+
     public static String getServerHost(String serverName) {
         for(Map.Entry<String,String[]> entry : hostServers.entrySet()) {
-            if (Arrays.asList(entry.getValue()).contains(serverName)) return entry.getKey();
+            if (Arrays.asList(entry.getValue()).contains(serverName)) { return entry.getKey(); }
         }
         return null;
     }

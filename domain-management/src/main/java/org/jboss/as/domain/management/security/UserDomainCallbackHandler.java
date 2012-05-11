@@ -25,17 +25,24 @@ package org.jboss.as.domain.management.security;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.PASSWORD;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.USER;
 import static org.jboss.as.domain.management.DomainManagementMessages.MESSAGES;
+import static org.jboss.as.domain.management.RealmConfigurationConstants.DIGEST_PLAIN_TEXT;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.sasl.AuthorizeCallback;
 import javax.security.sasl.RealmCallback;
-import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
 
+import org.jboss.as.domain.management.AuthenticationMechanism;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.Service;
 import org.jboss.msc.service.StartContext;
@@ -47,11 +54,9 @@ import org.jboss.msc.service.StopContext;
  *
  * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>
  */
-public class UserDomainCallbackHandler implements Service<UserDomainCallbackHandler>, DomainCallbackHandler {
+public class UserDomainCallbackHandler implements Service<CallbackHandlerService>, CallbackHandlerService, CallbackHandler {
 
     public static final String SERVICE_SUFFIX = "users";
-    private static final Class[] supportedCallbacks = {AuthorizeCallback.class, RealmCallback.class,
-                                                       NameCallback.class, PasswordCallback.class};
 
     private final String realm;
 
@@ -66,10 +71,34 @@ public class UserDomainCallbackHandler implements Service<UserDomainCallbackHand
         this.userDomain = userDomain == null || !userDomain.isDefined() ? new ModelNode().setEmptyObject() : userDomain.clone();
     }
 
+    /*
+     * CallbackHandlerService Methods
+     */
+
+    public AuthenticationMechanism getPreferredMechanism() {
+        return AuthenticationMechanism.DIGEST;
+    }
+
+    public Set<AuthenticationMechanism> getSupplementaryMechanisms() {
+        return Collections.singleton(AuthenticationMechanism.PLAIN);
+    }
+
+    public Map<String, String> getConfigurationOptions() {
+        return Collections.singletonMap(DIGEST_PLAIN_TEXT, Boolean.TRUE.toString());
+    }
+
+    public boolean isReady() {
+        return true;
+    }
+
+    public CallbackHandler getCallbackHandler(Map<String, Object> sharedState) {
+        return this;
+    }
 
     /*
      *  Service Methods
      */
+
 
     public void start(StartContext context) throws StartException {
     }
@@ -82,17 +111,8 @@ public class UserDomainCallbackHandler implements Service<UserDomainCallbackHand
     }
 
     /*
-     *  DomainCallbackHandler Methods
+     *  CallbackHandler Method
      */
-
-    public Class[] getSupportedCallbacks() {
-        return supportedCallbacks;
-    }
-
-    @Override
-    public boolean isReady() {
-        return true;
-    }
 
     public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
 

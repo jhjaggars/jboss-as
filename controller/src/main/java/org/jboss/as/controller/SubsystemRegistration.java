@@ -25,6 +25,7 @@ package org.jboss.as.controller;
 import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.persistence.SubsystemMarshallingContext;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
+import org.jboss.as.controller.transform.SubsystemTransformer;
 import org.jboss.staxmapper.XMLElementWriter;
 
 /**
@@ -77,4 +78,13 @@ public interface SubsystemRegistration {
      * @param writer the writer
      */
     void registerXMLElementWriter(XMLElementWriter<SubsystemMarshallingContext> writer);
+
+    /**
+     * Registers subsystem model transformer
+     * @param subsystemTransformer - transformer of model
+     *
+     * @deprecated experimental method; may be removed or changed without warning. Should not be used outside the main JBoss AS codebase
+     */
+    @Deprecated
+    void registerSubsystemTransformer(SubsystemTransformer subsystemTransformer);
 }

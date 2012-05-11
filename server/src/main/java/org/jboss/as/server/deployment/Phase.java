@@ -177,6 +177,8 @@ public enum Phase {
     public static final int STRUCTURE_EXPLODED_MOUNT                    = 0x0200;
     public static final int STRUCTURE_MOUNT                             = 0x0300;
     public static final int STRUCTURE_MANIFEST                          = 0x0400;
+    public static final int STRUCTURE_EE_SPEC_DESC_PROPERTY_REPLACEMENT = 0x0450;
+    public static final int STRUCTURE_EE_JBOSS_DESC_PROPERTY_REPLACEMENT= 0x0451;
     // must be before osgi
     public static final int STRUCTURE_JDBC_DRIVER                       = 0x0500;
     public static final int STRUCTURE_OSGI_MANIFEST                     = 0x0600;
@@ -204,6 +206,11 @@ public enum Phase {
     public static final int STRUCTURE_EE_RESOURCE_INJECTION_REGISTRY    = 0x1C00;
 
     // PARSE
+    public static final int PARSE_EE_DEPLOYMENT_PROPERTIES              = 0x0001;
+    public static final int PARSE_EE_DEPLOYMENT_PROPERTY_RESOLVER       = 0x0002;
+    public static final int PARSE_EE_VAULT_PROPERTY_RESOLVER            = 0x0003;
+    public static final int PARSE_EE_SYSTEM_PROPERTY_RESOLVER           = 0x0004;
+    public static final int PARSE_EE_PROPERTY_RESOLVER                  = 0x0005;
     public static final int PARSE_EE_MODULE_NAME                        = 0x0100;
     public static final int PARSE_EJB_DEFAULT_DISTINCT_NAME             = 0x0110;
     public static final int PARSE_EAR_SUBDEPLOYMENTS_ISOLATION_DEFAULT  = 0x0200;
@@ -378,6 +385,7 @@ public enum Phase {
     public static final int POST_MODULE_NAMING_CONTEXT                  = 0x2800;
     public static final int POST_MODULE_APP_NAMING_CONTEXT              = 0x2900;
     public static final int POST_MODULE_CACHED_CONNECTION_MANAGER       = 0x2A00;
+    public static final int POST_MODULE_LOGGING_CONFIG                  = 0x2B00;
 
     // INSTALL
     public static final int INSTALL_JNDI_DEPENDENCY_SETUP               = 0x0100;

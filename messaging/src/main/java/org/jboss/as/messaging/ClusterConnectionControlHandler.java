@@ -22,6 +22,9 @@
 
 package org.jboss.as.messaging;
 
+import static org.jboss.as.messaging.CommonAttributes.NODE_ID;
+import static org.jboss.as.messaging.CommonAttributes.TOPOLOGY;
+
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Map;
@@ -48,8 +51,8 @@ public class ClusterConnectionControlHandler extends AbstractHornetQComponentCon
 
     public static final ClusterConnectionControlHandler INSTANCE = new ClusterConnectionControlHandler();
 
-    public static final String NODE_ID = "node-id";
-
+    // we keep the operation for backwards compatibility but it duplicates the "static-connectors" writable attribute
+    @Deprecated
     public static final String GET_STATIC_CONNECTORS_AS_JSON = "get-static-connectors-as-json";
     public static final String GET_NODES = "get-nodes";
 
@@ -61,6 +64,7 @@ public class ClusterConnectionControlHandler extends AbstractHornetQComponentCon
         super.register(registry);
 
         registry.registerReadOnlyAttribute(NODE_ID, this, AttributeAccess.Storage.RUNTIME);
+        registry.registerReadOnlyAttribute(TOPOLOGY, this, AttributeAccess.Storage.RUNTIME);
 
         final EnumSet<OperationEntry.Flag> flags = EnumSet.of(OperationEntry.Flag.READ_ONLY, OperationEntry.Flag.RUNTIME_ONLY);
 
@@ -96,6 +100,9 @@ public class ClusterConnectionControlHandler extends AbstractHornetQComponentCon
         if (NODE_ID.equals(attributeName)) {
             ClusterConnectionControl control = getHornetQComponentControl(context, operation, false);
             context.getResult().set(control.getNodeID());
+        } else if (TOPOLOGY.equals(attributeName)) {
+            ClusterConnectionControl control = getHornetQComponentControl(context, operation, false);
+            context.getResult().set(control.getTopology());
         } else {
             unsupportedAttribute(attributeName);
         }

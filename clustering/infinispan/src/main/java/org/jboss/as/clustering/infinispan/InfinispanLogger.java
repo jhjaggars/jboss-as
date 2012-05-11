@@ -74,7 +74,6 @@ public interface InfinispanLogger extends BasicLogger {
     @Message(id = 10282, value = "Stopped %s cache from %s container")
     void cacheStopped(String cacheName, String containerName);
 
-
     /**
      * Logs a warning message indicating that the eager attribute of the transactional element
      * is no longer valid
@@ -83,4 +82,13 @@ public interface InfinispanLogger extends BasicLogger {
     @LogMessage(level = WARN)
     @Message(id = 10283, value = "The 'eager' attribute specified on the 'transaction' element of a cache is no longer valid")
     void eagerAttributeDeprecated();
+
+    /**
+     * Logs a warning message indicating that the specified topology attribute of the transport element
+     * is no longer valid
+     */
+    @LogMessage(level = WARN)
+    @Message(id = 10284, value = "The '%s' attribute specified on the 'transport' element of a cache container is no longer valid" +
+                "; use the same attribute specified on the 'transport' element of corresponding JGroups stack instead")
+    void topologyAttributeDeprecated(String attribute);
 }

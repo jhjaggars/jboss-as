@@ -22,13 +22,16 @@
 
 package org.jboss.as.clustering.msc;
 
+import java.security.AccessController;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 import org.jboss.msc.service.Service;
 import org.jboss.msc.service.StartContext;
 import org.jboss.msc.service.StartException;
 import org.jboss.msc.service.StopContext;
+import org.jboss.threads.JBossThreadFactory;
 
 /**
  * Base service class that executes service start/stop asynchronously.
@@ -36,17 +39,20 @@ import org.jboss.msc.service.StopContext;
  */
 public abstract class AsynchronousService<T> implements Service<T> {
 
-    private final Executor executor = Executors.newCachedThreadPool();
+    private final Executor executor;
     private final boolean startAsynchronously;
     private final boolean stopAsynchronously;
 
     protected AsynchronousService() {
-        this(true, true);
+        this(true, false);
     }
 
     protected AsynchronousService(boolean startAsynchronously, boolean stopAsynchronously) {
         this.startAsynchronously = startAsynchronously;
         this.stopAsynchronously = stopAsynchronously;
+        final ThreadFactory factory =  new JBossThreadFactory(new ThreadGroup(String.format("%s lifecycle", this.getClass().getSimpleName())),
+                Boolean.FALSE, null, "%G - %t", null, null, AccessController.getContext());
+        this. executor = Executors.newCachedThreadPool(factory);
     }
 
     @Override

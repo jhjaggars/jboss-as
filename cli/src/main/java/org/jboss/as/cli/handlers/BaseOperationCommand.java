@@ -104,7 +104,7 @@ public abstract class BaseOperationCommand extends CommandHandlerWithHelp implem
         final Iterator<Node> iterator = requiredAddress.iterator();
         if(iterator.hasNext()) {
             final String firstType = iterator.next().getType();
-            dependsOnProfile = "subsystem".equals(firstType) || Util.PROFILE.equals(firstType);
+            dependsOnProfile = Util.SUBSYSTEM.equals(firstType) || Util.PROFILE.equals(firstType);
         }
         if(requiredAddress.endsOnType()) {
             requiredType = requiredAddress.toParentNode().getType();
@@ -140,26 +140,39 @@ public abstract class BaseOperationCommand extends CommandHandlerWithHelp implem
             return addressAvailable.booleanValue();
         }
 
-        ModelControllerClient client = ctx.getModelControllerClient();
+        final ModelControllerClient client = ctx.getModelControllerClient();
         if(client == null) {
             return false;
         }
-        ModelNode request = new ModelNode();
-        ModelNode address = request.get(Util.ADDRESS);
-        for(OperationRequestAddress.Node node : requiredAddress) {
-            address.add(node.getType(), node.getName());
-        }
+        final ModelNode request = new ModelNode();
+        final ModelNode address = request.get(Util.ADDRESS);
 
         if(requiredType == null) {
+            address.setEmptyList();
             request.get(Util.OPERATION).set(Util.VALIDATE_ADDRESS);
-            ModelNode result;
+            final ModelNode addressValue = request.get(Util.VALUE);
+            for(OperationRequestAddress.Node node : requiredAddress) {
+                addressValue.add(node.getType(), node.getName());
+            }
+            final ModelNode response;
             try {
-                result = ctx.getModelControllerClient().execute(request);
+                response = ctx.getModelControllerClient().execute(request);
             } catch (IOException e) {
                 return false;
             }
-            addressAvailable = Util.isSuccess(result);
+            final ModelNode result = response.get(Util.RESULT);
+            if(!result.isDefined()) {
+                return false;
+            }
+            final ModelNode valid = result.get(Util.VALID);
+            if(!valid.isDefined()) {
+                return false;
+            }
+            addressAvailable = valid.asBoolean();
         } else {
+            for(OperationRequestAddress.Node node : requiredAddress) {
+                address.add(node.getType(), node.getName());
+            }
             request.get(Util.OPERATION).set(Util.READ_CHILDREN_TYPES);
             ModelNode result;
             try {
@@ -195,6 +208,9 @@ public abstract class BaseOperationCommand extends CommandHandlerWithHelp implem
         } catch (Exception e) {
             throw new CommandFormatException("Failed to perform operation: " + e.getLocalizedMessage());
         }
+        if (!Util.isSuccess(response)) {
+            throw new CommandFormatException(Util.getFailureDescription(response));
+        }
         handleResponse(ctx, response, Util.COMPOSITE.equals(request.get(Util.OPERATION).asString()));
     }
 
@@ -217,10 +233,7 @@ public abstract class BaseOperationCommand extends CommandHandlerWithHelp implem
         opHeaders.set(headersNode);
     }
 
-    protected void handleResponse(CommandContext ctx, ModelNode response, boolean composite) throws CommandFormatException {
-        if (!Util.isSuccess(response)) {
-            throw new CommandFormatException(Util.getFailureDescription(response));
-        }
+    protected void handleResponse(CommandContext ctx, ModelNode response, boolean composite) throws CommandLineException {
     }
 
     @Override

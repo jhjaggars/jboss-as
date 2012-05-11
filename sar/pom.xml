@@ -29,12 +29,12 @@
     <parent>
         <groupId>org.jboss.as</groupId>
         <artifactId>jboss-as-parent</artifactId>
-        <version>7.1.2.Final-SNAPSHOT</version>
+        <version>7.2.0.Alpha1-SNAPSHOT</version>
     </parent>
 
     <groupId>org.jboss.as</groupId>
     <artifactId>jboss-as-sar</artifactId>
-    <version>7.1.2.Final-SNAPSHOT</version>
+    <version>7.2.0.Alpha1-SNAPSHOT</version>
 
     <name>JBoss Application Server: Service Archive Subsystem</name>
 
@@ -80,8 +80,20 @@
             <optional>true</optional>
         </dependency>
         <dependency>
+            <groupId>org.jboss.common</groupId>
+            <artifactId>jboss-common-beans</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jboss.metadata</groupId>
+            <artifactId>jboss-metadata-common</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.jboss.msc</groupId>
             <artifactId>jboss-msc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jboss.as</groupId>
+            <artifactId>jboss-as-ee</artifactId>
         </dependency>
         <dependency>
             <groupId>org.jboss.as</groupId>

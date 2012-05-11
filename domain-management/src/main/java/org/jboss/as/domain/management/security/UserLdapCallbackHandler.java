@@ -28,6 +28,12 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REC
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.USERNAME_ATTRIBUTE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.USER_DN;
 import static org.jboss.as.domain.management.DomainManagementMessages.MESSAGES;
+import static org.jboss.as.domain.management.RealmConfigurationConstants.VERIFY_PASSWORD_CALLBACK_SUPPORTED;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 
 import javax.naming.Context;
 import javax.naming.NamingEnumeration;
@@ -37,12 +43,13 @@ import javax.naming.directory.InitialDirContext;
 import javax.naming.directory.SearchControls;
 import javax.naming.directory.SearchResult;
 import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.sasl.AuthorizeCallback;
 import javax.security.sasl.RealmCallback;
-import java.io.IOException;
 
+import org.jboss.as.domain.management.AuthenticationMechanism;
 import org.jboss.as.domain.management.connections.ConnectionManager;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.Service;
@@ -57,11 +64,10 @@ import org.jboss.sasl.callback.VerifyPasswordCallback;
  *
  * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>
  */
-public class UserLdapCallbackHandler implements Service<UserLdapCallbackHandler>, DomainCallbackHandler {
+public class UserLdapCallbackHandler implements Service<CallbackHandlerService>, CallbackHandlerService, CallbackHandler {
 
     public static final String SERVICE_SUFFIX = "ldap";
 
-    private static final Class[] supportedCallbacks = {RealmCallback.class, NameCallback.class, VerifyPasswordCallback.class, AuthorizeCallback.class};
     private static final String DEFAULT_USER_DN = "dn";
 
     private final InjectedValue<ConnectionManager> connectionManager = new InjectedValue<ConnectionManager>();
@@ -97,6 +103,32 @@ public class UserLdapCallbackHandler implements Service<UserLdapCallbackHandler>
         }
     }
 
+
+
+    /*
+     * CallbackHandlerService Methods
+     */
+
+    public AuthenticationMechanism getPreferredMechanism() {
+        return AuthenticationMechanism.PLAIN;
+    }
+
+    public Set<AuthenticationMechanism> getSupplementaryMechanisms() {
+        return Collections.emptySet();
+    }
+
+    public Map<String, String> getConfigurationOptions() {
+        return Collections.singletonMap(VERIFY_PASSWORD_CALLBACK_SUPPORTED, Boolean.TRUE.toString());
+    }
+
+    public boolean isReady() {
+        return true;
+    }
+
+    public CallbackHandler getCallbackHandler(Map<String, Object> sharedState) {
+        return this;
+    }
+
     /*
      *  Service Methods
      */
@@ -107,7 +139,7 @@ public class UserLdapCallbackHandler implements Service<UserLdapCallbackHandler>
     public void stop(StopContext context) {
     }
 
-    public UserLdapCallbackHandler getValue() throws IllegalStateException, IllegalArgumentException {
+    public CallbackHandlerService getValue() throws IllegalStateException, IllegalArgumentException {
         return this;
     }
 
@@ -121,19 +153,8 @@ public class UserLdapCallbackHandler implements Service<UserLdapCallbackHandler>
 
 
     /*
-     *  DomainCallbackHandler Methods
+     *  CallbackHandler Method
      */
-
-    public Class[] getSupportedCallbacks() {
-        // TODO - For safety this Array should be cloned or should use an unmodifiable collection to ensure
-        // TODO - caller can not modify.
-        return supportedCallbacks;
-    }
-
-    @Override
-    public boolean isReady() {
-        return true;
-    }
 
     public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
         if (callbacks.length == 1 && callbacks[0] instanceof AuthorizeCallback) {

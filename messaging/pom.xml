@@ -29,12 +29,12 @@
     <parent>
         <groupId>org.jboss.as</groupId>
         <artifactId>jboss-as-parent</artifactId>
-        <version>7.1.2.Final-SNAPSHOT</version>
+        <version>7.2.0.Alpha1-SNAPSHOT</version>
     </parent>
 
     <groupId>org.jboss.as</groupId>
     <artifactId>jboss-as-messaging</artifactId>
-    <version>7.1.2.Final-SNAPSHOT</version>
+    <version>7.2.0.Alpha1-SNAPSHOT</version>
 
     <name>JBoss Application Server: Messaging Subsystem</name>
 
@@ -123,7 +123,12 @@
             <scope>provided</scope>
             <optional>true</optional>
         </dependency>
-
+        
+        <dependency>
+            <groupId>org.jboss.common</groupId>
+            <artifactId>jboss-common-beans</artifactId>
+        </dependency>
+        
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>

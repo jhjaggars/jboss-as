@@ -151,6 +151,20 @@ public class SubsystemParserTestCase {
         Assert.assertEquals(normalizeXML(expected), normalizeXML(marshalled));
     }
 
+    @Test
+    public void testSimpleWithSeveralAttributeReplacements() throws Exception {
+        SubsystemParser parser = testSubsystem("simple-with-several-attribute-replacements.xml", "org.jboss.as.simple", null, false);
+        String marshalled = marshall(parser);
+        String expected =
+            "<?xml version='1.0' encoding='UTF-8'?>" +
+            "<subsystem xmlns=\"urn:jboss:domain:simple-with-text-and-comments:1.0\">" +
+            "   <some-element value=\"12345\"/>" +
+            "   <another-element value=\"12345\"/>" +
+            "   <yet-another-element value=\"12345\"/>" +
+            "</subsystem>";
+        Assert.assertEquals(normalizeXML(expected), normalizeXML(marshalled));
+    }
+
     private SubsystemParser testSubsystem(String xml, String extensionModule) throws Exception {
         return testSubsystem(xml, extensionModule, null, true);
     }
@@ -173,7 +187,7 @@ public class SubsystemParserTestCase {
 
     private String marshall(SubsystemParser subsystemParser) throws Exception {
         StringWriter stringWriter = new StringWriter();
-        XMLOutputFactory factory = XMLOutputFactory.newFactory();
+        XMLOutputFactory factory = XMLOutputFactory.newInstance();
         FormattingXMLStreamWriter writer = new FormattingXMLStreamWriter(factory.createXMLStreamWriter(stringWriter));
         try {
             Assert.assertNotNull(subsystemParser.getSubsystem());

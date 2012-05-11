@@ -630,4 +630,15 @@ public interface HostControllerMessages {
     @Message(id = 15862, value = "Unable to connect due to SSL failure.")
     IllegalStateException sslFailureUnableToConnect(@Cause Throwable cause);
 
+    @Message(id = 15863, value = "Option '%s' already exists")
+    IllegalStateException jvmOptionAlreadyExists(String option);
+
+    @Message(id = 15864, value = "Environment variable '%s' already exists")
+    IllegalStateException envVariableAlreadyExists(String var);
+
+    @Message(id=15865, value="Host controller management version %s.%s is too old, Only %s.%s or higher are supported")
+    OperationFailedException unsupportedManagementVersionForHost(int major, int minor, int minMajor, int minMinor);
+
+    @Message(id=15866, value="Failed to add extensions used by the domain. Failure description: %s")
+    IllegalStateException failedToAddExtensions(ModelNode failureDescription);
 }

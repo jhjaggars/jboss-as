@@ -28,6 +28,7 @@ import static org.jboss.as.messaging.CommonAttributes.BLOCK_ON_DURABLE_SEND;
 import static org.jboss.as.messaging.CommonAttributes.BLOCK_ON_NON_DURABLE_SEND;
 import static org.jboss.as.messaging.CommonAttributes.CACHE_LARGE_MESSAGE_CLIENT;
 import static org.jboss.as.messaging.CommonAttributes.CALL_TIMEOUT;
+import static org.jboss.as.messaging.CommonAttributes.CF_CONNECTOR;
 import static org.jboss.as.messaging.CommonAttributes.CLIENT_FAILURE_CHECK_PERIOD;
 import static org.jboss.as.messaging.CommonAttributes.CLIENT_ID;
 import static org.jboss.as.messaging.CommonAttributes.COMPRESS_LARGE_MESSAGES;
@@ -149,7 +150,7 @@ public class JMSServices {
 
     public static AttributeDefinition[] CONNECTION_FACTORY_ATTRS = new AttributeDefinition[] {
         //Do these 2 most frequently used ones out of alphabetical order
-        new SimpleAttributeDefinition(CONNECTOR, ModelType.OBJECT, true),   //<------
+        CF_CONNECTOR,
         JndiEntriesAttribute.DESTINATION,
 
         AUTO_GROUP,
@@ -166,7 +167,7 @@ public class JMSServices {
         CONSUMER_MAX_RATE,
         CONSUMER_WINDOW_SIZE,
         DISCOVERY_GROUP_NAME,
-        DISCOVERY_INITIAL_WAIT_TIMEOUT, // TODO not used in ConnectionFactoryConfiguration
+        DISCOVERY_INITIAL_WAIT_TIMEOUT, // Not used since messaging 1.2, we keep it for compatibility sake
         DUPS_OK_BATCH_SIZE,
         FAILOVER_ON_INITIAL_CONNECTION,
         FAILOVER_ON_SERVER_SHUTDOWN, // TODO not used in ConnectionFactoryConfiguration
@@ -222,7 +223,7 @@ public class JMSServices {
 
     public static AttributeDefinition[] POOLED_CONNECTION_FACTORY_ATTRS = new AttributeDefinition[] {
         //Do these 2 most frequently used ones out of alphabetical order
-        new SimpleAttributeDefinition(CONNECTOR, ModelType.OBJECT, true),   //<------
+        CF_CONNECTOR,
         JndiEntriesAttribute.CONNECTION_FACTORY,
 
         AUTO_GROUP,
@@ -238,7 +239,7 @@ public class JMSServices {
         CONSUMER_MAX_RATE,
         CONSUMER_WINDOW_SIZE,
         DISCOVERY_GROUP_NAME,
-        DISCOVERY_INITIAL_WAIT_TIMEOUT,
+        DISCOVERY_INITIAL_WAIT_TIMEOUT, // Not used since messaging 1.2, we keep it for compatibility sake
         DUPS_OK_BATCH_SIZE,
         FAILOVER_ON_INITIAL_CONNECTION,  // TODO HornetQResourceAdapter does not have this method
         FAILOVER_ON_SERVER_SHUTDOWN,   // TODO HornetQResourceAdapter does not have this method
@@ -285,7 +286,7 @@ public class JMSServices {
         new PooledCFAttribute(CONSUMER_MAX_RATE, CONSUMER_MAX_RATE_METHOD),
         new PooledCFAttribute(CONSUMER_WINDOW_SIZE, CONSUMER_WINDOW_SIZE_METHOD),
         new PooledCFAttribute(DISCOVERY_GROUP_NAME, DISCOVERY_GROUP_NAME_METHOD),
-        new PooledCFAttribute(DISCOVERY_INITIAL_WAIT_TIMEOUT, DISCOVERY_INITIAL_WAIT_TIMEOUT_METHOD),
+        new PooledCFAttribute(DISCOVERY_INITIAL_WAIT_TIMEOUT, DISCOVERY_INITIAL_WAIT_TIMEOUT_METHOD), // Not used since messaging 1.2, we keep it for compatibility sake
         new PooledCFAttribute(DUPS_OK_BATCH_SIZE, DUPS_OK_BATCH_SIZE_METHOD),
         // TODO HornetQResourceAdapter does not have this method
         //new PooledCFAttribute(FAILOVER_ON_INITIAL_CONNECTION, FAILOVER_ON_INITIAL_CONNECTION_METHOD),

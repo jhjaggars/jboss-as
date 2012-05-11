@@ -25,19 +25,20 @@ package org.jboss.as.messaging.jms;
 import org.hornetq.api.core.DiscoveryGroupConfiguration;
 import org.hornetq.api.core.TransportConfiguration;
 import org.hornetq.core.server.HornetQServer;
-import org.jboss.as.connector.ConnectorServices;
-import org.jboss.as.connector.registry.ResourceAdapterDeploymentRegistry;
-import org.jboss.as.connector.services.ResourceAdapterActivatorService;
+import org.jboss.as.connector.util.ConnectorServices;
+import org.jboss.as.connector.services.mdr.AS7MetadataRepository;
+import org.jboss.as.connector.services.resourceadapters.deployment.registry.ResourceAdapterDeploymentRegistry;
+import org.jboss.as.connector.services.resourceadapters.ResourceAdapterActivatorService;
 import org.jboss.as.connector.subsystems.jca.JcaSubsystemConfiguration;
 import org.jboss.as.naming.service.NamingService;
 import org.jboss.as.network.SocketBinding;
 import org.jboss.as.security.service.SubjectFactoryService;
 import org.jboss.as.txn.service.TxnServices;
 import org.jboss.jca.common.api.metadata.common.CommonAdminObject;
-import org.jboss.jca.common.api.metadata.common.CommonConnDef;
 import org.jboss.jca.common.api.metadata.common.FlushStrategy;
 import org.jboss.jca.common.api.metadata.common.Recovery;
 import org.jboss.jca.common.api.metadata.common.TransactionSupportEnum;
+import org.jboss.jca.common.api.metadata.common.v10.CommonConnDef;
 import org.jboss.jca.common.api.metadata.ironjacamar.IronJacamar;
 import org.jboss.jca.common.api.metadata.ra.AdminObject;
 import org.jboss.jca.common.api.metadata.ra.AuthenticationMechanism;
@@ -56,13 +57,13 @@ import org.jboss.jca.common.api.metadata.ra.SecurityPermission;
 import org.jboss.jca.common.api.metadata.ra.XsdString;
 import org.jboss.jca.common.api.metadata.ra.ra15.Connector15;
 import org.jboss.jca.common.api.validator.ValidateException;
-import org.jboss.jca.common.metadata.common.CommonConnDefImpl;
 import org.jboss.jca.common.metadata.common.CommonPoolImpl;
 import org.jboss.jca.common.metadata.common.CommonSecurityImpl;
 import org.jboss.jca.common.metadata.common.CommonTimeOutImpl;
 import org.jboss.jca.common.metadata.common.CommonValidationImpl;
 import org.jboss.jca.common.metadata.common.CredentialImpl;
-import org.jboss.jca.common.metadata.ironjacamar.IronJacamarImpl;
+import org.jboss.jca.common.metadata.common.v10.CommonConnDefImpl;
+import org.jboss.jca.common.metadata.ironjacamar.v10.IronJacamarImpl;
 import org.jboss.jca.common.metadata.ra.common.AuthenticationMechanismImpl;
 import org.jboss.jca.common.metadata.ra.common.ConfigPropertyImpl;
 import org.jboss.jca.common.metadata.ra.common.ConnectionDefinitionImpl;
@@ -75,7 +76,6 @@ import org.jboss.jca.common.metadata.ra.ra15.Activationspec15Impl;
 import org.jboss.jca.common.metadata.ra.ra15.Connector15Impl;
 import org.jboss.jca.core.api.connectionmanager.ccm.CachedConnectionManager;
 import org.jboss.jca.core.api.management.ManagementRepository;
-import org.jboss.jca.core.spi.mdr.MetadataRepository;
 import org.jboss.jca.core.spi.rar.ResourceAdapterRepository;
 import org.jboss.jca.core.spi.transaction.TransactionIntegration;
 import org.jboss.msc.inject.Injector;
@@ -263,7 +263,7 @@ public class PooledConnectionFactoryService implements Service<Void> {
 
             serviceTarget
                     .addService(ConnectorServices.RESOURCE_ADAPTER_ACTIVATOR_SERVICE.append(name), activator)
-                    .addDependency(ConnectorServices.IRONJACAMAR_MDR, MetadataRepository.class,
+                    .addDependency(ConnectorServices.IRONJACAMAR_MDR, AS7MetadataRepository.class,
                             activator.getMdrInjector())
                     .addDependency(ConnectorServices.RA_REPOSITORY_SERVICE, ResourceAdapterRepository.class,
                             activator.getRaRepositoryInjector())

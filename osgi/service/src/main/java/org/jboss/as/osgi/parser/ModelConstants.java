@@ -39,10 +39,13 @@ public interface ModelConstants {
     String ENTRIES = "entries";
     String FRAGMENT = "fragment";
     String ID = "id";
+    String LOCATION = "location";
     String NAME = "name";
     String PROPERTY = "property";
+    String START = "start";
     String STARTLEVEL = "startlevel";
     String STATE = "state";
+    String STOP = "stop";
     String SYMBOLIC_NAME = "symbolic-name";
     String TYPE = "type";
     String VALUE = "value";
