@@ -35,6 +35,7 @@ supplied for application-specific information
 import sys
 import traceback
 import os
+import platform
 import logging
 from optparse import OptionParser, Option
 import ConfigParser
@@ -196,6 +197,8 @@ class XmlReport(object):
         outf.close()
 
 
+
+
 class SoSReport(object):
 
     def __init__(self, opts):
@@ -305,11 +308,14 @@ class SoSReport(object):
         except IOError:
             pass
 
-    def _setup_logging(self):
-
+    def _batch_gate(self):
         if not sys.stdin.isatty():
             self.opts.nocolors = True
             self.opts.batch = True
+
+    def _setup_logging(self):
+
+        self._batch_gate()
 
         # main soslog
         self.soslog = logging.getLogger('sos')
@@ -950,7 +956,22 @@ class SoSReport(object):
         except SystemExit:
             return None
 
+class JythonSoSReport(SoSReport):
+    """This subclass avoids calls that rely on jffi libraries in RH distributions"""
+
+    @staticmethod
+    def _exception(etype, eval_, etrace):
+        sys.__excepthook__(etype, eval_, etrace)
+
+    def _batch_gate(self):
+        self.opts.nocolors = True
+        self.opts.batch = True
+
+
 def main(args):
     """The main entry point"""
-    sos = SoSReport(args)
+    if platform.system() == 'Java':
+        sos = JythonSoSReport(args)
+    else:
+        sos = SoSReport(args)
     sos.execute()
