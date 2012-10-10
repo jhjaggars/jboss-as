@@ -111,26 +111,28 @@ public class JdrReportService implements JdrReportCollector, Service<JdrReportCo
                 password = String.valueOf(cons.readPassword("Management password: "));
             }
         }
-        SosInterpreter interpreter = new SosInterpreter();
-        return interpreter.collect(username, password, host, port);
+        return new JdrRunner(username, password, host, port).collect();
     }
 
     /**
      * Collect a JDR report.
      */
     public JdrReport collect() throws OperationFailedException {
-        SosInterpreter interpreter = new SosInterpreter();
+        JdrRunner runner = new JdrRunner();
         serverEnvironment = serverEnvironmentValue.getValue();
-        interpreter.setJbossHomeDir(serverEnvironment.getHomeDir().getAbsolutePath());
-        interpreter.setReportLocationDir(serverEnvironment.getServerTempDir().getAbsolutePath());
-        interpreter.setControllerClient(controllerClient);
-        interpreter.setHostControllerName(serverEnvironment.getHostControllerName());
-        interpreter.setServerName(serverEnvironment.getServerName());
-        return interpreter.collect();
+        runner.setJbossHomeDir(serverEnvironment.getHomeDir().getAbsolutePath());
+        runner.setReportLocationDir(serverEnvironment.getServerTempDir().getAbsolutePath());
+        runner.setControllerClient(controllerClient);
+        runner.setHostControllerName(serverEnvironment.getHostControllerName());
+        runner.setServerName(serverEnvironment.getServerName());
+        return runner.collect();
     }
 
     public synchronized void start(StartContext context) throws StartException {
-        final ThreadFactory threadFactory = new JBossThreadFactory(new ThreadGroup("JdrReportCollector-threads"), Boolean.FALSE, null, "%G - %t", null, null, AccessController.getContext());
+        final ThreadFactory threadFactory = new JBossThreadFactory(
+                new ThreadGroup("JdrReportCollector-threads"),
+                Boolean.FALSE, null, "%G - %t", null, null,
+                AccessController.getContext());
         executorService = Executors.newCachedThreadPool(threadFactory);
         serverEnvironment = serverEnvironmentValue.getValue();
         controllerClient = modelControllerValue.getValue().createClient(executorService);
