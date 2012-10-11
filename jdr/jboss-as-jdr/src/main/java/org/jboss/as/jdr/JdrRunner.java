@@ -32,7 +32,10 @@ public class JdrRunner implements JdrReportCollector {
 
         List<JdrCommand> commands = Arrays.asList(
             new TreeCommand(),
-            new CallAS7("configuration.json").param("recursive", "true"),
+            new JarCheck(),
+            new CallAS7("configuration").param("recursive", "true"),
+            new CallAS7("dump-services").resource("core-service", "service-container"),
+            new CallAS7("cluster-proxies-configuration").resource("subsystem", "modcluster"),
             new CopyDir("*/standalone/configuration/*"),
             new CopyDir("*/domain/configuration/*"),
             new CopyDir("*.log"),

@@ -20,6 +20,8 @@ import java.util.HashMap;
 import java.util.LinkedList;
 
 import org.jboss.dmr.ModelNode;
+import org.apache.commons.io.filefilter.AndFileFilter;
+import org.apache.commons.io.filefilter.DelegateFileFilter;
 
 class CopyDir extends JdrCommand {
 
@@ -34,7 +36,11 @@ class CopyDir extends JdrCommand {
     }
 
     public void execute() throws Exception {
-        Collection<File> matches = Find.walk(new java.io.File(this.env.jbossHome), this.filter);
+        Collection<File> matches = Find.walk(
+            new File(this.env.jbossHome),
+            new AndFileFilter(new DelegateFileFilter(this.filter),
+                new DelegateFileFilter(new BlackListFilter()))
+        );
         for( File f : matches ) {
             this.env.zip.add(f);
         }
@@ -123,7 +129,7 @@ class CallAS7 extends JdrCommand {
     private String name;
 
     public CallAS7(String name) {
-        this.name = name;
+        this.name = name + ".json";
     }
 
     public CallAS7 operation(String operation) {

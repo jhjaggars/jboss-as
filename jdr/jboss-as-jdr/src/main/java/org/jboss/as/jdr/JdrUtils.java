@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.FileOutputStream;
 import java.io.FileInputStream;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.zip.ZipOutputStream;
@@ -100,6 +101,20 @@ class WildcardPathFilter implements FileFilter {
 
     public String toString() {
         return "<WildcardPathFilter: [" + pattern + "]>";
+    }
+}
+
+class BlackListFilter implements FileFilter {
+
+    public boolean accept(File f) {
+        for (String p : Arrays.asList(
+                "mgmt-users.properties",
+                "application-users.properties")) {
+            if (f.getPath().endsWith(p) ) {
+                return false;
+            }
+        }
+        return true;
     }
 }
 
