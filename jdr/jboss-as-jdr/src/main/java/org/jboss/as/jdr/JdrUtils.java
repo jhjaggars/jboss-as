@@ -2,33 +2,104 @@ package org.jboss.as.jdr;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.io.FileOutputStream;
+import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.zip.ZipOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
+import java.util.Date;
+import java.text.SimpleDateFormat;
 
 import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
+
+class JdrZipFile {
+
+    ZipOutputStream zos;
+    String jbossHome;
+    JdrEnvironment env;
+    String name;
+
+    public JdrZipFile(JdrEnvironment env) throws Exception {
+        this.env = env;
+        this.jbossHome = this.env.jbossHome;
+        SimpleDateFormat fmt = new SimpleDateFormat("yy-MM-dd_hh-mm-ss");
+        this.name = this.env.outputDirectory +
+                    java.io.File.separator +
+                    "jdr_" + fmt.format(new Date());
+
+        if (this.env.hostControllerName != null) {
+            this.name += "." + this.env.hostControllerName;
+        }
+
+        if (this.env.serverName != null) {
+            this.name += "_" + this.env.serverName;
+        }
+
+        this.name += ".zip";
+
+
+        zos = new ZipOutputStream(new FileOutputStream(this.name));
+    }
+
+    public String name() {
+        return this.name;
+    }
+
+    public void add(File file) throws Exception {
+        String name = file.getPath().substring(this.jbossHome.length());
+        byte [] buffer = new byte[1024];
+
+        try {
+            ZipEntry ze = new ZipEntry("JBOSS_HOME" + name);
+            ze.setSize(file.length());
+            zos.putNextEntry(ze);
+
+            FileInputStream fis = new FileInputStream(file);
+            int bytesRead = fis.read(buffer);
+            while( bytesRead > -1 ) {
+                zos.write(buffer);
+                bytesRead = fis.read(buffer);
+            }
+        }
+        catch (ZipException ze) {
+            // if this is a dupe we don't care...
+        }
+        finally {
+            zos.closeEntry();
+        }
+    }
+
+    public void add(String content, String path) throws Exception {
+        ZipEntry ze = new ZipEntry("sos_strings/as7/" + path);
+        ze.setSize(content.length());
+        zos.putNextEntry(ze);
+        zos.write(content.getBytes());
+        zos.closeEntry();
+    }
+
+    public void close() throws Exception {
+        this.zos.close();
+    }
+}
 
 class WildcardPathFilter implements FileFilter {
 
-    String [] bits;
+    String pattern;
 
     public WildcardPathFilter(String pattern) {
-        bits = pattern.split("\\*");
+        this.pattern = pattern;
     }
 
     public boolean accept(File f) {
-        return match(f.getPath());
+        return FilenameUtils.wildcardMatch(f.getPath(), this.pattern);
     }
 
-    private boolean match(String path) {
-        for(String bit : bits) {
-            int index = path.indexOf(bit);
-            if(index == -1) {
-                return false;
-            }
-            path = path.substring(index + bit.length());
-        }
-        return true;
+    public String toString() {
+        return "<WildcardPathFilter: [" + pattern + "]>";
     }
 }
 
