@@ -17,7 +17,6 @@ import java.util.zip.ZipEntry;
 import java.util.Collection;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.List;
 import java.util.LinkedList;
 
 import org.jboss.dmr.ModelNode;
@@ -37,15 +36,19 @@ class CopyDir extends JdrCommand {
     public void execute() throws Exception {
         Collection<File> matches = Find.walk(new java.io.File(this.env.jbossHome), this.filter);
         for( File f : matches ) {
-            System.out.println( f.getPath() );
+            this.env.zip.add(f);
         }
     }
 }
 
 class JarCheck extends JdrCommand {
 
+    StringBuilder buffer;
+
     public void execute() throws Exception {
-            walk(new java.io.File(this.env.jbossHome));
+        this.buffer = new StringBuilder();
+        walk(new java.io.File(this.env.jbossHome));
+        this.env.zip.add(this.buffer.toString(), "jarcheck.txt");
     }
 
     private void walk(File root) throws NoSuchAlgorithmException {
@@ -68,7 +71,7 @@ class JarCheck extends JdrCommand {
             fis.read(buffer);
             alg.update(buffer);
             String sum = new BigInteger(1, alg.digest()).toString(16);
-            System.out.println(
+            this.buffer.append(
                     f.getCanonicalPath().replace(this.env.jbossHome, "JBOSSHOME") + "\n"
                     + sum + "\n"
                     + getManifestString(jf) + "===");
@@ -108,7 +111,7 @@ class TreeCommand extends JdrCommand {
 
     public void execute() throws Exception {
         FSTree tree = new FSTree(this.env.jbossHome);
-        System.out.println(tree.toString());
+        this.env.zip.add(tree.toString(), "tree.txt");
     }
 }
 
@@ -117,6 +120,11 @@ class CallAS7 extends JdrCommand {
     private String operation = "read-resource";
     private LinkedList<String> resource = new LinkedList<String>();
     private Map<String, String> parameters = new HashMap<String, String>();
+    private String name;
+
+    public CallAS7(String name) {
+        this.name = name;
+    }
 
     public CallAS7 operation(String operation) {
         this.operation = operation;
@@ -140,15 +148,23 @@ class CallAS7 extends JdrCommand {
         request.get("operation").set(this.operation);
 
         assert this.resource.size() % 2 == 0;
-        while(this.resource.size() > 0) {
+        while (this.resource.size() > 0) {
             request.get("address").add(this.resource.removeFirst(),
                     this.resource.removeFirst());
         }
 
-        for(Map.Entry<String, String> entry : parameters.entrySet()) {
+        for (Map.Entry<String, String> entry : parameters.entrySet()) {
             request.get(entry.getKey()).set(entry.getValue());
         }
 
-        System.out.println(this.env.client.execute(request).toJSONString(true));
+        if (this.env.hostControllerName != null) {
+            request.get("host").set(this.env.hostControllerName);
+        }
+
+        if (this.env.serverName != null) {
+            request.get("server").set(this.env.serverName);
+        }
+
+        this.env.zip.add(this.env.client.execute(request).toJSONString(true), this.name);
     }
 }

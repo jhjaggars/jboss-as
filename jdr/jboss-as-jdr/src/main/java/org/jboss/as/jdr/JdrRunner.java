@@ -4,6 +4,7 @@ import org.jboss.as.controller.client.ModelControllerClient;
 
 import java.util.Arrays;
 import java.util.List;
+import java.io.File;
 
 public class JdrRunner implements JdrReportCollector {
 
@@ -20,16 +21,30 @@ public class JdrRunner implements JdrReportCollector {
     }
 
     public JdrReport collect() {
+
+        try {
+            this.env.zip = new JdrZipFile(new JdrEnvironment(this.env));
+        }
+        catch (Exception e) {
+            System.err.println(e);
+            // handle zip failure and bail
+        }
+
         List<JdrCommand> commands = Arrays.asList(
             new TreeCommand(),
-            new CallAS7().param("recursive", "true")
+            new CallAS7("configuration.json").param("recursive", "true"),
+            new CopyDir("*/standalone/configuration/*"),
+            new CopyDir("*/domain/configuration/*"),
+            new CopyDir("*.log"),
+            new CopyDir("*.properties"),
+            new CopyDir("*.xml")
         );
 
         JdrReport report = new JdrReport();
         report.setStartTime();
 
         for( JdrCommand command : commands ) {
-            command.setEnvironment(this.env);
+            command.setEnvironment(new JdrEnvironment(this.env));
             try {
                 command.execute();
             } catch (Exception e) {
@@ -37,8 +52,15 @@ public class JdrRunner implements JdrReportCollector {
             }
         }
 
+        try {
+            this.env.zip.close();
+        } catch (Exception e) {
+            System.err.println(e);
+            // couldn't close zip
+        }
+
         report.setEndTime();
-        report.setLocation("none");
+        report.setLocation(this.env.zip.name());
         return report;
     }
 
