@@ -24,8 +24,8 @@ public class JdrTestCase {
         InputStream is = new ByteArrayInputStream(xml.getBytes());
         XMLSanitizer s = new XMLSanitizer("//password");
         InputStream res = s.sanitize(is);
-        byte [] buf = new byte [1024];
+        byte [] buf = new byte [res.available()];
         res.read(buf);
-        assertEquals(new String(buf), "<test><password></password></test>");
+        assertEquals("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><test><password/></test>", new String(buf));
     }
 }
