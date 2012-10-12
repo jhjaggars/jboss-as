@@ -6,14 +6,32 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.FileOutputStream;
 import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Collection;
 import java.util.zip.ZipOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.Date;
 import java.text.SimpleDateFormat;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.xpath.XPathFactory;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.io.FileUtils;
@@ -44,7 +62,6 @@ class JdrZipFile {
 
         this.name += ".zip";
 
-
         zos = new ZipOutputStream(new FileOutputStream(this.name));
     }
 
@@ -52,36 +69,42 @@ class JdrZipFile {
         return this.name;
     }
 
-    public void add(File file) throws Exception {
-        String name = file.getPath().substring(this.jbossHome.length());
+    public void add(InputStream is, String path) {
         byte [] buffer = new byte[1024];
 
         try {
-            ZipEntry ze = new ZipEntry("JBOSS_HOME" + name);
-            ze.setSize(file.length());
+            ZipEntry ze = new ZipEntry(path);
             zos.putNextEntry(ze);
-
-            FileInputStream fis = new FileInputStream(file);
-            int bytesRead = fis.read(buffer);
+            int bytesRead = is.read(buffer);
             while( bytesRead > -1 ) {
                 zos.write(buffer);
-                bytesRead = fis.read(buffer);
+                bytesRead = is.read(buffer);
             }
         }
         catch (ZipException ze) {
-            ROOT_LOGGER.tracef(ze, "%s is already in the zip", name);
+            ROOT_LOGGER.tracef(ze, "%s is already in the zip", path);
+        }
+        catch (Exception e) {
+            ROOT_LOGGER.debugf(e, "Error when adding %s", path);
         }
         finally {
-            zos.closeEntry();
+            try {
+                zos.closeEntry();
+            }
+            catch (Exception e) {
+                ROOT_LOGGER.debugf(e, "Error when closing entry for %s", path);
+            }
         }
     }
 
+    public void add(File file) throws Exception {
+        String name = "JBOSS_HOME" + file.getPath().substring(this.jbossHome.length());
+        this.add(new FileInputStream(file), name);
+    }
+
     public void add(String content, String path) throws Exception {
-        ZipEntry ze = new ZipEntry("sos_strings/as7/" + path);
-        ze.setSize(content.length());
-        zos.putNextEntry(ze);
-        zos.write(content.getBytes());
-        zos.closeEntry();
+        String name = "sos_strings/as7/" + path;
+        this.add(new ByteArrayInputStream(content.getBytes()), name);
     }
 
     public void close() throws Exception {
@@ -108,15 +131,53 @@ class WildcardPathFilter implements FileFilter {
 
 class BlackListFilter implements FileFilter {
 
+    private List<String> patterns = Arrays.asList("*-users.properties");
+
+    public BlackListFilter() {
+    }
+
+    public BlackListFilter(List<String> patterns) {
+        this.patterns = patterns;
+    }
+
     public boolean accept(File f) {
-        for (String p : Arrays.asList(
-                "mgmt-users.properties",
-                "application-users.properties")) {
-            if (f.getPath().endsWith(p) ) {
+        for(String pattern : this.patterns) {
+            if (FilenameUtils.wildcardMatch(f.getPath(), pattern)) {
                 return false;
             }
         }
         return true;
+    }
+}
+
+class XMLSanitizer {
+
+    XPathExpression expression;
+
+    public XMLSanitizer (String pattern) throws Exception {
+        XPathFactory factory = XPathFactory.newInstance();
+        XPath xpath = factory.newXPath();
+        expression = xpath.compile(pattern);
+    }
+
+    public InputStream sanitize(InputStream in) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document doc = builder.parse(in);
+        Object result = expression.evaluate(doc, XPathConstants.NODESET);
+        NodeList nodes = (NodeList) result;
+        for (int i = 0; i < nodes.getLength(); i++) {
+            System.err.println(nodes.item(i).getNodeValue());
+            nodes.item(i).setNodeValue("");
+        }
+        TransformerFactory transformerFactory = TransformerFactory.newInstance();
+        Transformer transformer = transformerFactory.newTransformer();
+        DOMSource source = new DOMSource(doc);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        StreamResult outStream = new StreamResult(output);
+        transformer.transform(source, outStream);
+        return new ByteArrayInputStream(output.toByteArray());
     }
 }
 
