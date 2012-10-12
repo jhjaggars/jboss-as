@@ -28,6 +28,7 @@ import org.apache.commons.io.filefilter.DelegateFileFilter;
 class CopyDir extends JdrCommand {
 
     FileFilter filter;
+    FileFilter blacklistFilter = new BlackListFilter();
 
     public CopyDir(FileFilter filter) {
         this.filter = filter;
@@ -37,11 +38,18 @@ class CopyDir extends JdrCommand {
         this.filter = new WildcardPathFilter(pattern);
     }
 
+    public CopyDir blacklist(FileFilter blacklistFilter) {
+        this.blacklistFilter = blacklistFilter;
+        return this;
+    }
+
     public void execute() throws Exception {
         Collection<File> matches = Find.walk(
             new File(this.env.jbossHome),
-            new AndFileFilter(new DelegateFileFilter(this.filter),
-                new DelegateFileFilter(new BlackListFilter()))
+            new AndFileFilter(
+                new DelegateFileFilter(this.filter),
+                new DelegateFileFilter(this.blacklistFilter)
+            )
         );
         for( File f : matches ) {
             this.env.zip.add(f);
