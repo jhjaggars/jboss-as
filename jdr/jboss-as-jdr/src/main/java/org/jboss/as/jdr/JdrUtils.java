@@ -168,8 +168,7 @@ class XMLSanitizer {
         Object result = expression.evaluate(doc, XPathConstants.NODESET);
         NodeList nodes = (NodeList) result;
         for (int i = 0; i < nodes.getLength(); i++) {
-            System.err.println(nodes.item(i).getNodeValue());
-            nodes.item(i).setNodeValue("");
+            nodes.item(i).setTextContent("");
         }
         TransformerFactory transformerFactory = TransformerFactory.newInstance();
         Transformer transformer = transformerFactory.newTransformer();
