@@ -1,6 +1,10 @@
 package org.jboss.as.jdr;
 
+import static org.jboss.as.jdr.JdrLogger.ROOT_LOGGER;
+import static org.jboss.as.jdr.JdrMessages.MESSAGES;
+
 import org.jboss.as.controller.client.ModelControllerClient;
+import org.jboss.as.controller.OperationFailedException;
 
 import java.util.Arrays;
 import java.util.List;
@@ -20,14 +24,14 @@ public class JdrRunner implements JdrReportCollector {
         this.env.port = port;
     }
 
-    public JdrReport collect() {
+    public JdrReport collect() throws OperationFailedException {
 
         try {
             this.env.zip = new JdrZipFile(new JdrEnvironment(this.env));
         }
         catch (Exception e) {
-            System.err.println(e);
-            // handle zip failure and bail
+            ROOT_LOGGER.couldNotCreateZipfile(e);
+            throw MESSAGES.couldNotCreateZipfile();
         }
 
         List<JdrCommand> commands = Arrays.asList(
@@ -51,15 +55,14 @@ public class JdrRunner implements JdrReportCollector {
             try {
                 command.execute();
             } catch (Exception e) {
-                System.out.println(e);
+                ROOT_LOGGER.debugf("Skipping command %s", command.toString());
             }
         }
 
         try {
             this.env.zip.close();
         } catch (Exception e) {
-            System.err.println(e);
-            // couldn't close zip
+            ROOT_LOGGER.debugf(e, "Could not close zipfile");
         }
 
         report.setEndTime();

@@ -89,4 +89,11 @@ interface JdrLogger extends BasicLogger {
     @LogMessage(level = WARN)
     @Message(id = 13105, value = "Plugin contrib location is not a directory.  Ignoring.")
     void contribNotADirectory();
+
+    /**
+     * JDR could not create a zipfile to store the report.
+     */
+    @LogMessage(level = ERROR)
+    @Message(id=13306, value="Could not create zipfile.")
+    void couldNotCreateZipfile(@Cause Throwable cause);
 }

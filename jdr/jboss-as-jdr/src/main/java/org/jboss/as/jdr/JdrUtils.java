@@ -1,5 +1,7 @@
 package org.jboss.as.jdr;
 
+import static org.jboss.as.jdr.JdrLogger.ROOT_LOGGER;
+
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileOutputStream;
@@ -67,7 +69,7 @@ class JdrZipFile {
             }
         }
         catch (ZipException ze) {
-            // if this is a dupe we don't care...
+            ROOT_LOGGER.tracef(ze, "%s is already in the zip", name);
         }
         finally {
             zos.closeEntry();

@@ -25,6 +25,7 @@ package org.jboss.as.jdr;
 import org.jboss.logging.annotations.Message;
 import org.jboss.logging.annotations.MessageBundle;
 import org.jboss.logging.Messages;
+import org.jboss.as.controller.OperationFailedException;
 
 /**
  * This module is using message IDs in the range 13100-13199. This file is using the subset 13150-13199 for
@@ -62,4 +63,7 @@ interface JdrMessages {
 
     @Message(id = Message.NONE, value = "port that the management api is bound to. (default: 9990)")
     String jdrPortMessage();
+
+    @Message(id = 13352, value = "Zipfile could not be created.")
+    OperationFailedException couldNotCreateZipfile();
 }
