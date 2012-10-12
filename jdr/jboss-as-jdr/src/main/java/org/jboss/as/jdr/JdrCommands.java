@@ -1,5 +1,7 @@
 package org.jboss.as.jdr;
 
+import static org.jboss.as.jdr.JdrLogger.ROOT_LOGGER;
+
 import java.io.File;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
@@ -86,10 +88,10 @@ class JarCheck extends JdrCommand {
             // skip
         }
         catch( java.io.FileNotFoundException fnfe ) {
-            System.err.println(fnfe.toString());
+            ROOT_LOGGER.debug(fnfe);
         }
         catch( java.io.IOException ioe ) {
-            System.err.println(ioe.toString());
+            ROOT_LOGGER.debug(ioe);
         }
     }
 
@@ -107,7 +109,7 @@ class JarCheck extends JdrCommand {
             }
             return buffer.toString();
         } catch (NullPointerException npe) {
-            // No MANIFEST
+            ROOT_LOGGER.tracef("no MANIFEST present");
             return "";
         }
     }
