@@ -98,9 +98,9 @@ class JdrZipFile {
         }
     }
 
-    public void add(File file) throws Exception {
+    public void add(File file, InputStream is) throws Exception {
         String name = "JBOSS_HOME" + file.getPath().substring(this.jbossHome.length());
-        this.add(new FileInputStream(file), name);
+        this.add(is, name);
     }
 
     public void add(String content, String path) throws Exception {

@@ -29,7 +29,7 @@ class CopyDir extends JdrCommand {
 
     FileFilter filter;
     FileFilter blacklistFilter = new BlackListFilter();
-    Sanitizer sanitizer;
+    LinkedList<Sanitizer> sanitizers = new LinkedList<Sanitizer>();
 
     public CopyDir(FileFilter filter) {
         this.filter = filter;
@@ -45,7 +45,7 @@ class CopyDir extends JdrCommand {
     }
 
     public CopyDir sanitizer(Sanitizer sanitizer) {
-        this.sanitizer = sanitizer;
+        this.sanitizers.add(sanitizer);
         return this;
     }
 
@@ -58,7 +58,11 @@ class CopyDir extends JdrCommand {
             )
         );
         for( File f : matches ) {
-            this.env.zip.add(f);
+            InputStream stream = new FileInputStream(f);
+            for (Sanitizer s : this.sanitizers) {
+                stream = s.sanitize(stream);
+            }
+            this.env.zip.add(f, stream);
         }
     }
 }
