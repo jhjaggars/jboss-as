@@ -96,4 +96,11 @@ interface JdrLogger extends BasicLogger {
     @LogMessage(level = ERROR)
     @Message(id=13306, value="Could not create zipfile.")
     void couldNotCreateZipfile(@Cause Throwable cause);
+
+    /**
+     * One of the configuration steps in JDR threw an exception.
+     */
+    @LogMessage(level = ERROR)
+    @Message(id=13307, value="Could not configure JDR.")
+    void couldNotConfigureJDR(@Cause Throwable cause);
 }

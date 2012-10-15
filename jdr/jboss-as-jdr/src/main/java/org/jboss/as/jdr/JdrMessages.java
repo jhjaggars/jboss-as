@@ -66,4 +66,7 @@ interface JdrMessages {
 
     @Message(id = 13352, value = "Zipfile could not be created.")
     OperationFailedException couldNotCreateZipfile();
+
+    @Message(id = 13353, value = "Could not configure JDR. At least one configuration step failed.")
+    OperationFailedException couldNotConfigureJDR();
 }
