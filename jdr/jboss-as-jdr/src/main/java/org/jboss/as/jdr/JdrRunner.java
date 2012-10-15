@@ -34,18 +34,25 @@ public class JdrRunner implements JdrReportCollector {
             throw MESSAGES.couldNotCreateZipfile();
         }
 
-        List<JdrCommand> commands = Arrays.asList(
-            new TreeCommand(),
-            new JarCheck(),
-            new CallAS7("configuration").param("recursive", "true"),
-            new CallAS7("dump-services").resource("core-service", "service-container"),
-            new CallAS7("cluster-proxies-configuration").resource("subsystem", "modcluster"),
-            new CopyDir("*/standalone/configuration/*"),
-            new CopyDir("*/domain/configuration/*"),
-            new CopyDir("*.log"),
-            new CopyDir("*.properties"),
-            new CopyDir("*.xml")
-        );
+        List<JdrCommand> commands;
+
+        try {
+            commands = Arrays.asList(
+                new TreeCommand(),
+                new JarCheck(),
+                new CallAS7("configuration").param("recursive", "true"),
+                new CallAS7("dump-services").resource("core-service", "service-container"),
+                new CallAS7("cluster-proxies-configuration").resource("subsystem", "modcluster"),
+                new CopyDir("*/standalone/configuration/*").sanitizer(new XMLSanitizer("//password")),
+                new CopyDir("*/domain/configuration/*").sanitizer(new XMLSanitizer("//password")),
+                new CopyDir("*.log"),
+                new CopyDir("*.properties").sanitizer(new PatternSanitizer("password=*")),
+                new CopyDir("*.xml").sanitizer(new XMLSanitizer("//password"))
+            );
+        } catch (Exception e) {
+            ROOT_LOGGER.couldNotConfigureJDR(e);
+            throw MESSAGES.couldNotConfigureJDR();
+        }
 
         JdrReport report = new JdrReport();
         report.setStartTime();

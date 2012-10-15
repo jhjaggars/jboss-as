@@ -29,6 +29,7 @@ class CopyDir extends JdrCommand {
 
     FileFilter filter;
     FileFilter blacklistFilter = new BlackListFilter();
+    Sanitizer sanitizer;
 
     public CopyDir(FileFilter filter) {
         this.filter = filter;
@@ -40,6 +41,11 @@ class CopyDir extends JdrCommand {
 
     public CopyDir blacklist(FileFilter blacklistFilter) {
         this.blacklistFilter = blacklistFilter;
+        return this;
+    }
+
+    public CopyDir sanitizer(Sanitizer sanitizer) {
+        this.sanitizer = sanitizer;
         return this;
     }
 

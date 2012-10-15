@@ -36,6 +36,7 @@ import javax.xml.transform.stream.StreamResult;
 import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
 
 class JdrZipFile {
 
@@ -150,28 +151,58 @@ class BlackListFilter implements FileFilter {
     }
 }
 
-class XMLSanitizer {
+interface Sanitizer {
+    InputStream sanitize(InputStream in) throws Exception;
+}
+
+class PatternSanitizer implements Sanitizer {
+    String pattern;
+    String replacement;
+
+    public PatternSanitizer (String pattern) throws Exception {
+        this.pattern = pattern;
+    }
+
+    public InputStream sanitize(InputStream in) throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        for(String line : IOUtils.readLines(in)) {
+           if(FilenameUtils.wildcardMatch(line, pattern)) {
+               output.write(pattern.getBytes());
+           }
+           else {
+               output.write(line.getBytes());
+           }
+        }
+        return new ByteArrayInputStream(output.toByteArray());
+    }
+}
+
+class XMLSanitizer implements Sanitizer {
 
     XPathExpression expression;
+    DocumentBuilder builder;
+    Transformer transformer;
 
     public XMLSanitizer (String pattern) throws Exception {
         XPathFactory factory = XPathFactory.newInstance();
         XPath xpath = factory.newXPath();
         expression = xpath.compile(pattern);
+
+        DocumentBuilderFactory DBfactory = DocumentBuilderFactory.newInstance();
+        DBfactory.setNamespaceAware(true);
+        builder = DBfactory.newDocumentBuilder();
+
+        TransformerFactory transformerFactory = TransformerFactory.newInstance();
+        transformer = transformerFactory.newTransformer();
     }
 
     public InputStream sanitize(InputStream in) throws Exception {
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setNamespaceAware(true);
-        DocumentBuilder builder = factory.newDocumentBuilder();
         Document doc = builder.parse(in);
         Object result = expression.evaluate(doc, XPathConstants.NODESET);
         NodeList nodes = (NodeList) result;
         for (int i = 0; i < nodes.getLength(); i++) {
             nodes.item(i).setTextContent("");
         }
-        TransformerFactory transformerFactory = TransformerFactory.newInstance();
-        Transformer transformer = transformerFactory.newTransformer();
         DOMSource source = new DOMSource(doc);
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         StreamResult outStream = new StreamResult(output);
