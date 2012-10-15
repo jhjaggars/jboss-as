@@ -37,17 +37,20 @@ public class JdrRunner implements JdrReportCollector {
         List<JdrCommand> commands;
 
         try {
+            Sanitizer xmlSanitizer = new XMLSanitizer("//password");
+            Sanitizer passwordSanitizer = new PatternSanitizer("password=*");
+
             commands = Arrays.asList(
                 new TreeCommand(),
                 new JarCheck(),
                 new CallAS7("configuration").param("recursive", "true"),
                 new CallAS7("dump-services").resource("core-service", "service-container"),
                 new CallAS7("cluster-proxies-configuration").resource("subsystem", "modcluster"),
-                new CopyDir("*/standalone/configuration/*").sanitizer(new XMLSanitizer("//password")),
-                new CopyDir("*/domain/configuration/*").sanitizer(new XMLSanitizer("//password")),
+                new CopyDir("*/standalone/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
+                new CopyDir("*/domain/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
                 new CopyDir("*.log"),
-                new CopyDir("*.properties").sanitizer(new PatternSanitizer("password=*")),
-                new CopyDir("*.xml").sanitizer(new XMLSanitizer("//password"))
+                new CopyDir("*.properties").sanitizer(passwordSanitizer),
+                new CopyDir("*.xml").sanitizer(xmlSanitizer)
             );
         } catch (Exception e) {
             ROOT_LOGGER.couldNotConfigureJDR(e);
