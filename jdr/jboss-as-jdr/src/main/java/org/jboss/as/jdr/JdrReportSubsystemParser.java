@@ -51,6 +51,39 @@ public final class JdrReportSubsystemParser implements XMLStreamConstants, XMLEl
 
         final ModelNode subsystem = Util.createAddOperation(PathAddress.pathAddress(JdrReportExtension.SUBSYSTEM_PATH));
         list.add(subsystem);
+
+        while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
+            if (!reader.getLocalName().equals("plugins")) {
+                throw ParseUtils.unexpectedElement(reader);
+            }
+            while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
+                if (reader.isStartElement()) {
+                    readPlugin(reader, list);
+                }
+            }
+        }
+    }
+
+    private void readPlugin(final XMLExtendedStreamReader reader, final List<ModelNode> list) throws XMLStreamException {
+        if (!reader.getLocalName().equals("plugin")) {
+            throw ParseUtils.unexpectedElement(reader);
+        }
+        ModelNode addTypeOperation = new ModelNode();
+        addTypeOperation.get(OP).set(ModelDescriptionConstants.ADD);
+
+        String className = null;
+        for (int i; i < reader.getAttributeCount(); i++) {
+            String attr = reader.getAttributeLocalName(i);
+            String value = reader.getAttributeValue(i);
+            if (attr.equals("class")) {
+                
+            }
+        }
+
+        //Add the 'add' operation for each 'type' child
+        PathAddress addr = PathAddress.pathAddress(SUBSYSTEM_PATH, PathElement.pathElement(TYPE, pluginClassName));
+        addTypeOperation.get(OP_ADDR).set(addr.toModelNode());
+        list.add(addTypeOperation);
     }
 
     /**
@@ -59,6 +92,14 @@ public final class JdrReportSubsystemParser implements XMLStreamConstants, XMLEl
     public void writeContent(final XMLExtendedStreamWriter writer, final SubsystemMarshallingContext context)
             throws XMLStreamException {
         context.startSubsystemElement(org.jboss.as.jdr.Namespace.CURRENT.getUriString(), false);
+        writer.writeStartElement("plugins");
+        ModelNode node = context.getModelNode();
+        ModelNode type = node.get(TYPE);
+        for (Property property : type.asPropertyList()) {
+            writer.writeStartElement("plugin");
+            writer.writeElementText(property.getValue());
+        }
+
         writer.writeEndElement();
     }
 
