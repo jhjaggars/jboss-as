@@ -19,32 +19,33 @@
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
+package org.jboss.as.jdr.util;
 
-package org.jboss.as.jdr;
+import org.apache.commons.io.FilenameUtils;
 
+import java.io.File;
+import java.io.FileFilter;
 import java.util.Arrays;
+import java.util.List;
 
-public interface JdrPlugin {
-    List<JdrCommand> getCommands();
-}
+public class BlackListFilter implements FileFilter {
 
-class BasePlugin implements JdrPlugin {
+    private List<String> patterns = Arrays.asList("*-users.properties");
 
-    List<JdrCommand> getCommands() {
-        Sanitizer xmlSanitizer = new XMLSanitizer("//password");
-        Sanitizer passwordSanitizer = new PatternSanitizer("password=*");
+    public BlackListFilter() {
+    }
 
-        return Arrays.asList(
-            new TreeCommand(),
-            new JarCheck(),
-            new CallAS7("configuration").param("recursive", "true"),
-            new CallAS7("dump-services").resource("core-service", "service-container"),
-            new CallAS7("cluster-proxies-configuration").resource("subsystem", "modcluster"),
-            new CopyDir("*/standalone/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
-            new CopyDir("*/domain/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
-            new CopyDir("*.log"),
-            new CopyDir("*.properties").sanitizer(passwordSanitizer),
-            new CopyDir("*.xml").sanitizer(xmlSanitizer)
-        );
+    public BlackListFilter(List<String> patterns) {
+        this.patterns = patterns;
+    }
+
+    public boolean accept(File f) {
+        for(String pattern : this.patterns) {
+            if (FilenameUtils.wildcardMatch(f.getPath(), pattern)) {
+                return false;
+            }
+        }
+        return true;
     }
 }
+
