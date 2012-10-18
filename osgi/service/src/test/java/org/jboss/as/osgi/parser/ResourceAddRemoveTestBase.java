@@ -32,6 +32,7 @@ import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.ProcessType;
 import org.jboss.as.controller.RunningMode;
 import org.jboss.as.controller.registry.Resource;
+import org.jboss.as.osgi.OSGiConstants;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.ServiceController;
 import org.jboss.msc.service.ServiceRegistry;
@@ -53,13 +54,12 @@ class ResourceAddRemoveTestBase {
         ServiceRegistry serviceRegistry = Mockito.mock(ServiceRegistry.class);
         ServiceController serviceController = Mockito.mock(ServiceController.class);
         Mockito.when(serviceController.getValue()).thenReturn(stateService);
-        Mockito.when(serviceRegistry.getService(SubsystemState.SERVICE_NAME)).thenReturn(serviceController);
+        Mockito.when(serviceRegistry.getService(OSGiConstants.SUBSYSTEM_STATE_SERVICE_NAME)).thenReturn(serviceController);
         ModelNode result = new ModelNode();
         final OperationContext context = Mockito.mock(OperationContext.class);
         Resource resource = Mockito.mock(Resource.class);
         Mockito.when(resource.getModel()).thenReturn(result);
         Mockito.when(context.getServiceRegistry(true)).thenReturn(serviceRegistry);
-        Mockito.when(context.completeStep()).thenReturn(stepResult);
         Mockito.when(context.createResource(PathAddress.EMPTY_ADDRESS)).thenReturn(resource);
         Mockito.when(context.readResource(PathAddress.EMPTY_ADDRESS)).thenReturn(resource);
         Mockito.when(context.getProcessType()).thenReturn(ProcessType.STANDALONE_SERVER);
@@ -102,7 +102,6 @@ class ResourceAddRemoveTestBase {
                 return null;
             }
         }).when(context).completeStep(Mockito.any(OperationContext.RollbackHandler.class));
-        Mockito.when(context.completeStep()).thenReturn(OperationContext.ResultAction.ROLLBACK);
     }
 
     protected void configureForSuccess(final OperationContext context) {
@@ -112,6 +111,5 @@ class ResourceAddRemoveTestBase {
                 return null;
             }
         }).when(context).completeStep(Mockito.any(OperationContext.RollbackHandler.class));
-        Mockito.when(context.completeStep()).thenReturn(OperationContext.ResultAction.KEEP);
     }
 }

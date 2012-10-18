@@ -25,8 +25,10 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.jboss.as.cli.ArgumentValueConverter;
 import org.jboss.as.cli.CommandArgument;
@@ -196,15 +198,13 @@ public class ResourceCompositeOperationHandler extends BaseOperationCommand {
 
                 final String valueString = arg.getValue(parsedArgs);
                 if(valueString != null) {
-                    ModelNode nodeValue = arg.getValueConverter().fromString(valueString);
+                    ModelNode nodeValue = arg.getValueConverter().fromString(ctx, valueString);
                     req.get(propName).set(nodeValue);
-
                 }
             }
             steps.add(req);
         }
 
-//        System.out.println("\ncomposite:\n" + composite);
         return composite;
     }
 
@@ -228,8 +228,6 @@ public class ResourceCompositeOperationHandler extends BaseOperationCommand {
         return address;
     }
 
-    private Map<String,CommandArgument> allArgs;
-
     @Override
     public CommandArgument getArgument(CommandContext ctx, String name) {
 
@@ -241,11 +239,7 @@ public class ResourceCompositeOperationHandler extends BaseOperationCommand {
         } catch (CommandFormatException e) {
             return null;
         }
-
-        if(allArgs == null) {
-            allArgs = loadArguments(ctx);
-        }
-        return allArgs.get(name);
+        return getAllArguments(ctx).get(name);
     }
 
     @Override
@@ -259,11 +253,26 @@ public class ResourceCompositeOperationHandler extends BaseOperationCommand {
         } catch (CommandFormatException e) {
             return null;
         }
+        return getAllArguments(ctx).values();
+    }
 
+    @Override
+    protected void recognizeArguments(CommandContext ctx) throws CommandFormatException {
+        final Map<String, CommandArgument> allArgs = getAllArguments(ctx);
+        if(!allArgs.keySet().containsAll(ctx.getParsedCommandLine().getPropertyNames())) {
+            final Set<String> unrecognized = new HashSet<String>(ctx.getParsedCommandLine().getPropertyNames());
+            unrecognized.removeAll(allArgs.keySet());
+            throw new CommandFormatException("Unrecognized arguments: " + unrecognized);
+        }
+    }
+
+    private Map<String,CommandArgument> allArgs;
+    protected Map<String, CommandArgument> getAllArguments(CommandContext ctx) {
         if(allArgs == null) {
             allArgs = loadArguments(ctx);
+            allArgs.putAll(staticArgs);
         }
-        return allArgs.values();
+        return allArgs;
     }
 
     protected Map<String, CommandArgument> loadArguments(CommandContext ctx) {
@@ -315,8 +324,6 @@ public class ResourceCompositeOperationHandler extends BaseOperationCommand {
                             } else {
                                 valueConverter = ArgumentValueConverter.LIST;
                             }
-                        } else if(ModelType.OBJECT == type) {
-                            valueConverter = ArgumentValueConverter.OBJECT;
                         }
                     }
                 }

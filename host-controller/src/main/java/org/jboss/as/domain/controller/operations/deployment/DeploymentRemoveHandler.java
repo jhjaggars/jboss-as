@@ -28,7 +28,6 @@ import static org.jboss.as.domain.controller.DomainControllerMessages.MESSAGES;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationContext.ResultAction;
@@ -36,9 +35,7 @@ import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.PathElement;
-import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.registry.Resource;
-import org.jboss.as.domain.controller.descriptions.DomainRootDescription;
 import org.jboss.as.repository.ContentRepository;
 import org.jboss.as.repository.DeploymentFileRepository;
 import org.jboss.as.server.deployment.DeploymentUtils;
@@ -50,7 +47,7 @@ import org.jboss.dmr.ModelNode;
  *
  * @author Brian Stansberry (c) 2011 Red Hat Inc.
  */
-public abstract class DeploymentRemoveHandler implements OperationStepHandler, DescriptionProvider {
+public abstract class DeploymentRemoveHandler implements OperationStepHandler {
 
     public static final String OPERATION_NAME = REMOVE;
 
@@ -76,12 +73,18 @@ public abstract class DeploymentRemoveHandler implements OperationStepHandler, D
         context.addStep(new OperationStepHandler() {
             public void execute(OperationContext context, ModelNode operation) throws OperationFailedException {
 
-                if (context.completeStep() != ResultAction.ROLLBACK) {
-                    removeContent(deploymentHashes);
-                }
+                context.completeStep(new OperationContext.ResultHandler() {
+                    @Override
+                    public void handleResult(ResultAction resultAction, OperationContext context, ModelNode operation) {
+                        if (resultAction != ResultAction.ROLLBACK) {
+                            removeContent(deploymentHashes);
+                        }
+                    }
+                });
             }
         }, OperationContext.Stage.RUNTIME);
-        context.completeStep(OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER);
+
+        context.stepCompleted();
     }
 
     protected void checkCanRemove(OperationContext context, ModelNode operation) throws OperationFailedException {
@@ -100,11 +103,6 @@ public abstract class DeploymentRemoveHandler implements OperationStepHandler, D
                 throw new OperationFailedException(new ModelNode().set(MESSAGES.cannotRemoveDeploymentInUse(deploymentName, badGroups)));
             }
         }
-    }
-
-    @Override
-    public ModelNode getModelDescription(Locale locale) {
-        return DomainRootDescription.getDeploymentRemoveOperation(locale);
     }
 
     abstract void removeContent(List<byte[]> hashes);

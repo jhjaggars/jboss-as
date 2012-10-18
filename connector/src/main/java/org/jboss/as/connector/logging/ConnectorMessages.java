@@ -28,9 +28,9 @@ import org.jboss.as.server.deployment.DeploymentUnit;
 import org.jboss.as.server.deployment.DeploymentUnitProcessingException;
 import org.jboss.dmr.ModelNode;
 import org.jboss.jca.deployers.common.DeployException;
-import org.jboss.logging.Cause;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageBundle;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageBundle;
 import org.jboss.logging.Messages;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.StartException;
@@ -91,17 +91,6 @@ public interface ConnectorMessages {
      */
     @Message(id = 10433, value = "Error during the deployment of %s")
     StartException deploymentError(@Cause Throwable cause, String name);
-
-    /**
-     * Creates an exception indicating the deployment failed.
-     *
-     * @param cause     the cause of the error.
-     * @param className the name of the class that failed.
-     *
-     * @return a {@link DeployException} for the error.
-     */
-    @Message("Deployment %s failed")
-    DeployException deploymentFailed(@Cause Throwable cause, String className);
 
     /**
      * A message indicating inability to instantiate the driver class.
@@ -475,4 +464,15 @@ public interface ConnectorMessages {
      */
     @Message(id = 10471, value = "Jndi name have to start with java:/ or java:jboss/")
     OperationFailedException jndiNameInvalidFormat();
+
+    /**
+     * Creates an exception indicating the deployment failed.
+     *
+     * @param cause     the cause of the error.
+     * @param className the name of the class that failed.
+     *
+     * @return a {@link DeployException} for the error.
+     */
+    @Message(id = 10472, value = "Deployment %s failed")
+    DeployException deploymentFailed(@Cause Throwable cause, String className);
 }

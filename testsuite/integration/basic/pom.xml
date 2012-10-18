@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 
+  Set these VM properties in your IDE debugger 
+
+  -Djava.util.logging.manager=org.jboss.logmanager.LogManager
+  -Djboss.home=${workspace_loc:jboss-as-build}/target/jboss-as-7.2.0.Alpha1-SNAPSHOT 
+  -DallowConnectingToRunningServer=true
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -23,8 +31,8 @@
         <jbossas.ts.integ.dir>${basedir}/..</jbossas.ts.integ.dir>
         <jbossas.ts.dir>${jbossas.ts.integ.dir}/..</jbossas.ts.dir>
         <jbossas.project.dir>${jbossas.ts.dir}/..</jbossas.project.dir>
-        <version.apacheds>2.0.0-M6</version.apacheds>
-        <version.apacheds.shared>1.0.0-M11</version.apacheds.shared>
+        <version.apacheds>2.0.0-M7</version.apacheds>
+        <version.apacheds.shared>1.0.0-M12</version.apacheds.shared>
     </properties>
 
     <dependencies>
@@ -34,13 +42,7 @@
             <scope>provided</scope>
         </dependency>
 
-        <dependency>
-            <groupId>jboss</groupId>
-            <artifactId>jnp-client</artifactId>
-            <version>4.2.2.GA</version>
-        </dependency>    
-    
-        <dependency>
+       <dependency>
             <groupId>org.apache.directory.server</groupId>
             <artifactId>apacheds-core</artifactId>
             <version>${version.apacheds}</version>
@@ -65,12 +67,30 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.apache.directory.server</groupId>
+            <artifactId>apacheds-interceptor-kerberos</artifactId>
+            <version>${version.apacheds}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.directory.server</groupId>
+            <artifactId>apacheds-server-annotations</artifactId>
+            <version>${version.apacheds}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.apache.directory.shared</groupId>
             <artifactId>shared-ldap-codec-standalone</artifactId>
             <version>${version.apacheds.shared}</version>
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.directory.server</groupId>
+            <artifactId>apacheds-core-jndi</artifactId>
+            <version>${version.apacheds}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <profiles>
@@ -156,7 +176,6 @@
                             <!-- Disable default-test execution. -->
                             <execution><id>default-test</id><goals><goal>test</goal></goals><phase>none</phase></execution>
 
-
                             <execution>
                                 <id>basic-integration-default-full.surefire</id>
                                 <phase>test</phase>
@@ -164,6 +183,7 @@
                                 <configuration>
                                     <!-- Tests to execute. Overriden in webProfileExclusion.profile . -->
                                     <includes>
+                                        <include>org/jboss/as/test/integration/ee/remotelookup/*TestCase*.java</include>
                                         <include>org/jboss/as/test/integration/ejb/iiop/**/*TestCase*.java</include>
                                         <include>org/jboss/as/test/integration/*/security/**/*TestCase.java</include>
                                         <include>org/jboss/as/test/integration/ejb/mdb/**/*TestCase*.java</include>
@@ -206,9 +226,12 @@
                                 <configuration>
                                     <!-- Tests to execute. Overriden in webProfileExclusion.profile . -->
                                     <excludes>
+                                    	<!-- truststore setting used in LDAPs testing is affected by some other test -->
+                                        <exclude>org/jboss/as/test/integration/security/loginmodules/Ldap*LoginModuleTestCase.java</exclude>
                                         <!-- 2nd run tests are run in other execution. -->
                                         <exclude>org/jboss/as/test/integration/**/*SecondTestCase.java</exclude>
                                         <!-- Tests which need FULL config. -->
+                                        <exclude>org/jboss/as/test/integration/ee/remotelookup/*TestCase*.java</exclude>
                                         <exclude>org/jboss/as/test/integration/ejb/iiop/**/*TestCase*.java</exclude>
                                         <exclude>org/jboss/as/test/integration/*/security/**/*TestCase.java</exclude>
                                         <exclude>org/jboss/as/test/integration/ejb/mdb/**/*TestCase*.java</exclude>
@@ -242,7 +265,6 @@
                                 </configuration>
                             </execution>
 
-
                             <!-- The second run tests rely on restoring timer services setup in the first run of tests. -->
                             <execution>
                                 <id>basic-integration-2nd.surefire</id>
@@ -261,6 +283,26 @@
                                 </configuration>
                             </execution>
 
+                            <!-- truststore setting used in LDAPs testing was affected by some other test - need an extra run -->
+                            <execution>
+                                <id>basic-integration-ldap.surefire</id>
+                                <phase>test</phase>
+                                <goals><goal>test</goal></goals>
+                                <configuration>
+                                    <includes>
+                                        <include>org/jboss/as/test/integration/security/loginmodules/Ldap*LoginModuleTestCase.java</include>                                        
+                                    </includes>
+                                    
+                                    <systemPropertyVariables>
+                                        <jboss.server.config.file.name>standalone.xml</jboss.server.config.file.name>
+                                        <jboss.inst>${basedir}/target/jbossas</jboss.inst>
+                                    </systemPropertyVariables>
+
+                                    <additionalClasspathElements>
+                                        <additionalClasspathElement>${project.basedir}/../src/test/resources</additionalClasspathElement>
+                                    </additionalClasspathElements>                                    
+                                </configuration>
+                            </execution>
                         </executions>
 
                     </plugin>
@@ -308,6 +350,7 @@
                                     </includes>
                                     <excludes>
                                         <exclude>org/jboss/as/test/integration/**/*SecondTestCase.java</exclude>
+                                        <exclude>org/jboss/as/test/integration/security/loginmodules/Ldap*LoginModuleTestCase.java</exclude>
                                     </excludes>
                                 </configuration>
                             </execution>
@@ -330,6 +373,7 @@
                             <execution><id>basic-integration-default-full.surefire</id><phase>test</phase></execution>
                             <execution><id>basic-integration-default-web.surefire</id><phase>none</phase></execution>
                             <execution><id>basic-integration-2nd.surefire</id><phase>none</phase></execution>
+                            <execution><id>basic-integration-ldap.surefire</id><phase>none</phase></execution>
                         </executions>
                     </plugin>
                 </plugins>

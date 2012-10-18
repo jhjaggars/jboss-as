@@ -1,25 +1,23 @@
 package org.jboss.as.web;
 
 import org.jboss.as.controller.AttributeDefinition;
-import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.ReloadRequiredRemoveStepHandler;
 import org.jboss.as.controller.ReloadRequiredWriteAttributeHandler;
 import org.jboss.as.controller.SimpleAttributeDefinition;
 import org.jboss.as.controller.SimpleAttributeDefinitionBuilder;
-import org.jboss.as.controller.alias.AbstractAliasedResourceDefinition;
+import org.jboss.as.controller.SimpleResourceDefinition;
 import org.jboss.as.controller.operations.global.WriteAttributeHandlers;
 import org.jboss.as.controller.operations.validation.IntRangeValidator;
 import org.jboss.as.controller.operations.validation.StringLengthValidator;
 import org.jboss.as.controller.registry.AttributeAccess;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
-import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
 
 /**
  * @author Tomaz Cerar
  * @created 23.2.12 12:26
  */
-public class WebSSLDefinition extends AbstractAliasedResourceDefinition {
+public class WebSSLDefinition extends SimpleResourceDefinition {
     protected static final WebSSLDefinition INSTANCE = new WebSSLDefinition();
 
 
@@ -35,7 +33,6 @@ public class WebSSLDefinition extends AbstractAliasedResourceDefinition {
                     .setAllowNull(true)
                     .setValidator(new StringLengthValidator(1, true))
                     .setFlags(AttributeAccess.Flag.RESTART_ALL_SERVICES)
-                    .setDefaultValue(new ModelNode("jboss"))
                     .setAllowExpression(true)
                     .build();
 
@@ -191,12 +188,4 @@ public class WebSSLDefinition extends AbstractAliasedResourceDefinition {
             ssl.registerReadWriteAttribute(attr, null, new ReloadRequiredWriteAttributeHandler(attr));
         }
     }
-
-    public void registerAliasAttributes(ManagementResourceRegistration resourceRegistration, PathElement alias) {
-        resourceRegistration.registerReadOnlyAttribute(NAME, aliasHandler);
-        for (AttributeDefinition attr : SSL_ATTRIBUTES) {
-            resourceRegistration.registerReadWriteAttribute(attr, aliasHandler, aliasHandler);
-        }
-    }
-
 }

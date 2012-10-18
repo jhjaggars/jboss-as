@@ -27,7 +27,6 @@ import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.ServiceController;
-import org.jboss.msc.service.ServiceRegistry;
 import org.jboss.osgi.framework.Services;
 import org.osgi.service.startlevel.StartLevel;
 
@@ -64,7 +63,7 @@ public abstract class StartLevelHandler implements OperationStepHandler {
             // non-metric read-attribute handlers should not fail
             context.getResult().set(new ModelNode());
         }
-        context.completeStep();
+        context.completeStep(OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER);
     }
 
     abstract void invokeOperation(StartLevel sls, OperationContext context, ModelNode operation);

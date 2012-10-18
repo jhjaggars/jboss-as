@@ -10,25 +10,28 @@ DIRNAME=`dirname $0`
 TARGET=$DIRNAME/target
 PROJECT_ROOT_DIR="$DIRNAME/../..";
 
+AS_BUILT_DIR=`ls -1 -d $PROJECT_ROOT_DIR/build/target/jboss-as-* | tail -1`  # Latest built AS in target/
+
 if [ ! `which xsltproc` ]; then
   echo "xsltproc not found. This script needs it. Please install it.";
   exit 2;
 fi
 
 M2_REPO=~/.m2/repository
-#for i in `find $PROJECT_ROOT_DIR/build/src/main/resources/modules/ -name module.xml` ;  do
 
 mkdir -p $TARGET;
 rm $TARGET/listedPackages.tmp.txt
 touch $TARGET/listedPackages.tmp.txt
 
 ###
-###  Also print out the groups of packages from artifacts grouped by module; see build.xml for "groups definition".
+###  Print out the groups of packages from artifacts grouped by module; see build.xml for "groups definition".
 ###
 
-###  Get the groups of artifacts in format:
+###  Get the list of modules and their artifacts in this format:
 ###  MODULE:  org.foo.bar
-###      ARTIFACT:  org.foo:bar
+###  org.foo:bar
+###  org.foo:baz
+###  ...
 xsltproc $DIRNAME/printModulesInPlainText.xsl $PROJECT_ROOT_DIR/build/build.xml > $TARGET/modulesList.tmp.txt
 
 echo "<groups>"
@@ -39,15 +42,11 @@ echo "<groups>"
     #echo $LINE;
     ##  If it's a module name, create the <group>.
     if [[ $LINE == MODULE:* ]] ; then
-      if [ "" != "$MOD_NAME" ] ; then     ##  This is here for the case we wanted to grab packages from the list of artifacts from packagesGroups.tmp.txt.
-        #echo "    <packages>$PACKAGES</packages>"
-        echo "  </group>";
-        MOD_NAME="";
-      fi;
       MOD_NAME=${LINE#MODULE: }
       MOD_PATH=`echo $MOD_NAME | tr . /`
       PACKAGES="";
-      for JAR in `find $PROJECT_ROOT_DIR/build/target/jboss-as-7.1.2.Final-SNAPSHOT/modules/$MOD_PATH/main -name *.jar`; do
+      #for JAR in `find $PROJECT_ROOT_DIR/build/target/jboss-as-7.1.3.Beta1/modules/$MOD_PATH/main -name *.jar`; do
+      for JAR in `find $AS_BUILT_DIR/modules/$MOD_PATH/main -name *.jar`; do
         #echo "    JAR: $JAR";
         for PACKAGE in `jar tf $JAR | grep .class | sed 's#/[^/]*\.class##' | sort | uniq`; do
           #PACKAGE=`dirname $PACKAGE | tr / .`
@@ -69,6 +68,7 @@ echo "<groups>"
       echo "  <group>"
       echo "    <title>Module $MOD_NAME</title>"
       echo "    <packages>${PACKAGES#:}</packages>";  ## Remove first colon.
+      echo "  </group>";
       continue;
     fi;
 
@@ -79,9 +79,9 @@ echo "<groups>"
 
 echo "</groups>"
 
-#    <!-- To includes java.lang, java.lang.ref, java.lang.reflect and only java.util (i.e. not java.util.jar) -->
+#    <!-- Includes java.lang, java.lang.ref, java.lang.reflect and only java.util (i.e. not java.util.jar) -->
 #    <packages>java.lang*:java.util</packages>
-#     <!-- To include javax.accessibility, javax.crypto, ... (among others) -->
+#    <!-- Includes javax.accessibility, javax.crypto, ... (among others) -->
 #    <packages>javax.*</packages>
 
 

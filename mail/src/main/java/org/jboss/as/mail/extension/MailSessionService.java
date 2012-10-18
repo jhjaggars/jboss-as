@@ -1,22 +1,21 @@
 package org.jboss.as.mail.extension;
 
 
-import org.jboss.as.network.OutboundSocketBinding;
-import org.jboss.logging.Logger;
-import org.jboss.msc.inject.Injector;
-import org.jboss.msc.inject.MapInjector;
-import org.jboss.msc.service.Service;
-import org.jboss.msc.service.StartContext;
-import org.jboss.msc.service.StartException;
-import org.jboss.msc.service.StopContext;
-
-import javax.mail.Session;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import javax.mail.Session;
+
+import org.jboss.as.network.OutboundSocketBinding;
+import org.jboss.msc.inject.Injector;
+import org.jboss.msc.inject.MapInjector;
+import org.jboss.msc.service.Service;
+import org.jboss.msc.service.StartContext;
+import org.jboss.msc.service.StartException;
+import org.jboss.msc.service.StopContext;
 
 /**
  * Service that provides a javax.mail.Session.
@@ -25,25 +24,24 @@ import java.util.Properties;
  * @created 27.7.11 0:14
  */
 public class MailSessionService implements Service<Session> {
-    private static final Logger log = Logger.getLogger(MailSessionService.class);
     private volatile Properties props;
     private final MailSessionConfig config;
     private Map<String, OutboundSocketBinding> socketBindings = new HashMap<String, OutboundSocketBinding>();
 
     public MailSessionService(MailSessionConfig config) {
-        log.tracef("service constructed with config: %s", config);
+        MailLogger.ROOT_LOGGER.tracef("service constructed with config: %s", config);
         this.config = config;
     }
 
 
     public void start(StartContext startContext) throws StartException {
-        log.trace("start...");
+        MailLogger.ROOT_LOGGER.trace("start...");
         props = getProperties();
     }
 
 
     public void stop(StopContext stopContext) {
-        log.trace("stop...");
+        MailLogger.ROOT_LOGGER.trace("stop...");
     }
 
     Injector<OutboundSocketBinding> getSocketBindingInjector(String name) {
@@ -76,7 +74,7 @@ public class MailSessionService implements Service<Session> {
             props.setProperty("mail.from", config.getFrom());
         }
         props.setProperty("mail.debug", String.valueOf(config.isDebug()));
-        log.tracef("props: %s", props);
+        MailLogger.ROOT_LOGGER.tracef("props: %s", props);
         return props;
     }
 
@@ -86,6 +84,7 @@ public class MailSessionService implements Service<Session> {
         props.setProperty(getPortKey(protocol), String.valueOf(socketAddress.getPort()));
         if (server.isSslEnabled()) {
             props.setProperty(getPropKey(protocol, "ssl.enable"), "true");
+        }else if (server.isTlsEnabled()){
             props.setProperty(getPropKey(protocol, "starttls.enable"), "true");
         }
         if (server.getCredentials() != null) {
@@ -143,6 +142,7 @@ public class MailSessionService implements Service<Session> {
             msg.setContent("Testing mail subsystem, loerm ipsum", "text/plain");
             Transport.send(msg);
         } catch (Exception e) {
+            // Needs i18n if using
             log.error("could not send mail", e);
         }
     }*/

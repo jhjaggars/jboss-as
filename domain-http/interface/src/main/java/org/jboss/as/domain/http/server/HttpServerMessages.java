@@ -22,9 +22,9 @@
 
 package org.jboss.as.domain.http.server;
 
-import org.jboss.logging.Cause;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageBundle;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageBundle;
 import org.jboss.logging.Messages;
 
 /**
@@ -144,30 +144,6 @@ public interface HttpServerMessages {
     IllegalArgumentException missingClosingQuote(String key);
 
     /**
-     * The description for the {@link TrailingSlashFilter}.
-     *
-     * @return the description.
-     */
-    @Message("Ensure all requests to the context have a trailing slash.")
-    String trailingSlashFilterDescription();
-
-    /**
-     * The description for the {@link RealmReadinessFilter}.
-     *
-     * @return the description.
-     */
-    @Message("Redirect request to instructional page if the realm is not ready.")
-    String realmReadinessFilter();
-
-    /**
-     * The description for the {@link org.jboss.as.domain.http.server.security.SubjectAssociationHandler}.
-     *
-     * @return the description.
-     */
-    @Message("Filter to ensure the Subject for the current request is associated.")
-    String subjectAssociationFilter();
-
-    /**
      * Creates an exception indicating that unexpected characters are being drop from the header.
      *
      * @param dropping the characters being dropped.
@@ -178,9 +154,34 @@ public interface HttpServerMessages {
     @Message(id = 15131, value = "Unexpected characters being dropped from header '%s' for %s")
     IllegalArgumentException unexpectedHeaderChar(String dropping, String key);
 
+    /**
+     * The description for the {@link RedirectReadinessFilter}.
+     *
+     * @return the description.
+     */
+    @Message(id = 15133, value = "Redirect request to instructional page if the realm is not ready.")
+    String redirectReadinessFilter();
+
+    /**
+     * The description for the {@link DmrFailureReadinessFilter}.
+     *
+     * @return the description.
+     */
+    @Message(id = 15134, value = "Returns a DMR failure if the security realm is not ready to handle authentication requests.")
+    String dmrFailureReadinessFilter();
+
+    /**
+     * An error message indicating that the security realm is not ready to process requests and a URL that can be viewed for
+     * additional information.
+     *
+     * @param url - the url clients should visit for further information.
+     * @return the error message.
+     */
+    @Message(id = 15135, value = "The security realm is not ready to process requests, see %s")
+    String realmNotReadyMessage(final String url);
+
     /*
      * Message IDs 15100 to 15199 Reserved for the HTTP management interface, HttpServerLogger also contains messages in this
      * range commencing at 15100.
      */
-
 }

@@ -22,22 +22,6 @@
 
 package org.jboss.as.web;
 
-import org.jboss.as.controller.PathAddress;
-import org.jboss.as.controller.PathElement;
-import org.jboss.as.controller.SimpleAttributeDefinition;
-import org.jboss.as.controller.persistence.SubsystemMarshallingContext;
-import org.jboss.dmr.ModelNode;
-import org.jboss.dmr.Property;
-import org.jboss.staxmapper.XMLElementReader;
-import org.jboss.staxmapper.XMLElementWriter;
-import org.jboss.staxmapper.XMLExtendedStreamReader;
-import org.jboss.staxmapper.XMLExtendedStreamWriter;
-
-import javax.xml.stream.XMLStreamConstants;
-import javax.xml.stream.XMLStreamException;
-import java.util.Collections;
-import java.util.List;
-
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ADD;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
@@ -49,11 +33,49 @@ import static org.jboss.as.controller.parsing.ParseUtils.requireNoContent;
 import static org.jboss.as.controller.parsing.ParseUtils.requireNoNamespaceAttribute;
 import static org.jboss.as.controller.parsing.ParseUtils.unexpectedAttribute;
 import static org.jboss.as.controller.parsing.ParseUtils.unexpectedElement;
-import static org.jboss.as.web.Constants.*;
+import static org.jboss.as.web.Constants.ALIAS;
+import static org.jboss.as.web.Constants.CONDITION;
+import static org.jboss.as.web.Constants.CONFIGURATION;
+import static org.jboss.as.web.Constants.CONNECTOR;
+import static org.jboss.as.web.Constants.CONTAINER;
+import static org.jboss.as.web.Constants.EXTENDED;
+import static org.jboss.as.web.Constants.FLAGS;
+import static org.jboss.as.web.Constants.JSP_CONFIGURATION;
+import static org.jboss.as.web.Constants.MIME_MAPPING;
+import static org.jboss.as.web.Constants.NAME;
+import static org.jboss.as.web.Constants.PATH;
+import static org.jboss.as.web.Constants.PATTERN;
+import static org.jboss.as.web.Constants.PREFIX;
+import static org.jboss.as.web.Constants.RELATIVE_TO;
+import static org.jboss.as.web.Constants.RESOLVE_HOSTS;
+import static org.jboss.as.web.Constants.REWRITE;
+import static org.jboss.as.web.Constants.ROTATE;
+import static org.jboss.as.web.Constants.SSO;
+import static org.jboss.as.web.Constants.STATIC_RESOURCES;
+import static org.jboss.as.web.Constants.SUBSTITUTION;
+import static org.jboss.as.web.Constants.TEST;
+import static org.jboss.as.web.Constants.VIRTUAL_SERVER;
+import static org.jboss.as.web.Constants.WELCOME_FILE;
 import static org.jboss.as.web.WebExtension.ACCESS_LOG_PATH;
 import static org.jboss.as.web.WebExtension.DIRECTORY_PATH;
 import static org.jboss.as.web.WebExtension.SSL_PATH;
 import static org.jboss.as.web.WebExtension.SSO_PATH;
+
+import java.util.Collections;
+import java.util.List;
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamException;
+
+import org.jboss.as.controller.PathAddress;
+import org.jboss.as.controller.PathElement;
+import org.jboss.as.controller.SimpleAttributeDefinition;
+import org.jboss.as.controller.persistence.SubsystemMarshallingContext;
+import org.jboss.dmr.ModelNode;
+import org.jboss.dmr.Property;
+import org.jboss.staxmapper.XMLElementReader;
+import org.jboss.staxmapper.XMLElementWriter;
+import org.jboss.staxmapper.XMLExtendedStreamReader;
+import org.jboss.staxmapper.XMLExtendedStreamWriter;
 
 /**
  * The web subsystem parser.
@@ -91,9 +113,8 @@ class WebSubsystemParser implements XMLStreamConstants, XMLElementReader<List<Mo
                 writer.writeStartElement(Element.CONNECTOR.getLocalName());
                 writer.writeAttribute(NAME, connector.getName());
                 for (SimpleAttributeDefinition attr : WebConnectorDefinition.CONNECTOR_ATTRIBUTES) {
-                    if (attr != WebConnectorDefinition.VIRTUAL_SERVER) {
-                        attr.marshallAsAttribute(config, false, writer);
-                    }
+                    attr.marshallAsAttribute(config, false, writer);
+
                 }
                 if (config.get(SSL_PATH.getKey(), SSL_PATH.getValue()).isDefined()) {
                     ModelNode sslConfig = config.get(SSL_PATH.getKey(), SSL_PATH.getValue());
@@ -309,11 +330,13 @@ class WebSubsystemParser implements XMLStreamConstants, XMLElementReader<List<Mo
         }
         list.add(subsystem);
         boolean containerConfigDefined = false;
+        final Namespace namespace = Namespace.forUri(reader.getNamespaceURI());
         // elements
         while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
-            switch (Namespace.forUri(reader.getNamespaceURI())) {
+            switch (namespace) {
                 case WEB_1_0:
-                case WEB_1_1: {
+                case WEB_1_1:
+                case WEB_1_2: {
                     final Element element = Element.forName(reader.getLocalName());
                     switch (element) {
                         case CONTAINER_CONFIG: {
@@ -563,7 +586,8 @@ class WebSubsystemParser implements XMLStreamConstants, XMLElementReader<List<Mo
                     }
                     break;
                 }
-                case WEB_1_1: {
+                case WEB_1_1:
+                case WEB_1_2: {
                     final Element element = Element.forName(reader.getLocalName());
                     switch (element) {
                         case ALIAS:
@@ -645,7 +669,8 @@ class WebSubsystemParser implements XMLStreamConstants, XMLElementReader<List<Mo
         while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
             switch (Namespace.forUri(reader.getNamespaceURI())) {
                 case WEB_1_0:
-                case WEB_1_1: {
+                case WEB_1_1:
+                case WEB_1_2: {
                     final Element element = Element.forName(reader.getLocalName());
                     switch (element) {
                         case CONDITION:
@@ -725,7 +750,8 @@ class WebSubsystemParser implements XMLStreamConstants, XMLElementReader<List<Mo
         while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
             switch (Namespace.forUri(reader.getNamespaceURI())) {
                 case WEB_1_0:
-                case WEB_1_1: {
+                case WEB_1_1:
+                case WEB_1_2: {
                     final Element element = Element.forName(reader.getLocalName());
                     switch (element) {
                         case DIRECTORY:
@@ -831,7 +857,8 @@ class WebSubsystemParser implements XMLStreamConstants, XMLElementReader<List<Mo
         while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
             switch (Namespace.forUri(reader.getNamespaceURI())) {
                 case WEB_1_0:
-                case WEB_1_1: {
+                case WEB_1_1:
+                case WEB_1_2: {
                     final Element element = Element.forName(reader.getLocalName());
                     switch (element) {
                         case SSL:
@@ -916,6 +943,13 @@ class WebSubsystemParser implements XMLStreamConstants, XMLElementReader<List<Mo
                     throw unexpectedAttribute(reader, i);
             }
         }
+        Namespace namespace = Namespace.forUri(reader.getNamespaceURI());
+        if (namespace == Namespace.WEB_1_1 || namespace == Namespace.WEB_1_0) { // workaround to set default for old schema
+            if (!ssl.hasDefined(WebSSLDefinition.KEY_ALIAS.getName())) {
+                ssl.get(WebSSLDefinition.KEY_ALIAS.getName()).set("jboss");
+            }
+        }
+
         requireNoContent(reader);
         list.add(ssl);
     }

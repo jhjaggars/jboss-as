@@ -35,7 +35,7 @@ import org.jboss.as.controller.SimpleAttributeDefinition;
 import org.jboss.as.controller.SimpleAttributeDefinitionBuilder;
 import org.jboss.as.controller.SimpleResourceDefinition;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
-import org.jboss.as.controller.descriptions.common.ManagementDescription;
+import org.jboss.as.controller.descriptions.common.ControllerResolver;
 import org.jboss.as.controller.operations.validation.StringLengthValidator;
 import org.jboss.as.controller.registry.AttributeAccess;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
@@ -61,7 +61,7 @@ public class LdapAuthenticationResourceDefinition extends SimpleResourceDefiniti
             .setDefaultValue(new ModelNode(false)).setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES).build();
 
     public static final SimpleAttributeDefinition USER_DN = new SimpleAttributeDefinitionBuilder(ModelDescriptionConstants.USER_DN, ModelType.STRING, true)
-            .setValidator(new StringLengthValidator(1, Integer.MAX_VALUE, true, false)).setDefaultValue(new ModelNode("dn"))
+            .setValidator(new StringLengthValidator(1, Integer.MAX_VALUE, true, false)).setDefaultValue(new ModelNode(UserLdapCallbackHandler.DEFAULT_USER_DN))
             .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES).build();
 
     public static final SimpleAttributeDefinition USERNAME_FILTER = new SimpleAttributeDefinitionBuilder(ModelDescriptionConstants.USERNAME_ATTRIBUTE, ModelType.STRING, false)
@@ -84,7 +84,7 @@ public class LdapAuthenticationResourceDefinition extends SimpleResourceDefiniti
 
     public LdapAuthenticationResourceDefinition() {
         super(PathElement.pathElement(ModelDescriptionConstants.AUTHENTICATION, ModelDescriptionConstants.LDAP),
-                ManagementDescription.getResourceDescriptionResolver("core.management.security-realm.authentication.ldap"),
+                ControllerResolver.getResolver("core.management.security-realm.authentication.ldap"),
                 new LdapAuthenticationAddHandler(), new SecurityRealmChildRemoveHandler(true),
                 OperationEntry.Flag.RESTART_RESOURCE_SERVICES, OperationEntry.Flag.RESTART_RESOURCE_SERVICES);
     }
@@ -111,7 +111,7 @@ public class LdapAuthenticationResourceDefinition extends SimpleResourceDefiniti
                     final ModelNode model = resource.getModel();
                     validateAttributeCombination(model);
 
-                    context.completeStep();
+                    context.stepCompleted();
                 }
             }, OperationContext.Stage.MODEL);
             super.execute(context, operation);

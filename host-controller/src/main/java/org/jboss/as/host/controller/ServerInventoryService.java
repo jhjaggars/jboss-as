@@ -22,17 +22,16 @@
 
 package org.jboss.as.host.controller;
 
-import org.jboss.as.remoting.management.ManagementChannelRegistryService;
-
-import static org.jboss.msc.service.ServiceController.Mode.ON_DEMAND;
 import static org.jboss.as.host.controller.HostControllerLogger.ROOT_LOGGER;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
+import org.jboss.as.controller.extension.ExtensionRegistry;
 import org.jboss.as.domain.controller.DomainController;
 import org.jboss.as.network.NetworkInterfaceBinding;
+import org.jboss.as.remoting.management.ManagementChannelRegistryService;
 import org.jboss.as.server.services.net.NetworkInterfaceService;
 import org.jboss.msc.service.Service;
 import org.jboss.msc.service.ServiceName;
@@ -59,6 +58,7 @@ class ServerInventoryService implements Service<ServerInventory> {
     private final DomainController domainController;
     private final HostControllerEnvironment environment;
     private final HostRunningModeControl runningModeControl;
+    private final ExtensionRegistry extensionRegistry;
     private final int port;
     private final InjectedValue<ExecutorService> executorService = new InjectedValue<ExecutorService>();
 
@@ -66,7 +66,9 @@ class ServerInventoryService implements Service<ServerInventory> {
 
     private ServerInventoryImpl serverInventory;
 
-    private ServerInventoryService(final DomainController domainController, final HostRunningModeControl runningModeControl, final HostControllerEnvironment environment, final int port) {
+    private ServerInventoryService(final DomainController domainController, final HostRunningModeControl runningModeControl,
+                                   final HostControllerEnvironment environment, final ExtensionRegistry extensionRegistry, final int port) {
+        this.extensionRegistry = extensionRegistry;
         this.domainController = domainController;
         this.runningModeControl = runningModeControl;
         this.environment = environment;
@@ -74,9 +76,10 @@ class ServerInventoryService implements Service<ServerInventory> {
     }
 
     static Future<ServerInventory> install(final ServiceTarget serviceTarget, final DomainController domainController, final HostRunningModeControl runningModeControl, final HostControllerEnvironment environment,
+                                           final ExtensionRegistry extensionRegistry,
                                            final String interfaceBinding, final int port){
 
-        final ServerInventoryService inventory = new ServerInventoryService(domainController, runningModeControl, environment, port);
+        final ServerInventoryService inventory = new ServerInventoryService(domainController, runningModeControl, environment, extensionRegistry, port);
         serviceTarget.addService(ServerInventoryService.SERVICE_NAME, inventory)
                 .addDependency(HostControllerService.HC_EXECUTOR_SERVICE_NAME, ExecutorService.class, inventory.executorService)
                 .addDependency(ProcessControllerConnectionService.SERVICE_NAME, ProcessControllerConnectionService.class, inventory.getClient())
@@ -94,7 +97,7 @@ class ServerInventoryService implements Service<ServerInventory> {
         try {
             final ProcessControllerConnectionService processControllerConnectionService = client.getValue();
             final InetSocketAddress binding = new InetSocketAddress(interfaceBinding.getValue().getAddress(), port);
-            serverInventory = new ServerInventoryImpl(domainController, environment, binding, processControllerConnectionService.getClient());
+            serverInventory = new ServerInventoryImpl(domainController, environment, binding, processControllerConnectionService.getClient(), extensionRegistry);
             processControllerConnectionService.setServerInventory(serverInventory);
             serverCallback.getValue().setCallbackHandler(serverInventory.getServerCallbackHandler());
             futureInventory.setInventory(serverInventory);

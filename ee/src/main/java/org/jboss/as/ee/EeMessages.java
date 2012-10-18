@@ -23,6 +23,7 @@
 package org.jboss.as.ee;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Set;
@@ -39,14 +40,21 @@ import org.jboss.invocation.proxy.MethodIdentifier;
 import org.jboss.jandex.AnnotationTarget;
 import org.jboss.jandex.DotName;
 import org.jboss.jandex.MethodInfo;
-import org.jboss.logging.Cause;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageBundle;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageBundle;
 import org.jboss.logging.Messages;
-import org.jboss.logging.Param;
+import org.jboss.logging.annotations.Param;
 import org.jboss.vfs.VirtualFile;
 
 /**
+ * This module is using message IDs in the range 11000-11099 and 16700-16799.
+ * <p/>
+ * This file is using the subset 11025-11099 and 16700-16799 for non-logger messages.
+ * <p/>
+ * See <a href="http://community.jboss.org/docs/DOC-16810">http://community.jboss.org/docs/DOC-16810</a> for the full
+ * list of currently reserved JBAS message id blocks.
+ * <p/>
  * Date: 05.11.2011
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
@@ -866,6 +874,19 @@ public interface EeMessages {
     @Message(id = 11099, value = "More than one message destination with name %s for binding %s destinations: %s")
     String moreThanOneMessageDestination(String name, String binding, Set<String> jndiNames);
 
-    @Message(id = 11100, value = "Failed to load jboss.properties")
+    @Message(id = 16700, value = "Failed to load jboss.properties")
     DeploymentUnitProcessingException failedToLoadJbossProperties(@Cause IOException e);
+
+    @Message(id = 16701, value = "Unsupported ear module type: %s")
+    DeploymentUnitProcessingException unsupportedModuleType(String moduleFileName);
+
+    @Message(id = 16702, value = "library-directory of value / is not supported")
+    DeploymentUnitProcessingException rootAsLibraryDirectory();
+
+    @Message(id = 16703, value = "Module may not be a child of the EAR's library directory. Library directory: %s, module file name: %s")
+    DeploymentUnitProcessingException earModuleChildOfLibraryDirectory(String libraryDirectory, String moduleFileName);
+
+    @Message(id = 16704, value = "ManagedReference was null and injection is not optional for injection into field %s")
+    RuntimeException managedReferenceWasNull(Field field);
+
 }

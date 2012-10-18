@@ -90,6 +90,27 @@ public class CmpEntityBeanComponentInstance extends EntityBeanComponentInstance 
         return instance;
     }
 
+    @Override
+    public boolean isReloadRequired() {
+        return !getEjbContext().isValid();
+    }
+
+    @Override
+    public void setReloadRequired(final boolean reloadRequired) {
+        getEjbContext().setValid(!reloadRequired);
+    }
+
+    @Override
+    public void reload() {
+        try {
+            final CmpEntityBeanContext entityContext = getEjbContext();
+            getComponent().getStoreManager().loadEntity(entityContext);
+            entityContext.setValid(true);
+        } catch (RemoteException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public synchronized void store() {
         try {
             if (!isRemoved()) {
@@ -98,7 +119,7 @@ public class CmpEntityBeanComponentInstance extends EntityBeanComponentInstance 
 
                 final CmpEntityBeanContext context = getEjbContext();
                 final JDBCEntityPersistenceStore store = getComponent().getStoreManager();
-                if (context.getPrimaryKey() != null && store.isStoreRequired(context)) {
+                if (context.getPrimaryKeyUnchecked() != null && store.isStoreRequired(context)) {
                     store.storeEntity(context);
                 }
             }

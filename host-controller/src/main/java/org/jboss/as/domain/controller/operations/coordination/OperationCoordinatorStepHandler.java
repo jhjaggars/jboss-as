@@ -134,7 +134,7 @@ public class OperationCoordinatorStepHandler {
         // not a problem
         context.getFailureDescription().set(MESSAGES.masterDomainControllerOnlyOperation(operation.get(OP).asString(),
                 PathAddress.pathAddress(operation.get(OP_ADDR))));
-        context.completeStep();
+        context.stepCompleted();
     }
 
     /**
@@ -148,6 +148,7 @@ public class OperationCoordinatorStepHandler {
             HOST_CONTROLLER_LOGGER.trace("Executing direct");
         }
         final String operationName =  operation.require(OP).asString();
+
         OperationStepHandler stepHandler = null;
         final ImmutableManagementResourceRegistration registration = context.getResourceRegistration();
         if (registration != null) {
@@ -158,7 +159,7 @@ public class OperationCoordinatorStepHandler {
         } else {
             context.getFailureDescription().set(MESSAGES.noHandlerForOperation(operationName, PathAddress.pathAddress(operation.get(OP_ADDR))));
         }
-        context.completeStep();
+        context.stepCompleted();
     }
 
     private void executeTwoPhaseOperation(OperationContext context, ModelNode operation, OperationRouting routing) throws OperationFailedException {
@@ -222,7 +223,7 @@ public class OperationCoordinatorStepHandler {
         // Finally, the step to formulate and execute the 2nd phase rollout plan
         context.addStep(new DomainRolloutStepHandler(hostProxies, serverProxies, overallContext, rolloutPlan, getExecutorService()), OperationContext.Stage.DOMAIN);
 
-        context.completeStep();
+        context.stepCompleted();
     }
 
     private void storeDeploymentContent(ModelNode opNode, OperationContext context) throws OperationFailedException {
@@ -236,8 +237,7 @@ public class OperationCoordinatorStepHandler {
                 String opName = opNode.get(OP).asString();
                 if (DeploymentFullReplaceHandler.OPERATION_NAME.equals(opName) && hasStorableContent(opNode)) {
                     byte[] hash = DeploymentUploadUtil.storeDeploymentContent(context, opNode, contentRepository);
-                    opNode.get(CONTENT).get(0).remove(INPUT_STREAM_INDEX);
-                    opNode.get(CONTENT).get(0).get(HASH).set(hash);
+                    hashOnlyContent(opNode, hash);
                 }
                 else if (COMPOSITE.equals(opName) && opNode.hasDefined(STEPS)){
                     // Check the steps
@@ -249,12 +249,18 @@ public class OperationCoordinatorStepHandler {
             else if (address.size() == 1 && DEPLOYMENT.equals(address.getElement(0).getKey())
                     && ADD.equals(opNode.get(OP).asString()) && hasStorableContent(opNode)) {
                 byte[] hash = DeploymentUploadUtil.storeDeploymentContent(context, opNode, contentRepository);
-                    opNode.get(CONTENT).get(0).remove(INPUT_STREAM_INDEX);
-                    opNode.get(CONTENT).get(0).get(HASH).set(hash);
+                hashOnlyContent(opNode, hash);
             }
         } catch (IOException ioe) {
             throw MESSAGES.caughtExceptionStoringDeploymentContent(ioe.getClass().getSimpleName(), ioe);
         }
+    }
+
+    private void hashOnlyContent(ModelNode operation, byte[] hash) {
+        ModelNode content = new ModelNode();
+        content.get(HASH).set(hash);
+        operation.get(CONTENT).clear();
+        operation.get(CONTENT).add(content);
     }
 
     private boolean hasStorableContent(ModelNode operation) {

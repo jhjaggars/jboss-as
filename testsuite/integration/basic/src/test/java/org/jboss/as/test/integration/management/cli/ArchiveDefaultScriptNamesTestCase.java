@@ -34,8 +34,8 @@ import org.jboss.arquillian.container.test.api.RunAsClient;
 import org.jboss.arquillian.junit.Arquillian;
 import org.jboss.arquillian.test.api.ArquillianResource;
 import org.jboss.as.cli.CommandContext;
-import org.jboss.as.cli.CommandContextFactory;
 import org.jboss.as.test.integration.common.HttpRequest;
+import org.jboss.as.test.integration.management.util.CLITestUtil;
 import org.jboss.as.test.integration.management.util.SimpleServlet;
 import org.jboss.shrinkwrap.api.Archive;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
@@ -105,9 +105,9 @@ public class ArchiveDefaultScriptNamesTestCase {
     }
 
     @Test
-    public void testDeployArchive() throws Exception {
+    public void testDeployUndeployArchive() throws Exception {
 
-        final CommandContext ctx = CommandContextFactory.getInstance().newCommandContext();
+        final CommandContext ctx = CLITestUtil.getCommandContext();
         try {
             ctx.connectController();
             ctx.handle("deploy " + cliArchiveFile.getAbsolutePath());
@@ -119,7 +119,7 @@ public class ArchiveDefaultScriptNamesTestCase {
             assertTrue("Invalid response: " + response, response.indexOf("SimpleServlet") >=0);
             assertTrue(checkUndeployed(getBaseURL(url) + "deployment2/SimpleServlet"));
 
-            ctx.handle("deploy " + cliArchiveFile.getAbsolutePath() + " --script=undeploy.scr");
+            ctx.handle("undeploy " + "--path=" + cliArchiveFile.getAbsolutePath());
 
             // check that both wars are undeployed
             assertTrue(checkUndeployed(getBaseURL(url) + "deployment0/SimpleServlet"));

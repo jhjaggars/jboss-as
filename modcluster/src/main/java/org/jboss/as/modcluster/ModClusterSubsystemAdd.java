@@ -23,6 +23,7 @@
 package org.jboss.as.modcluster;
 
 import org.apache.catalina.connector.Connector;
+import org.jboss.as.clustering.msc.AsynchronousService;
 import org.jboss.as.controller.AbstractAddStepHandler;
 import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.OperationContext;
@@ -86,7 +87,7 @@ class ModClusterSubsystemAdd extends AbstractAddStepHandler {
         final String connector = CONNECTOR.resolveModelAttribute(context, modelConfig).asString();
         // Add mod_cluster service
         final ModClusterService service = new ModClusterService(config, loadProvider);
-        final ServiceBuilder<ModCluster> serviceBuilder = context.getServiceTarget().addService(ModClusterService.NAME, service)
+        final ServiceBuilder<ModCluster> builder = AsynchronousService.addService(context.getServiceTarget(), ModClusterService.NAME, service, true, true)
                 .addDependency(WebSubsystemServices.JBOSS_WEB, WebServer.class, service.getWebServer())
                 .addDependency(SocketBindingManager.SOCKET_BINDING_MANAGER, SocketBindingManager.class, service.getBindingManager())
                 .addDependency(WebSubsystemServices.JBOSS_WEB_CONNECTOR.append(connector), Connector.class, service.getConnectorInjector())
@@ -96,9 +97,9 @@ class ModClusterSubsystemAdd extends AbstractAddStepHandler {
         final ModelNode bindingRefNode = ADVERTISE_SOCKET.resolveModelAttribute(context, modelConfig);
         final String bindingRef = bindingRefNode.isDefined() ? bindingRefNode.asString() : null;
         if (bindingRef != null) {
-            serviceBuilder.addDependency(SocketBinding.JBOSS_BINDING_NAME.append(bindingRef), SocketBinding.class, service.getBinding());
+            builder.addDependency(SocketBinding.JBOSS_BINDING_NAME.append(bindingRef), SocketBinding.class, service.getBinding());
         }
-        newControllers.add(serviceBuilder.install());
+        newControllers.add(builder.install());
     }
 
     /*
@@ -114,7 +115,6 @@ class ModClusterSubsystemAdd extends AbstractAddStepHandler {
                 def.validateAndSet(operation, targetOperation);
             }
             context.addStep(targetOperation, ModClusterConfigAdd.INSTANCE, OperationContext.Stage.IMMEDIATE);
-            context.completeStep(OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER);
         }
     }
 

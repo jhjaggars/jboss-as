@@ -34,6 +34,7 @@ import javax.management.MBeanServer;
 import org.jboss.arquillian.protocol.jmx.JMXTestRunner;
 import org.jboss.arquillian.testenricher.osgi.BundleContextAssociation;
 import org.jboss.as.jmx.MBeanServerService;
+import org.jboss.as.osgi.OSGiConstants;
 import org.jboss.as.server.deployment.Attachments;
 import org.jboss.as.server.deployment.DeploymentUnit;
 import org.jboss.as.server.deployment.Phase;
@@ -51,9 +52,7 @@ import org.jboss.msc.service.StartContext;
 import org.jboss.msc.service.StartException;
 import org.jboss.msc.service.StopContext;
 import org.jboss.msc.value.InjectedValue;
-import org.jboss.osgi.framework.Services;
-import org.jboss.osgi.resolver.XEnvironment;
-import org.jboss.osgi.resolver.XResource;
+import org.jboss.osgi.resolver.XBundle;
 import org.osgi.framework.BundleContext;
 
 import static org.jboss.as.server.deployment.Services.JBOSS_DEPLOYMENT;
@@ -73,19 +72,16 @@ public class ArquillianService implements Service<ArquillianService> {
     private static final Logger log = Logger.getLogger("org.jboss.as.arquillian");
 
     private final InjectedValue<MBeanServer> injectedMBeanServer = new InjectedValue<MBeanServer>();
-    private final InjectedValue<XEnvironment> injectedEnvironment = new InjectedValue<XEnvironment>();
     private final Set<ArquillianConfig> deployedTests = new HashSet<ArquillianConfig>();
     private ServiceContainer serviceContainer;
     private ServiceTarget serviceTarget;
     private JMXTestRunner jmxTestRunner;
-    private XResource resource;
     AbstractServiceListener<Object> listener;
 
     public static void addService(final ServiceTarget serviceTarget) {
         ArquillianService service = new ArquillianService();
         ServiceBuilder<?> builder = serviceTarget.addService(ArquillianService.SERVICE_NAME, service);
         builder.addDependency(MBeanServerService.SERVICE_NAME, MBeanServer.class, service.injectedMBeanServer);
-        builder.addDependency(Services.ENVIRONMENT, XEnvironment.class, service.injectedEnvironment);
         builder.install();
     }
 
@@ -111,8 +107,8 @@ public class ArquillianService implements Service<ArquillianService> {
 
             @Override
             public void transition(ServiceController<? extends Object> serviceController, ServiceController.Transition transition) {
-                switch (transition) {
-                    case STARTING_to_UP: {
+                switch (transition.getAfter()) {
+                    case UP: {
                         ServiceName serviceName = serviceController.getName();
                         String simpleName = serviceName.getSimpleName();
                         if (JBOSS_DEPLOYMENT.isParentOf(serviceName) && simpleName.equals(Phase.INSTALL.toString())) {
@@ -123,9 +119,18 @@ public class ArquillianService implements Service<ArquillianService> {
                             if (arqConfig != null) {
                                 log.infof("Arquillian deployment detected: %s", arqConfig);
                                 ServiceBuilder<ArquillianConfig> builder = arqConfig.buildService(serviceTarget, serviceController);
-                                FrameworkActivationProcessor.process(serviceContainer, builder, arqConfig);
                                 builder.install();
                             }
+                        }
+                    }
+                    case STARTING: {
+                        ServiceName serviceName = serviceController.getName();
+                        String simpleName = serviceName.getSimpleName();
+                        if(JBOSS_DEPLOYMENT.isParentOf(serviceName) && simpleName.equals(Phase.DEPENDENCIES.toString())) {
+                            ServiceName parentName = serviceName.getParent();
+                            ServiceController<?> parentController = serviceContainer.getService(parentName);
+                            DeploymentUnit depUnit = (DeploymentUnit) parentController.getValue();
+                            ArquillianConfigBuilder.handleParseAnnotations(depUnit);
                         }
                     }
                 }
@@ -136,10 +141,6 @@ public class ArquillianService implements Service<ArquillianService> {
 
     public synchronized void stop(StopContext context) {
         log.debugf("Stopping Arquillian Test Runner");
-        if (resource != null) {
-            XEnvironment env = injectedEnvironment.getValue();
-            env.uninstallResources(resource);
-        }
         try {
             if (jmxTestRunner != null) {
                 jmxTestRunner.unregisterMBean(injectedMBeanServer.getValue());
@@ -207,7 +208,7 @@ public class ArquillianService implements Service<ArquillianService> {
         @Override
         public byte[] runTestMethod(final String className, final String methodName) {
             ArquillianConfig arqConfig = getArquillianConfig(className, 30000L);
-            Map<String, Object> properties = Collections.<String, Object> singletonMap(TEST_CLASS_PROPERTY, className);
+            Map<String, Object> properties = Collections.<String, Object>singletonMap(TEST_CLASS_PROPERTY, className);
             ContextManager contextManager = initializeContextManager(arqConfig, properties);
             try {
                 return super.runTestMethod(className, methodName);
@@ -218,12 +219,13 @@ public class ArquillianService implements Service<ArquillianService> {
 
         private ContextManager initializeContextManager(final ArquillianConfig config, final Map<String, Object> properties) {
             final ContextManagerBuilder builder = new ContextManagerBuilder();
-            final DeploymentUnit deployment = config.getDeploymentUnit();
-            final Module module = deployment.getAttachment(Attachments.MODULE);
-            if (module != null) {
+            final DeploymentUnit depUnit = config.getDeploymentUnit();
+            final XBundle bundle = depUnit.getAttachment(OSGiConstants.BUNDLE_KEY);
+            final Module module = depUnit.getAttachment(Attachments.MODULE);
+            if (bundle == null && module != null) {
                 builder.add(new TCCLSetupAction(module.getClassLoader()));
             }
-            builder.addAll(deployment);
+            builder.addAll(depUnit);
             ContextManager contextManager = builder.build();
             contextManager.setup(properties);
             return contextManager;

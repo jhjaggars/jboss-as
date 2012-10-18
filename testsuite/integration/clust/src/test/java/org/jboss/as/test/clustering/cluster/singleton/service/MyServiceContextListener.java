@@ -21,27 +21,22 @@
  */
 package org.jboss.as.test.clustering.cluster.singleton.service;
 
-import java.util.Collection;
-import java.util.EnumSet;
+import static org.jboss.as.test.clustering.ClusteringTestConstants.NODE_2;
 
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.servlet.annotation.WebListener;
 
+import org.jboss.as.clustering.msc.ServiceContainerHelper;
 import org.jboss.as.clustering.singleton.SingletonService;
 import org.jboss.as.clustering.singleton.election.NamePreference;
 import org.jboss.as.clustering.singleton.election.PreferredSingletonElectionPolicy;
 import org.jboss.as.clustering.singleton.election.SimpleSingletonElectionPolicy;
-import org.jboss.as.server.CurrentServiceContainer;
 import org.jboss.as.server.ServerEnvironment;
 import org.jboss.as.server.ServerEnvironmentService;
-import org.jboss.marshalling.SimpleClassResolver;
-import org.jboss.msc.service.AbstractServiceListener;
 import org.jboss.msc.service.ServiceController;
-import org.jboss.msc.service.ServiceListener;
-import org.jboss.msc.service.ServiceController.Transition;
-
-import static org.jboss.as.test.clustering.ClusteringTestConstants.*;
+import org.jboss.msc.service.ServiceName;
+import org.jboss.msc.service.StartException;
 
 @WebListener
 public class MyServiceContextListener implements ServletContextListener {
@@ -53,49 +48,31 @@ public class MyServiceContextListener implements ServletContextListener {
         MyService service = new MyService();
         SingletonService<Environment> singleton = new SingletonService<Environment>(service, MyService.SERVICE_NAME);
         singleton.setElectionPolicy(new PreferredSingletonElectionPolicy(new NamePreference(PREFERRED_NODE + "/" + SingletonService.DEFAULT_CONTAINER), new SimpleSingletonElectionPolicy()));
-        ServiceController<Environment> controller = singleton.build(CurrentServiceContainer.getServiceContainer())
+        ServiceController<Environment> controller = singleton.build(ServiceContainerHelper.getCurrentServiceContainer())
             .addDependency(ServerEnvironmentService.SERVICE_NAME, ServerEnvironment.class, service.getEnvInjector())
+            .setInitialMode(ServiceController.Mode.ACTIVE)
             .install()
         ;
-        controller.setMode(ServiceController.Mode.ACTIVE);
-        wait(controller, EnumSet.of(ServiceController.State.DOWN, ServiceController.State.STARTING), ServiceController.State.UP);
+        try {
+            ServiceContainerHelper.start(controller);
+        } catch (StartException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Override
     public void contextDestroyed(ServletContextEvent event) {
-        ServiceController<?> controller = CurrentServiceContainer.getServiceContainer().getRequiredService(MyService.SERVICE_NAME);
-        controller.setMode(ServiceController.Mode.REMOVE);
-        wait(controller, EnumSet.of(ServiceController.State.UP, ServiceController.State.STOPPING, ServiceController.State.DOWN), ServiceController.State.REMOVED);
+        System.out.println(String.format("Initiating removal of %s", MyService.SERVICE_NAME.getCanonicalName()));
+        ServiceContainerHelper.remove(ServiceContainerHelper.getCurrentServiceContainer().getRequiredService(MyService.SERVICE_NAME));
+        System.out.println(String.format("Removal of %s complete", MyService.SERVICE_NAME.getCanonicalName()));
+        this.verifyRemoved(MyService.SERVICE_NAME.append("service"));
+        this.verifyRemoved(MyService.SERVICE_NAME.append("singleton"));
     }
 
-    private static <T> void wait(ServiceController<T> controller, Collection<ServiceController.State> expectedStates, ServiceController.State targetState) {
-        if (controller.getState() != targetState) {
-            ServiceListener<T> listener = new NotifyingServiceListener<T>();
-            controller.addListener(listener);
-            try {
-                synchronized (controller) {
-                    while (expectedStates.contains(controller.getState())) {
-                        System.out.println(String.format("Service controller state is %s, waiting for transition to %s", controller.getState(), targetState));
-                        controller.wait();
-                    }
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            controller.removeListener(listener);
-            ServiceController.State state = controller.getState();
-            if (state != targetState) {
-                throw new IllegalStateException(String.format("Failed to wait for state to transition to %s.  Current state is %s", targetState, state), controller.getStartException());
-            }
-        }
-    }
-
-    private static class NotifyingServiceListener<T> extends AbstractServiceListener<T> {
-        @Override
-        public void transition(ServiceController<? extends T> controller, Transition transition) {
-            synchronized (controller) {
-                controller.notify();
-            }
+    private void verifyRemoved(ServiceName name) {
+        ServiceController<?> controller = ServiceContainerHelper.getCurrentServiceContainer().getService(name);
+        if ((controller != null) && (controller.getState() != ServiceController.State.REMOVED)) {
+            throw new IllegalStateException(String.format("%s state = %s", name.getCanonicalName(), controller.getState()));
         }
     }
 }

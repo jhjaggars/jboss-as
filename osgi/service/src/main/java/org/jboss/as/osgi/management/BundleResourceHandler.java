@@ -96,7 +96,7 @@ public class BundleResourceHandler extends AbstractRuntimeOnlyHandler {
         if (ModelDescriptionConstants.READ_ATTRIBUTE_OPERATION.equals(operationName)) {
             handleReadAttributeOperation(context, operation);
         } else {
-            handleOperation(operationName, context, operation);
+            handleOperation(context, operationName, operation);
         }
     }
 
@@ -135,14 +135,19 @@ public class BundleResourceHandler extends AbstractRuntimeOnlyHandler {
             Bundle bundle = getTargetBundle(context, operation);
             context.getResult().set(bundle.getVersion().toString());
         }
-        context.completeStep();
+        context.completeStep(OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER);
     }
 
-    private void handleOperation(String operationName, OperationContext context, ModelNode operation) {
+    private void handleOperation(OperationContext context, String operationName, ModelNode operation) {
         try {
             if (ModelConstants.START.equals(operationName)) {
-                Bundle bundle = getTargetBundle(context, operation);
-                bundle.start();
+                OperationAssociation.INSTANCE.setAssociation(operation);
+                try {
+                    Bundle bundle = getTargetBundle(context, operation);
+                    bundle.start();
+                } finally {
+                    OperationAssociation.INSTANCE.removeAssociation();
+                }
             } else if (ModelConstants.STOP.equals(operationName)) {
                 Bundle bundle = getTargetBundle(context, operation);
                 bundle.stop();
@@ -153,7 +158,7 @@ public class BundleResourceHandler extends AbstractRuntimeOnlyHandler {
             LOGGER.errorInOperationHandler(ex, operationName);
             context.getFailureDescription().set(ex.getLocalizedMessage());
         }
-        context.completeStep();
+        context.completeStep(OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER);
     }
 
     private Bundle getTargetBundle(OperationContext context, ModelNode operation) {
@@ -196,7 +201,7 @@ public class BundleResourceHandler extends AbstractRuntimeOnlyHandler {
     }
 
     private BundleContext getSystemContext(OperationContext context) {
-        ServiceController<?> controller = context.getServiceRegistry(false).getService(Services.SYSTEM_CONTEXT);
+        ServiceController<?> controller = context.getServiceRegistry(false).getService(Services.FRAMEWORK_CREATE);
         return controller != null ? (BundleContext)controller.getValue() : null;
     }
 

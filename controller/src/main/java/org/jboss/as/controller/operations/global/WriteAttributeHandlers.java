@@ -102,8 +102,9 @@ public class WriteAttributeHandlers {
         /**
          * Notification that the model has been changed. Subclasses can override
          * to apply additional processing. Any subclass that overrides MUST ensure
-         * that either {@link org.jboss.as.controller.OperationContext#completeStep()} is invoked
-         * or {@link OperationFailedException} is thrown.
+         * that either one of the
+         * {@link org.jboss.as.controller.OperationContext#completeStep(OperationContext.ResultHandler) context.completeStep variants}
+         * is invoked or an {@link OperationFailedException} is thrown.
          *
          * @param context the context of the operation
          * @param operation the operation
@@ -116,7 +117,7 @@ public class WriteAttributeHandlers {
         protected void modelChanged(final OperationContext context, final ModelNode operation, final String attributeName,
                                     final ModelNode newValue, final ModelNode currentValue) throws OperationFailedException {
 
-            context.completeStep();
+            context.completeStep(OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER);
         }
     }
 

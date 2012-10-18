@@ -23,12 +23,18 @@ package org.jboss.as.cli.impl;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.util.Collections;
+import java.util.List;
+import java.util.Properties;
 
 import org.jboss.as.cli.CliInitializationException;
 import org.jboss.as.cli.CommandContext;
 import org.jboss.as.cli.CommandContextFactory;
 import org.jboss.as.cli.CommandLineException;
+import org.jboss.as.cli.Util;
 import org.jboss.as.cli.gui.GuiMain;
 import org.jboss.as.cli.handlers.VersionHandler;
 import org.jboss.as.protocol.StreamUtils;
@@ -45,7 +51,7 @@ public class CliLauncher {
         boolean gui = false;
         try {
             String argError = null;
-            String[] commands = null;
+            List<String> commands = null;
             File file = null;
             boolean connect = false;
             String defaultControllerHost = null;
@@ -141,7 +147,7 @@ public class CliLauncher {
                         break;
                     }
                     final String value = arg.startsWith("--") ? arg.substring(11) : arg.substring(9);
-                    commands = value.split(",+");
+                    commands = Util.splitCommands(value);
                 } else if(arg.startsWith("--command=") || arg.startsWith("command=")) {
                     if(file != null) {
                         argError = "Only one of '--file', '--commands' or '--command' can appear as the argument at a time.";
@@ -152,24 +158,53 @@ public class CliLauncher {
                         break;
                     }
                     final String value = arg.startsWith("--") ? arg.substring(10) : arg.substring(8);
-                    commands = new String[]{value};
+                    commands = Collections.singletonList(value);
                 } else if (arg.startsWith("--user=")) {
                     username = arg.startsWith("--") ? arg.substring(7) : arg.substring(5);
                 } else if (arg.startsWith("--password=")) {
                     password = (arg.startsWith("--") ? arg.substring(11) : arg.substring(9)).toCharArray();
                 } else if (arg.equals("--help") || arg.equals("-h")) {
-                    commands = new String[]{"help"};
-                } else {
+                    commands = Collections.singletonList("help");
+                } else if (arg.startsWith("--properties=")) {
+                    final String value  = arg.substring(13);
+                    final File propertiesFile = new File(value);
+                    if(!propertiesFile.exists()) {
+                        argError = "File doesn't exist: " + propertiesFile.getAbsolutePath();
+                        break;
+                    }
+                    final Properties props = new Properties();
+                    FileInputStream fis = null;
+                    try {
+                        fis = new FileInputStream(propertiesFile);
+                        props.load(fis);
+                    } catch(FileNotFoundException e) {
+                        argError = e.getLocalizedMessage();
+                        break;
+                    } catch(java.io.IOException e) {
+                        argError = "Failed to load properties from " + propertiesFile.getAbsolutePath() + ": " + e.getLocalizedMessage();
+                        break;
+                    } finally {
+                        if(fis != null) {
+                            try {
+                                fis.close();
+                            } catch(java.io.IOException e) {
+                            }
+                        }
+                    }
+                    for(Object prop : props.keySet()) {
+                        SecurityActions.setSystemProperty((String)prop, (String)props.get(prop));
+                    }
+                } else if(!(arg.startsWith("-D") || arg.equals("-XX:"))) {// skip system properties and jvm options
                     // assume it's commands
                     if(file != null) {
-                        argError = "Only one of '--file', '--commands' or '--command' can appear as the argument at a time.";
+                        argError = "Only one of '--file', '--commands' or '--command' can appear as the argument at a time: " + arg;
                         break;
                     }
                     if(commands != null) {
                         argError = "Duplicate argument '--command'/'--commands'.";
                         break;
                     }
-                    commands = arg.split(",+");
+                    commands = Util.splitCommands(arg);
                 }
             }
 
@@ -180,7 +215,7 @@ public class CliLauncher {
             }
 
             if(version) {
-                cmdCtx = new CommandContextImpl();
+                cmdCtx = initCommandContext(defaultControllerHost, defaultControllerPort, username, password, false, connect);
                 VersionHandler.INSTANCE.handle(cmdCtx);
                 return;
             }
@@ -240,11 +275,11 @@ public class CliLauncher {
         }
     }
 
-    private static void processCommands(String[] commands, CommandContext cmdCtx) {
+    private static void processCommands(List<String> commands, CommandContext cmdCtx) {
         int i = 0;
         try {
-            while (cmdCtx.getExitCode() == 0 && i < commands.length && !cmdCtx.isTerminated()) {
-                cmdCtx.handleSafe(commands[i]);
+            while (cmdCtx.getExitCode() == 0 && i < commands.size() && !cmdCtx.isTerminated()) {
+                cmdCtx.handleSafe(commands.get(i));
                 ++i;
             }
         } finally {

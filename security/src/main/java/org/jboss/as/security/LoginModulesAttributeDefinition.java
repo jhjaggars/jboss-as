@@ -31,7 +31,6 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.VAL
 
 import java.util.Locale;
 import java.util.ResourceBundle;
-
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.XMLStreamWriter;
@@ -52,6 +51,7 @@ import org.jboss.dmr.ModelType;
 /**
 * @author Jason T. Greene
 */
+//todo convert to simple attribute (rd+ad)
 public class LoginModulesAttributeDefinition extends ListAttributeDefinition {
 
 
@@ -116,7 +116,7 @@ public class LoginModulesAttributeDefinition extends ListAttributeDefinition {
     }
 
     @Override
-    public void marshallAsElement(ModelNode resourceModel, XMLStreamWriter writer) throws XMLStreamException {
+    public void marshallAsElement(ModelNode resourceModel, final boolean marshalDefault, XMLStreamWriter writer) throws XMLStreamException {
       if (resourceModel.hasDefined(getName()) && resourceModel.asInt() > 0) {
             final ModelNode modules = resourceModel.get(getName());
             for (ModelNode module : modules.asList()) {
@@ -157,7 +157,7 @@ public class LoginModulesAttributeDefinition extends ListAttributeDefinition {
 
         final ModelNode module = valueType.get(Constants.MODULE);
         module.get(TYPE).set(ModelType.STRING);
-        module.get(NILLABLE).set(false);
+        module.get(NILLABLE).set(true);
 
         final ModelNode moduleOptions = valueType.get(Constants.MODULE_OPTIONS);
         moduleOptions.get(DESCRIPTION);  // placeholder

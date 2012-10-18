@@ -39,13 +39,15 @@ import org.junit.runners.Suite;
         CoreResourceManagementTestCase.class,
         ManagementReadsTestCase.class,
         DeploymentManagementTestCase.class,
+        DeploymentOverlayTestCase.class,
         ServerManagementTestCase.class,
         ServerRestartRequiredTestCase.class,
         ManagementAccessTestCase.class,
         ManagementClientContentTestCase.class,
         ValidateOperationOperationTestCase.class,
         ReadEnvironmentVariablesTestCase.class,
-        ExtensionManagementTestCase.class
+        ExtensionManagementTestCase.class,
+        OperationTransformationTestCase.class
 })
 public class DomainTestSuite {
 
@@ -57,14 +59,14 @@ public class DomainTestSuite {
         CONFIGURATION = DomainTestSupport.Configuration.create("domain-configs/domain-standard.xml", "host-configs/host-master.xml", "host-configs/host-slave.xml");
     }
 
-    static synchronized DomainTestSupport createSupport(final String testName) {
+    public static synchronized DomainTestSupport createSupport(final String testName) {
         if(support == null) {
             start(testName);
         }
         return support;
     }
 
-    static synchronized void stopSupport() {
+    public static synchronized void stopSupport() {
         if(! initializedLocally) {
             stop();
         }

@@ -22,10 +22,15 @@
 package org.jboss.as.cli;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.jboss.as.cli.operation.OperationFormatException;
 import org.jboss.as.cli.operation.OperationRequestAddress;
@@ -39,6 +44,8 @@ import org.jboss.dmr.Property;
  * @author Alexey Loubyansky
  */
 public class Util {
+
+    public static final String LINE_SEPARATOR = SecurityActions.getSystemProperty("line.separator");
 
     public static final String ACCESS_TYPE = "access-type";
     public static final String ADD = "add";
@@ -57,6 +64,7 @@ public class Util {
     public static final String DEPLOY = "deploy";
     public static final String DEPLOYMENT = "deployment";
     public static final String DEPLOYMENT_NAME = "deployment-name";
+    public static final String DEPLOYMENT_OVERLAY = "deployment-overlay";
     public static final String DESCRIPTION = "description";
     public static final String DOMAIN_FAILURE_DESCRIPTION = "domain-failure-description";
     public static final String DOMAIN_RESULTS = "domain-results";
@@ -88,6 +96,7 @@ public class Util {
     public static final String OUTCOME = "outcome";
     public static final String PATH = "path";
     public static final String PERSISTENT = "persistent";
+    public static final String PROBLEM = "problem";
     public static final String PRODUCT_NAME = "product-name";
     public static final String PRODUCT_VERSION = "product-version";
     public static final String PROFILE = "profile";
@@ -101,14 +110,20 @@ public class Util {
     public static final String READ_WRITE = "read-write";
     public static final String READ_RESOURCE = "read-resource";
     public static final String READ_RESOURCE_DESCRIPTION = "read-resource-description";
+    public static final String REDEPLOY = "redeploy";
+    public static final String REGULAR_EXPRESSION = "regular-expression";
     public static final String RELEASE_CODENAME = "release-codename";
     public static final String RELEASE_VERSION = "release-version";
+    public static final String REMOVE = "remove";
     public static final String REPLY_PROPERTIES = "reply-properties";
     public static final String REQUEST_PROPERTIES = "request-properties";
     public static final String REQUIRED = "required";
+    public static final String RESPONSE_HEADERS = "response-headers";
     public static final String RESTART_REQUIRED = "restart-required";
     public static final String RESULT = "result";
+    public static final String ROLLED_BACK = "rolled-back";
     public static final String ROLLBACK_ACROSS_GROUPS = "rollback-across-groups";
+    public static final String ROLLBACK_FAILURE_DESCRIPTION = "rollback-failure-description";
     public static final String ROLLBACK_ON_RUNTIME_FAILURE = "rollback-on-runtime-failure";
     public static final String ROLLING_TO_SERVERS = "rolling-to-servers";
     public static final String ROLLOUT_PLAN = "rollout-plan";
@@ -128,6 +143,8 @@ public class Util {
     public static final String TRUE = "true";
     public static final String TYPE = "type";
     public static final String UNDEFINE_ATTRIBUTE = "undefine-attribute";
+    public static final String UNDEPLOY = "undeploy";
+    public static final String UPLOAD_DEPLOYMENT_STREAM = "upload-deployment-stream";
     public static final String VALID = "valid";
     public static final String VALIDATE_ADDRESS = "validate-address";
     public static final String VALUE = "value";
@@ -138,23 +155,36 @@ public class Util {
         return SecurityActions.getSystemProperty("os.name").toLowerCase(Locale.ENGLISH).indexOf("windows") >= 0;
     }
 
-    public static boolean isSuccess(ModelNode operationResult) {
-        if(operationResult != null) {
-            return operationResult.hasDefined(Util.OUTCOME) && operationResult.get(Util.OUTCOME).asString().equals(Util.SUCCESS);
+    public static boolean isSuccess(ModelNode operationResponse) {
+        if(operationResponse != null) {
+            return operationResponse.hasDefined(Util.OUTCOME) && operationResponse.get(Util.OUTCOME).asString().equals(Util.SUCCESS);
         }
         return false;
     }
 
-    public static String getFailureDescription(ModelNode operationResult) {
-        if(operationResult == null) {
+    public static String getFailureDescription(ModelNode operationResponse) {
+        if(operationResponse == null) {
             return null;
         }
-        ModelNode descr = operationResult.get(Util.FAILURE_DESCRIPTION);
+        ModelNode descr = operationResponse.get(Util.FAILURE_DESCRIPTION);
         if(descr == null) {
             return null;
         }
         if(descr.hasDefined(Util.DOMAIN_FAILURE_DESCRIPTION)) {
             descr = descr.get(Util.DOMAIN_FAILURE_DESCRIPTION);
+        }
+        if(descr.hasDefined(Util.ROLLED_BACK)) {
+            final StringBuilder buf = new StringBuilder();
+            buf.append(descr.asString());
+            if(descr.get(Util.ROLLED_BACK).asBoolean()) {
+                buf.append("(The operation was rolled back)");
+            } else if(descr.hasDefined(Util.ROLLBACK_FAILURE_DESCRIPTION)){
+                buf.append(descr.get(Util.ROLLBACK_FAILURE_DESCRIPTION).asString());
+            } else {
+                buf.append("(The operation also failed to rollback, failure description is not available.)");
+            }
+        } else {
+            return descr.asString();
         }
         return descr.asString();
     }
@@ -170,6 +200,41 @@ public class Util {
             list.add(node.asString());
         }
         return list;
+    }
+
+    public static List<String> getList(ModelNode operationResult, String wildcardExpr) {
+        if(!operationResult.hasDefined(RESULT))
+            return Collections.emptyList();
+        final List<ModelNode> nodeList = operationResult.get(RESULT).asList();
+        if(nodeList.isEmpty()) {
+            return Collections.emptyList();
+        }
+        final List<String> list = new ArrayList<String>(nodeList.size());
+        final Pattern pattern = Pattern.compile(wildcardToJavaRegex(wildcardExpr));
+        for(ModelNode node : nodeList) {
+            final String candidate = node.asString();
+            if(pattern.matcher(candidate).matches()) {
+                list.add(candidate);
+            }
+        }
+        return list;
+    }
+
+    public static String wildcardToJavaRegex(String expr) {
+        if(expr == null) {
+            throw new IllegalArgumentException("expr is null");
+        }
+        final StringBuilder buf = new StringBuilder();
+        for(int i = 0; i < expr.length(); ++i) {
+            final char ch = expr.charAt(i);
+            if(ch == '*') {
+                buf.append('.');
+            } else if(ch == '.') {
+                buf.append('\\');
+            }
+            buf.append(ch);
+        }
+        return buf.toString();
     }
 
     public static boolean listContains(ModelNode operationResult, String item) {
@@ -216,8 +281,8 @@ public class Util {
         DefaultOperationRequestBuilder builder = new DefaultOperationRequestBuilder();
         ModelNode request;
         try {
-            builder.setOperationName("read-children-names");
-            builder.addProperty("child-type", "deployment");
+            builder.setOperationName(Util.READ_CHILDREN_NAMES);
+            builder.addProperty(Util.CHILD_TYPE, Util.DEPLOYMENT);
             request = builder.buildRequest();
         } catch (OperationFormatException e) {
             throw new IllegalStateException("Failed to build operation", e);
@@ -237,9 +302,9 @@ public class Util {
         }
 
         builder = new DefaultOperationRequestBuilder();
-        builder.addNode("deployment", name);
-        builder.setOperationName("read-attribute");
-        builder.addProperty("name", "enabled");
+        builder.addNode(Util.DEPLOYMENT, name);
+        builder.setOperationName(Util.READ_ATTRIBUTE);
+        builder.addProperty(Util.NAME, Util.ENABLED);
         try {
             request = builder.buildRequest();
         } catch (OperationFormatException e) {
@@ -249,10 +314,10 @@ public class Util {
         try {
             ModelNode outcome = client.execute(request);
             if (isSuccess(outcome)) {
-                if(!outcome.hasDefined("result")) {
+                if(!outcome.hasDefined(RESULT)) {
                     return false;
                 }
-                return outcome.get("result").asBoolean();
+                return outcome.get(RESULT).asBoolean();
             }
         } catch(Exception e) {
         }
@@ -321,55 +386,142 @@ public class Util {
         return result;
     }
 
-    public static List<String> getAllReferencingServerGroups(String deploymentName, ModelControllerClient client) {
-
-        List<String> serverGroups = getServerGroups(client);
+    public static List<String> getServerGroupsReferencingDeployment(String deploymentName, ModelControllerClient client)
+            throws CommandLineException {
+        final List<String> serverGroups = getServerGroups(client);
         if(serverGroups.isEmpty()) {
             return Collections.emptyList();
         }
-
-        List<String> result = new ArrayList<String>();
+        final List<String> groupNames = new ArrayList<String>();
         for(String serverGroup : serverGroups) {
-            DefaultOperationRequestBuilder builder = new DefaultOperationRequestBuilder();
-            ModelNode request;
-            try {
-                builder.setOperationName("read-children-names");
-                builder.addNode("server-group", serverGroup);
-                builder.addProperty("child-type", "deployment");
-                request = builder.buildRequest();
-            } catch (OperationFormatException e) {
-                throw new IllegalStateException("Failed to build operation", e);
-            }
+            final ModelNode request = new ModelNode();
+            request.get(Util.OPERATION).set(Util.VALIDATE_ADDRESS);
+            request.get(Util.ADDRESS).setEmptyList();
+            final ModelNode addr = request.get(Util.VALUE);
+            addr.add(Util.SERVER_GROUP, serverGroup);
+            addr.add(Util.DEPLOYMENT, deploymentName);
 
+            final ModelNode response;
             try {
-                ModelNode outcome = client.execute(request);
-                if (isSuccess(outcome)) {
-                    if(listContains(outcome, deploymentName)) {
-                        result.add(serverGroup);
-                    }
-                }
+                response = client.execute(request);
             } catch (Exception e) {
+                throw new CommandLineException("Failed to execute " + Util.VALIDATE_ADDRESS + " for " + request.get(Util.ADDRESS) , e);
+            }
+            if (response.has(Util.RESULT)) {
+                final ModelNode result = response.get(Util.RESULT);
+                if(result.has(Util.VALID)) {
+                    if(result.get(Util.VALID).asBoolean()) {
+                        groupNames.add(serverGroup);
+                    }
+                } else {
+                    throw new CommandLineException("Failed to validate address " + request.get(Util.ADDRESS) + ": " + response);
+                }
+            } else {
+                throw new CommandLineException(Util.getFailureDescription(response));
             }
         }
-        return result;
+        return groupNames;
+    }
+
+    public static List<String> getServerGroupsReferencingOverlay(String overlayName, ModelControllerClient client)
+            throws CommandLineException {
+        final List<String> serverGroups = getServerGroups(client);
+        if(serverGroups.isEmpty()) {
+            return Collections.emptyList();
+        }
+        final List<String> groupNames = new ArrayList<String>();
+        for(String serverGroup : serverGroups) {
+            final ModelNode request = new ModelNode();
+            request.get(Util.OPERATION).set(Util.VALIDATE_ADDRESS);
+            request.get(Util.ADDRESS).setEmptyList();
+            final ModelNode addr = request.get(Util.VALUE);
+            addr.add(Util.SERVER_GROUP, serverGroup);
+            addr.add(Util.DEPLOYMENT_OVERLAY, overlayName);
+
+            final ModelNode response;
+            try {
+                response = client.execute(request);
+            } catch (Exception e) {
+                throw new CommandLineException("Failed to execute " + Util.VALIDATE_ADDRESS + " for " + request.get(Util.ADDRESS) , e);
+            }
+            if (response.has(Util.RESULT)) {
+                final ModelNode result = response.get(Util.RESULT);
+                if(result.has(Util.VALID)) {
+                    if(result.get(Util.VALID).asBoolean()) {
+                        groupNames.add(serverGroup);
+                    }
+                } else {
+                    throw new CommandLineException("Failed to validate address " + request.get(Util.ADDRESS) + ": " + response);
+                }
+            } else {
+                throw new CommandLineException(Util.getFailureDescription(response));
+            }
+        }
+        return groupNames;
     }
 
     public static List<String> getDeployments(ModelControllerClient client) {
 
-        DefaultOperationRequestBuilder builder = new DefaultOperationRequestBuilder();
+        final DefaultOperationRequestBuilder builder = new DefaultOperationRequestBuilder();
         final ModelNode request;
         try {
-            builder.setOperationName("read-children-names");
-            builder.addProperty("child-type", "deployment");
+            builder.setOperationName(Util.READ_CHILDREN_NAMES);
+            builder.addProperty(Util.CHILD_TYPE, Util.DEPLOYMENT);
             request = builder.buildRequest();
         } catch (OperationFormatException e) {
             throw new IllegalStateException("Failed to build operation", e);
         }
 
         try {
-            ModelNode outcome = client.execute(request);
+            final ModelNode outcome = client.execute(request);
             if (isSuccess(outcome)) {
                 return getList(outcome);
+            }
+        } catch (Exception e) {
+        }
+
+        return Collections.emptyList();
+    }
+
+    public static List<String> getDeployments(ModelControllerClient client, String serverGroup) {
+
+        final ModelNode request = new ModelNode();
+        ModelNode address = request.get(ADDRESS);
+        if(serverGroup != null) {
+            address.add(SERVER_GROUP, serverGroup);
+        }
+        request.get(OPERATION).set(READ_CHILDREN_NAMES);
+        request.get(CHILD_TYPE).set(DEPLOYMENT);
+        try {
+            final ModelNode outcome = client.execute(request);
+            if (isSuccess(outcome)) {
+                return getList(outcome);
+            }
+        } catch (Exception e) {
+        }
+
+        return Collections.emptyList();
+    }
+
+    public static List<String> getMatchingDeployments(ModelControllerClient client, String wildcardExpr, String serverGroup) {
+
+        final DefaultOperationRequestBuilder builder = new DefaultOperationRequestBuilder();
+        final ModelNode request;
+        try {
+            if(serverGroup != null) {
+                builder.addNode(Util.SERVER_GROUP, serverGroup);
+            }
+            builder.setOperationName(Util.READ_CHILDREN_NAMES);
+            builder.addProperty(Util.CHILD_TYPE, Util.DEPLOYMENT);
+            request = builder.buildRequest();
+        } catch (OperationFormatException e) {
+            throw new IllegalStateException("Failed to build operation", e);
+        }
+
+        try {
+            final ModelNode outcome = client.execute(request);
+            if (isSuccess(outcome)) {
+                return getList(outcome, wildcardExpr);
             }
         } catch (Exception e) {
         }
@@ -382,8 +534,8 @@ public class Util {
         DefaultOperationRequestBuilder builder = new DefaultOperationRequestBuilder();
         final ModelNode request;
         try {
-            builder.setOperationName("read-children-names");
-            builder.addProperty("child-type", "server-group");
+            builder.setOperationName(Util.READ_CHILDREN_NAMES);
+            builder.addProperty(Util.CHILD_TYPE, Util.SERVER_GROUP);
             request = builder.buildRequest();
         } catch (OperationFormatException e) {
             throw new IllegalStateException("Failed to build operation", e);
@@ -445,8 +597,8 @@ public class Util {
         final ModelNode request;
         DefaultOperationRequestBuilder builder = address == null ? new DefaultOperationRequestBuilder() : new DefaultOperationRequestBuilder(address);
         try {
-            builder.setOperationName("read-children-names");
-            builder.addProperty("child-type", type);
+            builder.setOperationName(Util.READ_CHILDREN_NAMES);
+            builder.addProperty(Util.CHILD_TYPE, type);
             request = builder.buildRequest();
         } catch (OperationFormatException e1) {
             throw new IllegalStateException("Failed to build operation", e1);
@@ -502,9 +654,9 @@ public class Util {
             if(profile != null) {
                 builder.addNode("profile", profile);
             }
-            builder.addNode("subsystem", "datasources");
-            builder.setOperationName("read-children-names");
-            builder.addProperty("child-type", dsType);
+            builder.addNode(Util.SUBSYSTEM, Util.DATASOURCES);
+            builder.setOperationName(Util.READ_CHILDREN_NAMES);
+            builder.addProperty(Util.CHILD_TYPE, dsType);
             request = builder.buildRequest();
         } catch (OperationFormatException e) {
             throw new IllegalStateException("Failed to build operation", e);
@@ -540,10 +692,41 @@ public class Util {
         ModelNode op = new ModelNode();
         op.get(OPERATION).set(operationName);
         if (serverGroup != null) {
-            op.get(ADDRESS).add("server-group", serverGroup);
+            op.get(ADDRESS).add(Util.SERVER_GROUP, serverGroup);
         }
         op.get(ADDRESS).add(DEPLOYMENT, uniqueName);
         return op;
+    }
+
+    public static boolean isValidPath(ModelControllerClient client, String... node) throws CommandLineException {
+        if(node == null) {
+            return false;
+        }
+        if(node.length % 2 != 0) {
+            return false;
+        }
+        final ModelNode op = new ModelNode();
+        op.get(ADDRESS).setEmptyList();
+        op.get(OPERATION).set(VALIDATE_ADDRESS);
+        final ModelNode addressValue = op.get(VALUE);
+        for(int i = 0; i < node.length; i += 2) {
+            addressValue.add(node[i], node[i+1]);
+        }
+        final ModelNode response;
+        try {
+            response = client.execute(op);
+        } catch (IOException e) {
+            throw new CommandLineException("Failed to execute " + VALIDATE_ADDRESS, e);
+        }
+        final ModelNode result = response.get(Util.RESULT);
+        if(!result.isDefined()) {
+            return false;
+        }
+        final ModelNode valid = result.get(Util.VALID);
+        if(!valid.isDefined()) {
+            return false;
+        }
+        return valid.asBoolean();
     }
 
     public static String getCommonStart(List<String> list) {
@@ -659,5 +842,65 @@ public class Util {
             throw new CommandFormatException("Operation response is missing result.");
         }
         return response.get(RESULT);
+    }
+
+    private static final Map<Character,Character> wrappingPairs = new HashMap<Character, Character>();
+    static {
+        wrappingPairs.put('(', ')');
+        wrappingPairs.put('{', '}');
+        wrappingPairs.put('[', ']');
+        wrappingPairs.put('\"', '\"');
+    }
+
+    public static List<String> splitCommands(String line) {
+
+        List<String> commands = null;
+        int nextOpIndex = 0;
+        Character expectedClosing = null;
+        Deque<Character> expectedClosingStack = null;
+        int i = 0;
+        while(i < line.length()) {
+            final char ch = line.charAt(i);
+            if(ch == '\\') {
+                ++i;//escape
+            } else if(expectedClosing != null && expectedClosing == ch) {
+                if(expectedClosingStack != null && !expectedClosingStack.isEmpty()) {
+                    expectedClosing = expectedClosingStack.pop();
+                } else {
+                    expectedClosing = null;
+                }
+            } else {
+                final Character matchingClosing = wrappingPairs.get(ch);
+                if(matchingClosing != null) {
+                    if(expectedClosing == null) {
+                        expectedClosing = matchingClosing;
+                    } else {
+                        if(expectedClosingStack == null) {
+                            expectedClosingStack = new ArrayDeque<Character>();
+                        }
+                        expectedClosingStack.push(expectedClosing);
+                        expectedClosing = matchingClosing;
+                    }
+                } else if(expectedClosing == null && ch == ',') {
+                    if(commands == null) {
+                        commands = new ArrayList<String>();
+                    }
+                    commands.add(line.substring(nextOpIndex, i));
+                    nextOpIndex = i + 1;
+                }
+            }
+            ++i;
+        }
+
+        if(commands == null) {
+            commands = Collections.singletonList(line);
+        } else {
+            commands.add(line.substring(nextOpIndex, i));
+        }
+        return commands;
+    }
+
+    public static String resolveProperties(String s) {
+        return StringPropertyReplacer.replaceProperties(s);
     }
 }

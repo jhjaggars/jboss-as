@@ -29,8 +29,10 @@ import static junit.framework.Assert.fail;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.CHILD_TYPE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.INCLUDE_RUNTIME;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.NAME;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ATTRIBUTES_ONLY;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OPERATIONS;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OPERATION_NAME;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.READ_ATTRIBUTE_OPERATION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.READ_CHILDREN_NAMES_OPERATION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.READ_CHILDREN_RESOURCES_OPERATION;
@@ -50,6 +52,8 @@ import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+
+import junit.framework.Assert;
 
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.dmr.ModelNode;
@@ -457,7 +461,7 @@ public class GlobalOperationsTestCase extends AbstractGlobalOperationsTestCase {
         ModelNode result = executeForResult(operation);
 
         assertEquals(ModelType.LIST, result.getType());
-        assertEquals(11, result.asList().size());
+        assertEquals(12, result.asList().size());
         List<String> names = modelNodeListToStringList(result.asList());
         assertTrue(names.contains("testA1-1"));
         assertTrue(names.contains("testA1-2"));
@@ -476,7 +480,7 @@ public class GlobalOperationsTestCase extends AbstractGlobalOperationsTestCase {
 
         result = executeForResult(operation);
         assertEquals(ModelType.LIST, result.getType());
-        assertEquals(10, result.asList().size());
+        assertEquals(11, result.asList().size());
         names = modelNodeListToStringList(result.asList());
         assertTrue(names.contains("testA2"));
         assertTrue(names.contains(READ_RESOURCE_OPERATION));
@@ -492,7 +496,7 @@ public class GlobalOperationsTestCase extends AbstractGlobalOperationsTestCase {
         operation = createOperation(READ_OPERATION_NAMES_OPERATION, "profile", "profileB");
         result = executeForResult(operation);
         assertEquals(ModelType.LIST, result.getType());
-        assertEquals(9, result.asList().size());
+        assertEquals(10, result.asList().size());
         assertTrue(names.contains(READ_RESOURCE_OPERATION));
         assertTrue(names.contains(READ_ATTRIBUTE_OPERATION));
         assertTrue(names.contains(READ_RESOURCE_DESCRIPTION_OPERATION));
@@ -676,6 +680,32 @@ public class GlobalOperationsTestCase extends AbstractGlobalOperationsTestCase {
         operation.get(RECURSIVE).set(true);
         result = executeForResult(operation);
         checkType2Description(result);
+    }
+
+    @Test
+    public void testReadResourceAttributesOnly() throws Exception {
+        ModelNode operation = createOperation(READ_RESOURCE_OPERATION);
+        operation.get(ATTRIBUTES_ONLY).set(true);
+        ModelNode result = executeForResult(operation);
+        Assert.assertEquals(0, result.keys().size());
+
+
+        operation.get(OP_ADDR).add("profile", "profileB");
+        result = executeForResult(operation);
+        Assert.assertEquals(1, result.keys().size());
+        Assert.assertEquals("Profile B", result.get("name").asString());
+
+        operation.get(OP_ADDR).setEmptyList().add("profile", "profileA").add("subsystem", "subsystem1");
+        result = executeForResult(operation);
+        Assert.assertEquals(1, result.keys().size());
+        List<ModelNode> list = result.get("attr1").asList();
+        Assert.assertEquals(2, list.size());
+        Assert.assertEquals(1, list.get(0).asInt());
+        Assert.assertEquals(2, list.get(1).asInt());
+
+
+        operation.get(RECURSIVE).set(true);
+        executeForFailure(operation);
     }
 
     private void checkNonRecursiveSubsystem1(ModelNode result, boolean includeRuntime) {

@@ -36,9 +36,9 @@ import javax.security.auth.Subject;
 import javax.validation.constraints.*;
 
 /**
+ * Managed connection factory
  * 
- * 
- * @version $Revision: $
+ * @author <a href="mailto:vrastsel@redhat.com">Vladimir Rastseluev</a>
  */
 public class ValidManagedConnectionFactory implements ManagedConnectionFactory, ResourceAdapterAssociation {
     /** The serial version UID */

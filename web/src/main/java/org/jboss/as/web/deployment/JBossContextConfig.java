@@ -135,6 +135,32 @@ public class JBossContextConfig extends ContextConfig {
     @Override
     public void lifecycleEvent(LifecycleEvent event) {
         if (event.getType().equals(Lifecycle.AFTER_START_EVENT)) {
+            final WarMetaData warMetaData = deploymentUnitContext.getAttachment(WarMetaData.ATTACHMENT_KEY);
+            // Find and configure overlays
+            Set<VirtualFile> overlayVirtualFiles = warMetaData.getOverlays();
+            if (overlayVirtualFiles != null) {
+                if (context.getResources() instanceof ProxyDirContext) {
+                    ProxyDirContext resources = (ProxyDirContext) context.getResources();
+                    for (VirtualFile overlay : overlayVirtualFiles) {
+                        VFSDirContext dirContext = new VFSDirContext();
+                        dirContext.setVirtualFile(overlay);
+                        resources.addOverlay(dirContext);
+                    }
+                } else if (overlayVirtualFiles.size() > 0) {
+                    // Error, overlays need a ProxyDirContext to compose results
+                    WebLogger.WEB_LOGGER.noOverlay(context.getName());
+                    ok = false;
+                }
+            }
+            // Add other overlays, if any
+            for (String overlay : overlays) {
+                if (context.getResources() instanceof ProxyDirContext) {
+                    ProxyDirContext resources = (ProxyDirContext) context.getResources();
+                    FileDirContext dirContext = new FileDirContext();
+                    dirContext.setDocBase(overlay);
+                    resources.addOverlay(dirContext);
+                }
+            }
             // Invoke ServletContainerInitializer
             final ScisMetaData scisMetaData = deploymentUnitContext.getAttachment(ScisMetaData.ATTACHMENT_KEY);
             if (scisMetaData != null) {
@@ -148,7 +174,6 @@ public class JBossContextConfig extends ContextConfig {
                 }
             }
             // Post order
-            final WarMetaData warMetaData = deploymentUnitContext.getAttachment(WarMetaData.ATTACHMENT_KEY);
             List<String> order = warMetaData.getOrder();
             if (!warMetaData.isNoOrder()) {
                 context.getServletContext().setAttribute(ServletContext.ORDERED_LIBS, order);
@@ -238,9 +263,10 @@ public class JBossContextConfig extends ContextConfig {
         }
 
         // Distributable
-        if (metaData.getDistributable() != null) {
+        // [TODO] Distributable for unresolved WABs
+        Module module = this.deploymentUnitContext.getAttachment(Attachments.MODULE);
+        if (module != null && metaData.getDistributable() != null) {
             try {
-                Module module = this.deploymentUnitContext.getAttachment(Attachments.MODULE);
                 ClassResolver resolver = ModularClassResolver.getInstance(module.getModuleLoader());
                 context.setManager(new DistributableSessionManager<OutgoingDistributableSessionData>(this.factory.getValue(), metaData, new ClassLoaderAwareClassResolver(resolver, module.getClassLoader())));
                 context.setDistributable(true);
@@ -849,37 +875,6 @@ public class JBossContextConfig extends ContextConfig {
         // Configure an authenticator if we need one
         if (ok) {
             authenticatorConfig();
-        }
-
-        // Find and configure overlays
-        if (ok) {
-            Set<VirtualFile> overlays = warMetaData.getOverlays();
-            if (overlays != null) {
-                if (context.getResources() instanceof ProxyDirContext) {
-                    ProxyDirContext resources = (ProxyDirContext) context.getResources();
-                    for (VirtualFile overlay : overlays) {
-                        VFSDirContext dirContext = new VFSDirContext();
-                        dirContext.setVirtualFile(overlay);
-                        resources.addOverlay(dirContext);
-                    }
-                } else if (overlays.size() > 0) {
-                    // Error, overlays need a ProxyDirContext to compose results
-                    WebLogger.WEB_LOGGER.noOverlay(context.getName());
-                    ok = false;
-                }
-            }
-        }
-
-        // Add other overlays, if any
-        if (ok) {
-            for (String overlay : overlays) {
-                if (context.getResources() instanceof ProxyDirContext) {
-                    ProxyDirContext resources = (ProxyDirContext) context.getResources();
-                    FileDirContext dirContext = new FileDirContext();
-                    dirContext.setDocBase(overlay);
-                    resources.addOverlay(dirContext);
-                }
-            }
         }
 
         // Make our application unavailable if problems were encountered

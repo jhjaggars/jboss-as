@@ -119,11 +119,20 @@ class ModelControllerImpl implements ModelController {
         if (restartResourceServices) {
             contextFlags.add(OperationContextImpl.ContextFlag.ALLOW_RESOURCE_SERVICE_RESTART);
         }
-        OperationContextImpl context = new OperationContextImpl(this, processType, runningModeControl.getRunningMode(), contextFlags, handler, attachments, model, control, processState, bootingFlag.get());
-        ModelNode response = new ModelNode();
-        context.addStep(response, operation, prepareStep, OperationContext.Stage.MODEL);
 
-        context.completeStep();
+        final ModelNode response = new ModelNode();
+        // Report the correct operation response, otherwise the preparedResult would only contain
+        // the result of the last active step in a composite operation
+        final OperationTransactionControl originalResultTxControl = control == null ? null : new OperationTransactionControl() {
+            @Override
+            public void operationPrepared(OperationTransaction transaction, ModelNode result) {
+                control.operationPrepared(transaction, response);
+            }
+        };
+
+        OperationContextImpl context = new OperationContextImpl(this, processType, runningModeControl.getRunningMode(), contextFlags, handler, attachments, model, originalResultTxControl, processState, bootingFlag.get());
+        context.addStep(response, operation, prepareStep, OperationContext.Stage.MODEL);
+        context.executeOperation();
 
         if (!response.hasDefined(RESPONSE_HEADERS) || !response.get(RESPONSE_HEADERS).hasDefined(PROCESS_STATE)) {
             ControlledProcessState.State state = processState.getState();
@@ -153,7 +162,7 @@ class ModelControllerImpl implements ModelController {
         List<ParsedBootOp> postExtensionOps = organizeBootOperations(bootList, context);
 
         // Run the steps up to the last ExtensionAddHandler
-        OperationContext.ResultAction resultAction = context.completeStep();
+        OperationContext.ResultAction resultAction = context.executeOperation();
         if (resultAction == OperationContext.ResultAction.KEEP && postExtensionOps != null) {
 
             // Success. Now any extension handlers are registered. Continue with remaining ops
@@ -172,7 +181,7 @@ class ModelControllerImpl implements ModelController {
                 }
             }
 
-            resultAction = postExtContext.completeStep();
+            resultAction = postExtContext.executeOperation();
         }
 
         return  resultAction == OperationContext.ResultAction.KEEP;
@@ -470,7 +479,7 @@ class ModelControllerImpl implements ModelController {
             } else {
                 context.getFailureDescription().set(MESSAGES.noHandler(operationName, address));
             }
-            context.completeStep();
+            context.completeStep(OperationContext.ResultHandler.NOOP_RESULT_HANDLER);
         }
     }
 

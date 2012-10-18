@@ -1,19 +1,43 @@
 package org.jboss.as.controller.transform;
 
-import org.jboss.dmr.ModelNode;
+import org.jboss.as.controller.OperationFailedException;
+import org.jboss.as.controller.PathAddress;
+import org.jboss.as.controller.registry.ImmutableManagementResourceRegistration;
+import org.jboss.as.controller.registry.Resource;
 
 /**
- * @author <a href="mailto:tomaz.cerar@redhat.com">Tomaz Cerar</a>
+ * The resource transformer.
  *
- * @deprecated experimental interface; may be removed or change without warning. Should not be used outside the main JBoss AS codebase
+ * @author <a href="mailto:tomaz.cerar@redhat.com">Tomaz Cerar</a>
  */
-@Deprecated
 public interface ResourceTransformer {
+
     /**
-     * Transforms model based on current context and original model
-     * @param context - context on where this is executed
-     * @param model - original model that needs to be transformed
-     * @return transformed model
+     * Transform a resource.
+     *
+     * @param context the resource transformation context
+     * @param address the path address
+     * @param resource the resource to transform
+     * @throws OperationFailedException
      */
-    ModelNode transformModel(TransformationContext context, ModelNode model);
+    void transformResource(ResourceTransformationContext context, PathAddress address, Resource resource) throws OperationFailedException;
+
+    ResourceTransformer DEFAULT = new ResourceTransformer() {
+        @Override
+        public void transformResource(ResourceTransformationContext context, PathAddress address, Resource resource) throws OperationFailedException  {
+            if (resource.isProxy() || resource.isRuntime()) {
+                return;
+            }
+            final ResourceTransformationContext childContext = context.addTransformedResource(PathAddress.EMPTY_ADDRESS, resource);
+            childContext.processChildren(resource);
+        }
+    };
+
+    ResourceTransformer DISCARD = new ResourceTransformer() {
+        @Override
+        public void transformResource(ResourceTransformationContext context, PathAddress address, Resource resource) {
+            // nothing
+        }
+    };
+
 }

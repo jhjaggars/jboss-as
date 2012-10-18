@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 
+  Set these VM properties in your IDE debugger 
+
+  -Djava.util.logging.manager=org.jboss.logmanager.LogManager
+  -Djboss.home=${workspace_loc:jboss-as-build}/target/jboss-as-7.2.0.Alpha1-SNAPSHOT 
+  -DallowConnectingToRunningServer=true
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -64,8 +72,8 @@
                                 <goals><goal>test</goal></goals>
                                 <configuration>
                                     <includes>
-                                        <include>org/jboss/as/test/smoke/jms/**/*Test.java</include>
-                                        <include>org/jboss/as/test/smoke/messaging/**/*TestCase.java</include>
+                                        <include>org/jboss/as/test/smoke/jms/**/*Test*.java</include>
+                                        <include>org/jboss/as/test/smoke/messaging/**/*Test*.java</include>
                                     </includes>
 
                                     <!-- Parameters to test cases. -->
@@ -94,11 +102,8 @@
                                     </systemPropertyVariables>
                                 </configuration>
                             </execution>
-
                         </executions>
-
                     </plugin>
-
                 </plugins>
             </build>
         </profile>

@@ -55,6 +55,7 @@ import org.jboss.dmr.ModelNode;
 import org.jboss.sasl.util.UsernamePasswordHashUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.xnio.IoUtils;
 
@@ -69,6 +70,7 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.REA
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RESTART;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RESULT;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RUNNING_SERVER;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SERVER_CONFIG;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SHUTDOWN;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUCCESS;
 
@@ -77,9 +79,10 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUC
  *
  * @author <a href="mailto:kabir.khan@jboss.com">Kabir Khan</a>
  */
+@Ignore // AST-5242 - Unstable
 public class RespawnTestCase {
 
-    private static final int TIMEOUT = 30000;
+    private static final int TIMEOUT = 120000;
     private static final String HOST_CONTROLLER = "host-controller";
     private static final String PROCESS_CONTROLLER = "process";
     private static final String SERVER_ONE = "respawn-one";
@@ -146,8 +149,6 @@ public class RespawnTestCase {
         args.add("-Xmx512m");
         args.add("-XX:MaxPermSize=256m");
         args.add("-Dorg.jboss.resolver.warning=true");
-        args.add("-Dsun.rmi.dgc.client.gcInterval=3600000");
-        args.add("-Dsun.rmi.dgc.server.gcInterval=3600000");
         args.add("--");
         args.add("-default-jvm");
         args.add(processUtil.getJavaCommand());
@@ -255,6 +256,34 @@ public class RespawnTestCase {
         }
     }
 
+    @Test
+    public void testReloadHcButNotServersWithFailedServer() throws Exception {
+        List<RunningProcess> original = waitForAllProcesses();
+        //Wait for servers (last test restarted them)
+        readHostControllerServers();
+
+        RunningProcess serverOne = processUtil.getProcess(original, SERVER_ONE);
+        Assert.assertNotNull(serverOne);
+
+        System.out.println("killing respawn-one: " + serverOne);
+        processUtil.killProcess(serverOne);
+
+        //Execute reload w/ restart-servers=false, admin-only=false
+        executeReloadOperation(false, false);
+        //Wait for servers
+        readHostControllerServer(SERVER_TWO);
+
+        manageServer("stop", SERVER_ONE);
+        Thread.sleep(10000);
+        readHostControllerServer(SERVER_TWO);
+        manageServer("start", SERVER_ONE);
+
+        //Check all processes are the same
+        List<RunningProcess> reloaded = waitForAllProcesses();
+        Assert.assertEquals(original.size(), reloaded.size());
+    }
+
+
     private RunningProcess findProcess(List<RunningProcess> processes, String name) {
         RunningProcess proc = null;
         for (RunningProcess cur : processes) {
@@ -293,6 +322,32 @@ public class RespawnTestCase {
 
     }
 
+    private void manageServer(String operationName, String serverName) throws Exception {
+        ModelNode operation = new ModelNode();
+        operation.get(OP).set(operationName);
+        operation.get(OP_ADDR).set(getHostControllerServerConfigAddress(MASTER, serverName));
+
+        final ModelControllerClient client = ModelControllerClient.Factory.create(DomainTestSupport.masterAddress, HC_PORT, getCallbackHandler());
+        try {
+            Assert.assertEquals(SUCCESS, client.execute(operation).get(OUTCOME).asString());
+        } catch (IOException canHappenWhenShuttingDownController) {
+        }
+    }
+
+    private void readHostControllerServer(String serverName) throws Exception {
+        final long time = System.currentTimeMillis() + TIMEOUT;
+        boolean hasOne = false;
+
+        do {
+            hasOne = lookupServerInModel(MASTER, serverName);
+            if (hasOne) {
+                break;
+            }
+            Thread.sleep(250);
+        } while (System.currentTimeMillis() < time);
+        Assert.assertTrue(hasOne);
+    }
+
     private void readHostControllerServers() throws Exception {
         final long time = System.currentTimeMillis() + TIMEOUT;
         boolean hasOne = false;
@@ -303,7 +358,7 @@ public class RespawnTestCase {
             if (hasOne && hasTwo) {
                 break;
             }
-            Thread.sleep(200);
+            Thread.sleep(250);
         } while (System.currentTimeMillis() < time);
         Assert.assertTrue(hasOne);
         Assert.assertTrue(hasTwo);
@@ -333,6 +388,11 @@ public class RespawnTestCase {
     private ModelNode getHostControllerServerAddress(String host, String server) {
         return PathAddress.pathAddress(PathElement.pathElement(HOST, host), PathElement.pathElement(RUNNING_SERVER, server)).toModelNode();
     }
+
+    private ModelNode getHostControllerServerConfigAddress(String host, String server) {
+        return PathAddress.pathAddress(PathElement.pathElement(HOST, host), PathElement.pathElement(SERVER_CONFIG, server)).toModelNode();
+    }
+
 
     private List<RunningProcess> waitForAllProcesses() throws Exception {
         final long time = System.currentTimeMillis() + TIMEOUT;

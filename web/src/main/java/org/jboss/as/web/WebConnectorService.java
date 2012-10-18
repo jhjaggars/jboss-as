@@ -28,12 +28,14 @@ import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.HashSet;
+import java.util.List;
 import java.util.concurrent.Executor;
 
 import org.apache.catalina.connector.Connector;
 import org.apache.coyote.ajp.AjpAprProtocol;
 import org.apache.coyote.ajp.AjpProtocol;
 import org.apache.coyote.http11.Http11AprProtocol;
+import org.apache.coyote.http11.Http11NioProtocol;
 import org.jboss.as.network.ManagedBinding;
 import org.jboss.as.network.SocketBinding;
 import org.jboss.dmr.ModelNode;
@@ -62,7 +64,7 @@ class WebConnectorService implements Service<Connector> {
     private Integer maxSavePostSize = null;
     private Integer maxConnections = null;
     private ModelNode ssl;
-    private ModelNode virtualServers;
+    private List<String> virtualServers;
 
     private Connector connector;
 
@@ -98,9 +100,13 @@ class WebConnectorService implements Service<Connector> {
             if(redirectPort != null) connector.setRedirectPort(redirectPort);
             if(secure != null) connector.setSecure(secure);
             boolean nativeProtocolHandler = false;
+            boolean nioProtocolHandler = false;
             if (connector.getProtocolHandler() instanceof Http11AprProtocol
                     || connector.getProtocolHandler() instanceof AjpAprProtocol) {
                 nativeProtocolHandler = true;
+            }
+            if (connector.getProtocolHandler() instanceof Http11NioProtocol) {
+                nioProtocolHandler = true;
             }
             if (executor != null) {
                 Method m = connector.getProtocolHandler().getClass().getMethod("setExecutor", Executor.class);
@@ -117,7 +123,7 @@ class WebConnectorService implements Service<Connector> {
                 } catch (NoSuchMethodException e) {
                  // Not all connectors will have this
                 }
-                if (nativeProtocolHandler) {
+                if (nativeProtocolHandler || nioProtocolHandler) {
                     try {
                         Method m = connector.getProtocolHandler().getClass().getMethod("setSendfileSize", Integer.TYPE);
                         m.invoke(connector.getProtocolHandler(), maxConnections);
@@ -131,8 +137,8 @@ class WebConnectorService implements Service<Connector> {
             }
             if (virtualServers != null) {
                 HashSet<String> virtualServersList = new HashSet<String>();
-                for (final ModelNode virtualServer : virtualServers.asList()) {
-                    virtualServersList.add(virtualServer.asString());
+                for (final String virtualServer : virtualServers) {
+                    virtualServersList.add(virtualServer);
                 }
                 connector.setAllowedHosts(virtualServersList);
             }
@@ -306,7 +312,7 @@ class WebConnectorService implements Service<Connector> {
         this.ssl = ssl;
     }
 
-    void setVirtualServers(ModelNode virtualServers) {
+    void setVirtualServers(List<String> virtualServers) {
         this.virtualServers = virtualServers;
     }
 

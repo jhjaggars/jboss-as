@@ -29,7 +29,7 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ADD
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.CONTENT;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.CORE_SERVICE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.DEPLOYMENT;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ENABLED;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.DEPLOYMENT_OVERLAY;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.EXTENSION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.HTTP_INTERFACE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.INTERFACE;
@@ -42,7 +42,6 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.PATH;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.PERSISTENT;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RUNTIME_NAME;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SOCKET_BINDING_GROUP;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUBSYSTEM;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SYSTEM_PROPERTY;
@@ -61,7 +60,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
@@ -76,10 +77,13 @@ import org.jboss.as.controller.parsing.Element;
 import org.jboss.as.controller.parsing.ExtensionXml;
 import org.jboss.as.controller.parsing.Namespace;
 import org.jboss.as.controller.parsing.ParseUtils;
+import org.jboss.as.controller.parsing.ProfileParsingCompletionHandler;
 import org.jboss.as.controller.persistence.ModelMarshallingContext;
 import org.jboss.as.controller.persistence.SubsystemMarshallingContext;
 import org.jboss.as.controller.resource.SocketBindingGroupResourceDefinition;
 import org.jboss.as.domain.management.parsing.ManagementXml;
+import org.jboss.as.server.controller.resources.DeploymentAttributes;
+import org.jboss.as.server.controller.resources.ServerRootResourceDefinition;
 import org.jboss.as.server.mgmt.HttpManagementResourceDefinition;
 import org.jboss.as.server.mgmt.NativeManagementResourceDefinition;
 import org.jboss.dmr.ModelNode;
@@ -99,10 +103,12 @@ import org.jboss.staxmapper.XMLExtendedStreamWriter;
 public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
 
     private final ExtensionXml extensionXml;
+    private final ExtensionRegistry extensionRegistry;
 
     public StandaloneXml(final ModuleLoader loader, final ExecutorService executorService, final ExtensionRegistry extensionRegistry) {
         super();
         extensionXml = new ExtensionXml(loader, executorService, extensionRegistry);
+        this.extensionRegistry = extensionRegistry;
     }
 
     public void readElement(final XMLExtendedStreamReader reader, final List<ModelNode> operationList)
@@ -123,12 +129,13 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
             }
             case DOMAIN_1_1:
             case DOMAIN_1_2:
-            case DOMAIN_1_3:{
+            case DOMAIN_1_3:
+            case DOMAIN_1_4: {
                 readServerElement_1_1(readerNS, reader, address, operationList);
                 break;
             }
             default: {
-              throw unexpectedElement(reader);
+                throw unexpectedElement(reader);
             }
         }
 
@@ -143,7 +150,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
      *
      * @param reader  the xml stream reader
      * @param address address of the parent resource of any resources this method will add
-     * @param list the list of boot operations to which any new operations should be added
+     * @param list    the list of boot operations to which any new operations should be added
      * @throws XMLStreamException if a parsing error occurs
      */
     private void readServerElement_1_0(final XMLExtendedStreamReader reader, final ModelNode address, final List<ModelNode> list)
@@ -151,7 +158,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
 
         parseNamespaces(reader, address, list);
 
-        String serverName = null;
+        ModelNode serverName = null;
 
         // attributes
         final int count = reader.getAttributeCount();
@@ -162,7 +169,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
                     final Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
                     switch (attribute) {
                         case NAME: {
-                            serverName = value;
+                            serverName = ServerRootResourceDefinition.NAME.parse(value, reader.getLocation());
                             break;
                         }
                         default:
@@ -249,7 +256,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
      *
      * @param reader  the xml stream reader
      * @param address address of the parent resource of any resources this method will add
-     * @param list the list of boot operations to which any new operations should be added
+     * @param list    the list of boot operations to which any new operations should be added
      * @throws XMLStreamException if a parsing error occurs
      */
     private void readServerElement_1_1(final Namespace namespace, final XMLExtendedStreamReader reader, final ModelNode address, final List<ModelNode> list)
@@ -257,7 +264,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
 
         parseNamespaces(reader, address, list);
 
-        String serverName = null;
+        ModelNode serverName = null;
 
         // attributes
         final int count = reader.getAttributeCount();
@@ -268,7 +275,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
                     final Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
                     switch (attribute) {
                         case NAME: {
-                            serverName = value;
+                            serverName = ServerRootResourceDefinition.NAME.parse(value, reader.getLocation());
                             break;
                         }
                         default:
@@ -349,6 +356,10 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
             element = nextElement(reader, namespace);
         }
 
+        if (element == Element.DEPLOYMENT_OVERLAYS) {
+            parseDeploymentOverlays(reader, namespace, new ModelNode(), list);
+            element = nextElement(reader, namespace);
+        }
         if (element != null) {
             throw unexpectedElement(reader);
         }
@@ -356,7 +367,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
 
     @Override
     public void parseManagementInterfaces(final XMLExtendedStreamReader reader, final ModelNode address, final Namespace expectedNs,
-            final List<ModelNode> list) throws XMLStreamException {
+                                          final List<ModelNode> list) throws XMLStreamException {
 
         switch (expectedNs) {
             case DOMAIN_1_0:
@@ -368,7 +379,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
     }
 
     private void parseManagementInterfaces_1_0(final XMLExtendedStreamReader reader, final ModelNode address, final Namespace expectedNs,
-            final List<ModelNode> list) throws XMLStreamException {
+                                               final List<ModelNode> list) throws XMLStreamException {
 
         requireNoAttributes(reader);
 
@@ -392,7 +403,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
     }
 
     private void parseHttpManagementInterface1_0(final XMLExtendedStreamReader reader, final ModelNode address,
-                                                   final List<ModelNode> list) throws XMLStreamException {
+                                                 final List<ModelNode> list) throws XMLStreamException {
 
         final ModelNode mgmtSocket = new ModelNode();
         mgmtSocket.get(OP).set(ADD);
@@ -498,7 +509,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
     }
 
     private void parseManagementInterfaces_1_1(final XMLExtendedStreamReader reader, final ModelNode address, final Namespace expectedNs,
-                                                 final List<ModelNode> list) throws XMLStreamException {
+                                               final List<ModelNode> list) throws XMLStreamException {
         requireNoAttributes(reader);
 
         while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
@@ -524,7 +535,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
         }
     }
 
-    private void parseManagementInterface1_1(XMLExtendedStreamReader reader, ModelNode address, boolean http, Namespace expectedNs, List<ModelNode> list)  throws XMLStreamException {
+    private void parseManagementInterface1_1(XMLExtendedStreamReader reader, ModelNode address, boolean http, Namespace expectedNs, List<ModelNode> list) throws XMLStreamException {
         final ModelNode operationAddress = address.clone();
         operationAddress.add(MANAGEMENT_INTERFACE, http ? HTTP_INTERFACE : NATIVE_INTERFACE);
         final ModelNode addOp = Util.getEmptyOperation(ADD, operationAddress);
@@ -547,9 +558,9 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
                         }
                         break;
                     }
-                    case CONSOLE_ENABLED:{
-                        if (http){
-                            HttpManagementResourceDefinition.CONSOLE_ENABLED.parseAndSetParameter(value,addOp,reader);
+                    case CONSOLE_ENABLED: {
+                        if (http) {
+                            HttpManagementResourceDefinition.CONSOLE_ENABLED.parseAndSetParameter(value, addOp, reader);
                         }
                         break;
                     }
@@ -671,11 +682,11 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
                 final Attribute attribute = Attribute.forName(reader.getAttributeLocalName(i));
                 switch (attribute) {
                     case HTTP: {
-                       HttpManagementResourceDefinition.SOCKET_BINDING.parseAndSetParameter(value, addOp, reader);
+                        HttpManagementResourceDefinition.SOCKET_BINDING.parseAndSetParameter(value, addOp, reader);
                         break;
                     }
                     case HTTPS: {
-                       HttpManagementResourceDefinition.SECURE_SOCKET_BINDING.parseAndSetParameter(value, addOp, reader);
+                        HttpManagementResourceDefinition.SECURE_SOCKET_BINDING.parseAndSetParameter(value, addOp, reader);
                         break;
                     }
                     default:
@@ -718,7 +729,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
     }
 
     private void parseNativeRemotingManagementInterface(final XMLExtendedStreamReader reader, final ModelNode address,
-            final List<ModelNode> list) throws XMLStreamException {
+                                                        final List<ModelNode> list) throws XMLStreamException {
 
         requireNoAttributes(reader);
         //requireNoContent(reader);
@@ -734,7 +745,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
     }
 
     private void parseSocketBindingGroup_1_0(final XMLExtendedStreamReader reader, final Set<String> interfaces,
-            final ModelNode address, final Namespace expectedNs, final List<ModelNode> updates) throws XMLStreamException {
+                                             final ModelNode address, final Namespace expectedNs, final List<ModelNode> updates) throws XMLStreamException {
 
         // unique names socket-binding(s)
         final Set<String> uniqueBindingNames = new HashSet<String>();
@@ -807,7 +818,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
     }
 
     private void parseSocketBindingGroup_1_1(final XMLExtendedStreamReader reader, final Set<String> interfaces,
-            final ModelNode address, final Namespace expectedNs, final List<ModelNode> updates) throws XMLStreamException {
+                                             final ModelNode address, final Namespace expectedNs, final List<ModelNode> updates) throws XMLStreamException {
 
         // unique names for both socket-binding and outbound-socket-binding(s)
         final Set<String> uniqueBindingNames = new HashSet<String>();
@@ -892,19 +903,29 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
         requireNoAttributes(reader);
 
         // Content
-        final Set<String> configuredSubsystemTypes = new HashSet<String>();
+        final Map<String, List<ModelNode>> profileOps = new LinkedHashMap<String, List<ModelNode>>();
         while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
             if (Element.forName(reader.getLocalName()) != Element.SUBSYSTEM) {
                 throw unexpectedElement(reader);
             }
-            if (!configuredSubsystemTypes.add(reader.getNamespaceURI())) {
+            String namespace = reader.getNamespaceURI();
+            if (profileOps.containsKey(namespace)) {
                 throw MESSAGES.duplicateDeclaration("subsystem", reader.getLocation());
             }
             // parse subsystem
             final List<ModelNode> subsystems = new ArrayList<ModelNode>();
             reader.handleAny(subsystems);
 
-            // Process subsystems
+            profileOps.put(namespace, subsystems);
+        }
+
+        // Let extensions modify the profile
+        Set<ProfileParsingCompletionHandler> completionHandlers = extensionRegistry.getProfileParsingCompletionHandlers();
+        for (ProfileParsingCompletionHandler completionHandler : completionHandlers) {
+            completionHandler.handleProfileParsingCompletion(profileOps, list);
+        }
+
+        for (List<ModelNode> subsystems : profileOps.values()) {
             for (final ModelNode update : subsystems) {
                 // Process relative subsystem path address
                 final ModelNode subsystemAddress = address.clone();
@@ -917,8 +938,8 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
         }
     }
 
-    private void setServerName(final ModelNode address, final List<ModelNode> operationList, final String value) {
-        if (value != null && value.length() > 0) {
+    private void setServerName(final ModelNode address, final List<ModelNode> operationList, final ModelNode value) {
+        if (value != null && value.isDefined() && value.asString().length() > 0) {
             final ModelNode update = Util.getWriteAttributeOperation(address, NAME, value);
             operationList.add(update);
         }
@@ -932,7 +953,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
         writer.writeStartElement(Element.SERVER.getLocalName());
 
         if (modelNode.hasDefined(NAME)) {
-            writeAttribute(writer, Attribute.NAME, modelNode.get(NAME).asString());
+            ServerRootResourceDefinition.NAME.marshallAsAttribute(modelNode, false, writer);
         }
 
         writer.writeDefaultNamespace(Namespace.CURRENT.getUriString());
@@ -990,6 +1011,11 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
             writeServerDeployments(writer, modelNode.get(DEPLOYMENT));
             writeNewLine(writer);
         }
+
+        if (modelNode.hasDefined(DEPLOYMENT_OVERLAY)) {
+            writeDeploymentOverlays(writer, modelNode.get(DEPLOYMENT_OVERLAY));
+            writeNewLine(writer);
+        }
         writer.writeEndElement();
         writeNewLine(writer);
         writer.writeEndDocument();
@@ -1010,14 +1036,18 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
                     writer.writeStartElement(Element.DEPLOYMENTS.getLocalName());
                     deploymentWritten = true;
                 }
-                final String runtimeName = deployment.get(RUNTIME_NAME).asString();
-                boolean enabled = deployment.get(ENABLED).asBoolean();
+
+
                 writer.writeStartElement(Element.DEPLOYMENT.getLocalName());
                 writeAttribute(writer, Attribute.NAME, uniqueName);
-                writeAttribute(writer, Attribute.RUNTIME_NAME, runtimeName);
-                if (!enabled) {
-                    writeAttribute(writer, Attribute.ENABLED, "false");
-                }
+              //final String runtimeName = deployment.get(RUNTIME_NAME).asString();
+                //writeAttribute(writer, Attribute.RUNTIME_NAME, runtimeName);
+                DeploymentAttributes.RUNTIME_NAME.marshallAsAttribute(deployment, writer);
+              //boolean enabled = deployment.get(ENABLED).asBoolean();
+//                if (!enabled) {
+//                    writeAttribute(writer, Attribute.ENABLED, "false");
+//                }
+                DeploymentAttributes.ENABLED.marshallAsAttribute(deployment, false, writer);
                 final List<ModelNode> contentItems = deployment.require(CONTENT).asList();
                 for (ModelNode contentItem : contentItems) {
                     writeContentItem(writer, contentItem);
@@ -1035,8 +1065,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
 
         final ModelNode profileNode = context.getModelNode();
         // In case there are no subsystems defined
-        if(! profileNode.hasDefined(SUBSYSTEM)) {
-            writer.writeEmptyElement(Element.PROFILE.getLocalName());
+        if (!profileNode.hasDefined(SUBSYSTEM)) {
             return;
         }
 
@@ -1085,7 +1114,7 @@ public class StandaloneXml extends CommonXml implements ManagementXml.Delegate {
         writer.writeStartElement(Element.HTTP_INTERFACE.getLocalName());
         HttpManagementResourceDefinition.SECURITY_REALM.marshallAsAttribute(protocol, writer);
         boolean consoleEnabled = protocol.get(ModelDescriptionConstants.CONSOLE_ENABLED).asBoolean(true);
-        if (!consoleEnabled){
+        if (!consoleEnabled) {
             HttpManagementResourceDefinition.CONSOLE_ENABLED.marshallAsAttribute(protocol, writer);
         }
 

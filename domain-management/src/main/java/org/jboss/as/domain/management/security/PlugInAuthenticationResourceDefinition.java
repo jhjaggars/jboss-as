@@ -22,17 +22,12 @@
 
 package org.jboss.as.domain.management.security;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.SimpleAttributeDefinition;
 import org.jboss.as.controller.SimpleAttributeDefinitionBuilder;
-import org.jboss.as.controller.descriptions.common.ManagementDescription;
-import org.jboss.as.controller.operations.validation.AllowedValuesValidator;
-import org.jboss.as.controller.operations.validation.StringLengthValidator;
+import org.jboss.as.controller.descriptions.common.ControllerResolver;
+import org.jboss.as.controller.operations.validation.EnumValidator;
 import org.jboss.as.controller.registry.AttributeAccess;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
 import org.jboss.as.controller.registry.OperationEntry;
@@ -49,14 +44,17 @@ import org.jboss.dmr.ModelType;
 public class PlugInAuthenticationResourceDefinition extends AbstractPlugInAuthResourceDefinition {
 
     public static final SimpleAttributeDefinition MECHANISM = new SimpleAttributeDefinitionBuilder(
-            ModelDescriptionConstants.MECHANISM, ModelType.STRING, false).setValidator(new MechanismValidator())
-            .setAllowNull(true).setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES).build();
+            ModelDescriptionConstants.MECHANISM, ModelType.STRING, true)
+            .setValidator(new EnumValidator<AuthenticationMechanism>(AuthenticationMechanism.class, true, false,
+                    AuthenticationMechanism.DIGEST, AuthenticationMechanism.PLAIN)) //currently only these are supported
+            .setDefaultValue(new ModelNode(AuthenticationMechanism.DIGEST.toString()))
+            .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES).build();
 
     public static final AttributeDefinition[] ATTRIBUTE_DEFINITIONS = { NAME, MECHANISM };
 
     public PlugInAuthenticationResourceDefinition() {
         super(PathElement.pathElement(ModelDescriptionConstants.AUTHENTICATION, ModelDescriptionConstants.PLUG_IN),
-                ManagementDescription.getResourceDescriptionResolver("core.management.security-realm.authentication.plug-in"),
+                ControllerResolver.getResolver("core.management.security-realm.authentication.plug-in"),
                 new SecurityRealmChildAddHandler(true, ATTRIBUTE_DEFINITIONS), new SecurityRealmChildRemoveHandler(true),
                 OperationEntry.Flag.RESTART_RESOURCE_SERVICES, OperationEntry.Flag.RESTART_RESOURCE_SERVICES);
     }
@@ -65,23 +63,6 @@ public class PlugInAuthenticationResourceDefinition extends AbstractPlugInAuthRe
     public void registerAttributes(ManagementResourceRegistration resourceRegistration) {
         SecurityRealmChildWriteAttributeHandler handler = new SecurityRealmChildWriteAttributeHandler(ATTRIBUTE_DEFINITIONS);
         handler.registerAttributes(resourceRegistration);
-    }
-
-    private static final class MechanismValidator extends StringLengthValidator implements AllowedValuesValidator {
-
-        private final List<ModelNode> allowedValues;
-
-        private MechanismValidator() {
-            super(1, true);
-            List<ModelNode> allowedValues = new ArrayList<ModelNode>(2);
-            allowedValues.add(new ModelNode().set(AuthenticationMechanism.DIGEST.name()));
-            allowedValues.add(new ModelNode().set(AuthenticationMechanism.PLAIN.name()));
-            this.allowedValues = Collections.unmodifiableList(allowedValues);
-        }
-
-        public List<ModelNode> getAllowedValues() {
-            return allowedValues;
-        }
     }
 
 }

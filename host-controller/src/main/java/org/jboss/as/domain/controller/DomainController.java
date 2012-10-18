@@ -22,7 +22,17 @@
 
 package org.jboss.as.domain.controller;
 
+import org.jboss.as.controller.ExpressionResolver;
 import org.jboss.as.controller.ProxyController;
+import org.jboss.as.controller.RunningMode;
+import org.jboss.as.controller.extension.ExtensionRegistry;
+import org.jboss.as.controller.persistence.ExtensibleConfigurationPersister;
+import org.jboss.as.controller.registry.ManagementResourceRegistration;
+import org.jboss.as.controller.services.path.PathManagerService;
+import org.jboss.as.controller.transform.Transformers;
+import org.jboss.as.host.controller.ignored.IgnoredDomainResourceRegistry;
+import org.jboss.as.protocol.mgmt.ManagementChannelHandler;
+import org.jboss.as.repository.ContentRepository;
 import org.jboss.as.repository.HostFileRepository;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.ServiceName;
@@ -41,6 +51,13 @@ public interface DomainController {
     ServiceName SERVICE_NAME = ServiceName.JBOSS.append("domain", "controller");
 
     /**
+     * Gets the domain controller's current running mode.
+     *
+     * @return  the running mode
+     */
+    RunningMode getCurrentRunningMode();
+
+    /**
      * Gets the local host controller info.
      *
      * @return the local host info
@@ -48,16 +65,16 @@ public interface DomainController {
      LocalHostControllerInfo getLocalHostInfo();
 
     /**
-     * Registers a Host Controller with this domain controller.
+     * Registers a slave Host Controller with this domain controller.
      *
-     * @param hostControllerClient client the domain controller can use to communicate with the Host Controller.
      *
-     * @throws IllegalArgumentException if there already exists a host controller with the same id as
-     *                                  <code>hostControllerClient</code>
-     *
-     * @throws SlaveRegistrationException if there is a problem registering the host
+     * @param hostName the name of the slave host
+     * @param handler  handler for communications with the host
+     * @param transformers transformation handler for converting resources and operations to forms appropriate for the slave
+     * @param remoteConnectionId long identifying this specific connection to the host, or {@code null} if the host did not provide such an id
+     * @throws SlaveRegistrationException  if there is a problem registering the host
      */
-    void registerRemoteHost(final ProxyController hostControllerClient) throws SlaveRegistrationException;
+    void registerRemoteHost(final String hostName, final ManagementChannelHandler handler, final Transformers transformers, Long remoteConnectionId) throws SlaveRegistrationException;
 
     /**
      * Check if a Host Controller is already registered with this domain controller.
@@ -72,8 +89,18 @@ public interface DomainController {
      *
      * @param id the name of the previously
      *           registered Host Controller
+     * @param remoteConnectionId long identifying the specific connection to the host, or {@code null}. If {@code null}
+     *                           the host's registration will be removed regardless of any remote connection id
+     *                           that was provided at registration. If not {@code null}, the registration will only
+     *                           be removed if the currently registered id matches the given id
      */
-    void unregisterRemoteHost(final String id);
+    void unregisterRemoteHost(final String id, Long remoteConnectionId);
+
+    /**
+     * Asynchronously ping the slave host with the given {@code hostName} to validate its connection.
+     * @param hostName the name of the slave host
+     */
+    void pingRemoteHost(String hostName);
 
     /**
      * Registers a running server in the domain model
@@ -127,4 +154,19 @@ public interface DomainController {
      * @param exitCode the exit code passed to the ProcessController
      */
     void stopLocalHost(int exitCode);
+
+    ExtensionRegistry getExtensionRegistry();
+
+    ExpressionResolver getExpressionResolver();
+
+    void initializeMasterDomainRegistry(final ManagementResourceRegistration root,
+            final ExtensibleConfigurationPersister configurationPersister, final ContentRepository contentRepository,
+            final HostFileRepository fileRepository,
+            final ExtensionRegistry extensionRegistry, final PathManagerService pathManager);
+
+    void initializeSlaveDomainRegistry(final ManagementResourceRegistration root,
+            final ExtensibleConfigurationPersister configurationPersister, final ContentRepository contentRepository,
+            final HostFileRepository fileRepository, final LocalHostControllerInfo hostControllerInfo,
+            final ExtensionRegistry extensionRegistry,
+            final IgnoredDomainResourceRegistry ignoredDomainResourceRegistry, final PathManagerService pathManager);
 }

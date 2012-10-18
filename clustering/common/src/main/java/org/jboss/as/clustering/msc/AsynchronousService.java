@@ -22,37 +22,54 @@
 
 package org.jboss.as.clustering.msc;
 
-import java.security.AccessController;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ExecutorService;
 
+import org.jboss.as.server.Services;
 import org.jboss.msc.service.Service;
+import org.jboss.msc.service.ServiceBuilder;
+import org.jboss.msc.service.ServiceName;
+import org.jboss.msc.service.ServiceTarget;
 import org.jboss.msc.service.StartContext;
 import org.jboss.msc.service.StartException;
 import org.jboss.msc.service.StopContext;
-import org.jboss.threads.JBossThreadFactory;
+import org.jboss.msc.value.InjectedValue;
+import org.jboss.msc.value.Value;
 
 /**
- * Base service class that executes service start/stop asynchronously.
+ * Service decorator that optionally starts/stops a service asynchronously.
  * @author Paul Ferraro
  */
-public abstract class AsynchronousService<T> implements Service<T> {
-
-    private final Executor executor;
+public final class AsynchronousService<T> implements Service<T> {
+    final Service<T> service;
+    private final Value<ExecutorService> executor;
     private final boolean startAsynchronously;
     private final boolean stopAsynchronously;
 
-    protected AsynchronousService() {
-        this(true, false);
+    public static <T> ServiceBuilder<T> addService(ServiceTarget target, ServiceName name, Service<T> service) {
+        return addService(target, name, service, true, false);
     }
 
-    protected AsynchronousService(boolean startAsynchronously, boolean stopAsynchronously) {
+    public static <T> ServiceBuilder<T> addService(ServiceTarget target, ServiceName name, Service<T> service, boolean startAsynchronously, boolean stopAsynchronously) {
+        final InjectedValue<ExecutorService> executor = new InjectedValue<ExecutorService>();
+        final ServiceBuilder<T> builder = target.addService(name, new AsynchronousService<T>(service, executor, startAsynchronously, stopAsynchronously));
+        Services.addServerExecutorDependency(builder, executor, false);
+        return builder;
+    }
+
+    public AsynchronousService(Service<T> service, Value<ExecutorService> executor) {
+        this(service, executor, true, false);
+    }
+
+    public AsynchronousService(Service<T> service, Value<ExecutorService> executor, boolean startAsynchronously, boolean stopAsynchronously) {
+        this.service = service;
+        this.executor = executor;
         this.startAsynchronously = startAsynchronously;
         this.stopAsynchronously = stopAsynchronously;
-        final ThreadFactory factory =  new JBossThreadFactory(new ThreadGroup(String.format("%s lifecycle", this.getClass().getSimpleName())),
-                Boolean.FALSE, null, "%G - %t", null, null, AccessController.getContext());
-        this. executor = Executors.newCachedThreadPool(factory);
+    }
+
+    @Override
+    public T getValue() {
+        return this.service.getValue();
     }
 
     @Override
@@ -62,21 +79,19 @@ public abstract class AsynchronousService<T> implements Service<T> {
                 @Override
                 public void run() {
                     try {
-                        AsynchronousService.this.start();
+                        AsynchronousService.this.service.start(context);
                         context.complete();
-                    } catch (Exception e) {
+                    } catch (StartException e) {
+                        context.failed(e);
+                    } catch (Throwable e) {
                         context.failed(new StartException(e));
                     }
                 }
             };
             context.asynchronous();
-            this.executor.execute(task);
+            this.executor.getValue().execute(task);
         } else {
-            try {
-                this.start();
-            } catch (Exception e) {
-                throw new StartException(e);
-            }
+            this.service.start(context);
         }
     }
 
@@ -87,20 +102,16 @@ public abstract class AsynchronousService<T> implements Service<T> {
                 @Override
                 public void run() {
                     try {
-                        AsynchronousService.this.stop();
+                        AsynchronousService.this.service.stop(context);
                     } finally {
                         context.complete();
                     }
                 }
             };
             context.asynchronous();
-            this.executor.execute(task);
+            this.executor.getValue().execute(task);
         } else {
-            this.stop();
+            this.service.stop(context);
         }
     }
-
-    protected abstract void start() throws Exception;
-
-    protected abstract void stop();
 }

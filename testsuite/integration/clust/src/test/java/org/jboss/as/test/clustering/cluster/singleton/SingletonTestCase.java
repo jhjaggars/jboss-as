@@ -43,6 +43,7 @@ import org.jboss.shrinkwrap.api.asset.StringAsset;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -50,6 +51,7 @@ import static org.jboss.as.test.clustering.ClusteringTestConstants.*;
 
 @RunWith(Arquillian.class)
 @RunAsClient
+@Ignore // AS7-5210 - unstable test
 public class SingletonTestCase {
 
     @ArquillianResource
@@ -78,7 +80,7 @@ public class SingletonTestCase {
     private static Archive<?> createDeployment() {
         WebArchive war = ShrinkWrap.create(WebArchive.class, "singleton.war");
         war.addPackage(MyService.class.getPackage());
-        war.setManifest(new StringAsset("Manifest-Version: 1.0\nDependencies: org.jboss.msc, org.jboss.as.clustering.singleton, org.jboss.as.server, org.jboss.marshalling, org.jgroups\n"));
+        war.setManifest(new StringAsset("Manifest-Version: 1.0\nDependencies: org.jboss.msc, org.jboss.as.clustering.common, org.jboss.as.clustering.singleton, org.jboss.as.server, org.jboss.marshalling, org.jgroups\n"));
         return war;
     }
 
@@ -124,12 +126,7 @@ public class SingletonTestCase {
             controller.start(CONTAINER_2);
             deployer.deploy(DEPLOYMENT_2);
 
-
-            response = client.execute(new HttpGet(url1));
-            long startTime = System.currentTimeMillis();
-            while(response.getStatusLine().getStatusCode() != HttpServletResponse.SC_OK && startTime + GRACE_TIME_TO_MEMBERSHIP_CHANGE > System.currentTimeMillis()) {
-                response = client.execute(new HttpGet(url1));
-            }
+            response = tryGet(client, url1);
             Assert.assertEquals(HttpServletResponse.SC_OK, response.getStatusLine().getStatusCode());
             Assert.assertEquals(MyServiceContextListener.PREFERRED_NODE, response.getFirstHeader("node").getValue());
             response.getEntity().getContent().close();

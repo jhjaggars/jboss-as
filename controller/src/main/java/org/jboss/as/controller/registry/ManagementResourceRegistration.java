@@ -27,6 +27,7 @@ import static org.jboss.as.controller.ControllerMessages.MESSAGES;
 import java.util.EnumSet;
 
 import org.jboss.as.controller.AttributeDefinition;
+import org.jboss.as.controller.OperationDefinition;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.PathElement;
@@ -34,6 +35,8 @@ import org.jboss.as.controller.ProxyController;
 import org.jboss.as.controller.ResourceDefinition;
 import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.descriptions.OverrideDescriptionProvider;
+import org.jboss.as.controller.descriptions.ResourceDescriptionResolver;
+import org.jboss.dmr.ModelType;
 
 /**
  * A registration for a management resource which consists of a resource description plus registered operation handlers.
@@ -74,7 +77,10 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      *
      * @throws IllegalArgumentException if a submodel is already registered at {@code address}
      * @throws IllegalStateException if {@link #isRuntimeOnly()} returns {@code true}
+     * @deprecated use {@link ManagementResourceRegistration#registerSubModel(org.jboss.as.controller.ResourceDefinition)}
      */
+    @Deprecated
+    @SuppressWarnings("deprecation")
     ManagementResourceRegistration registerSubModel(PathElement address, DescriptionProvider descriptionProvider);
 
     /**
@@ -148,7 +154,9 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      * @param handler the operation handler
      * @param descriptionProvider the description provider for this operation
      * @throws IllegalArgumentException if either parameter is {@code null}
+     * @deprecated use {@link #registerOperationHandler(org.jboss.as.controller.OperationDefinition, org.jboss.as.controller.OperationStepHandler)}
      */
+     @Deprecated
     void registerOperationHandler(String operationName, OperationStepHandler handler, DescriptionProvider descriptionProvider);
 
     /**
@@ -159,7 +167,9 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      * @param descriptionProvider the description provider for this operation
      * @param flags operational modifier flags for this operation (e.g. read-only)
      * @throws IllegalArgumentException if either parameter is {@code null}
+     * @deprecated use {@link #registerOperationHandler(org.jboss.as.controller.OperationDefinition, org.jboss.as.controller.OperationStepHandler)}
      */
+    @Deprecated
     void registerOperationHandler(String operationName, OperationStepHandler handler, DescriptionProvider descriptionProvider, EnumSet<OperationEntry.Flag> flags);
 
     /**
@@ -170,7 +180,9 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      * @param descriptionProvider the description provider for this operation
      * @param inherited {@code true} if the operation is inherited to child nodes, {@code false} otherwise
      * @throws IllegalArgumentException if either parameter is {@code null}
+     * @deprecated use {@link #registerOperationHandler(org.jboss.as.controller.OperationDefinition, org.jboss.as.controller.OperationStepHandler)}
      */
+    @Deprecated
     void registerOperationHandler(String operationName, OperationStepHandler handler, DescriptionProvider descriptionProvider, boolean inherited);
 
     /**
@@ -182,7 +194,9 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      * @param inherited {@code true} if the operation is inherited to child nodes, {@code false} otherwise
      * @param entryType the operation entry type
      * @throws IllegalArgumentException if either parameter is {@code null}
+     * @deprecated use {@link #registerOperationHandler(org.jboss.as.controller.OperationDefinition, org.jboss.as.controller.OperationStepHandler)}
      */
+    @Deprecated
     void registerOperationHandler(String operationName, OperationStepHandler handler, DescriptionProvider descriptionProvider, boolean inherited, OperationEntry.EntryType entryType);
 
 
@@ -195,7 +209,9 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      * @param inherited {@code true} if the operation is inherited to child nodes, {@code false} otherwise
      * @param flags operational modifier flags for this operation (e.g. read-only)
      * @throws IllegalArgumentException if either parameter is {@code null}
+     * @deprecated use {@link #registerOperationHandler(org.jboss.as.controller.OperationDefinition, org.jboss.as.controller.OperationStepHandler)}
      */
+    @Deprecated
     void registerOperationHandler(String operationName, OperationStepHandler handler, DescriptionProvider descriptionProvider, boolean inherited, EnumSet<OperationEntry.Flag> flags);
 
     /**
@@ -208,9 +224,27 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      * @param entryType the operation entry type
      * @param flags operational modifier flags for this operation (e.g. read-only)
      * @throws IllegalArgumentException if either parameter is {@code null}
+     * @deprecated use {@link #registerOperationHandler(org.jboss.as.controller.OperationDefinition, org.jboss.as.controller.OperationStepHandler)}
      */
+    @Deprecated
     void registerOperationHandler(String operationName, OperationStepHandler handler, DescriptionProvider descriptionProvider, boolean inherited, OperationEntry.EntryType entryType, EnumSet<OperationEntry.Flag> flags);
 
+    /**
+     * Register an operation handler for this resource.
+     *
+     * @param definition the definition of operation
+     * @param handler    the operation handler
+     */
+    void registerOperationHandler(OperationDefinition definition, OperationStepHandler handler);
+
+    /**
+     * Register an operation handler for this resource.
+     *
+     * @param definition the definition of operation
+     * @param handler    the operation handler
+     * @param inherited  {@code true} if the operation is inherited to child nodes, {@code false} otherwise
+     */
+    void registerOperationHandler(OperationDefinition definition, OperationStepHandler handler, boolean inherited);
 
     /**
      * Unregister an operation handler for this resource.
@@ -231,7 +265,9 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      * @param writeHandler the handler for attribute writes. Cannot be {@code null}
      * @param storage the storage type for this attribute
      * @throws IllegalArgumentException if {@code attributeName} or {@code writeHandler} are {@code null}
+     * @deprecated use {@link ManagementResourceRegistration#registerReadWriteAttribute(org.jboss.as.controller.AttributeDefinition, org.jboss.as.controller.OperationStepHandler, org.jboss.as.controller.OperationStepHandler)}
      */
+    @Deprecated
     void registerReadWriteAttribute(String attributeName, OperationStepHandler readHandler, OperationStepHandler writeHandler, AttributeAccess.Storage storage);
 
     /**
@@ -246,7 +282,9 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      * @param writeHandler the handler for attribute writes. Cannot be {@code null}
      * @param flags additional flags describing this attribute
      * @throws IllegalArgumentException if {@code attributeName} or {@code writeHandler} are {@code null}
+     * @deprecated use {@link ManagementResourceRegistration#registerReadWriteAttribute(org.jboss.as.controller.AttributeDefinition, org.jboss.as.controller.OperationStepHandler, org.jboss.as.controller.OperationStepHandler)}
      */
+     @Deprecated
     void registerReadWriteAttribute(String attributeName, OperationStepHandler readHandler, OperationStepHandler writeHandler,
                                     EnumSet<AttributeAccess.Flag> flags);
 
@@ -275,7 +313,9 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      *                    in which case the default handling is used
      * @param storage the storage type for this attribute
      * @throws IllegalArgumentException if {@code attributeName} is {@code null}
+     * @deprecated use {@link ManagementResourceRegistration#registerReadOnlyAttribute(org.jboss.as.controller.AttributeDefinition, org.jboss.as.controller.OperationStepHandler)}
      */
+    @Deprecated
     void registerReadOnlyAttribute(String attributeName, OperationStepHandler readHandler, AttributeAccess.Storage storage);
 
     /**
@@ -289,7 +329,9 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      *                    in which case the default handling is used
      * @param flags additional flags describing this attribute
      * @throws IllegalArgumentException if {@code attributeName} is {@code null}
-     */
+     * @deprecated use {@link ManagementResourceRegistration#registerReadOnlyAttribute(org.jboss.as.controller.AttributeDefinition, org.jboss.as.controller.OperationStepHandler)}
+      */
+    @Deprecated
     void registerReadOnlyAttribute(String attributeName, OperationStepHandler readHandler, EnumSet<AttributeAccess.Flag> flags);
 
     /**
@@ -313,7 +355,9 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      * @param metricHandler the handler for attribute reads. Cannot be {@code null}
      *
      * @throws IllegalArgumentException if {@code attributeName} or {@code metricHandler} are {@code null}
+     * @deprecated use {@link ManagementResourceRegistration#registerMetric(org.jboss.as.controller.AttributeDefinition, org.jboss.as.controller.OperationStepHandler)}
      */
+    @Deprecated
     void registerMetric(String attributeName, OperationStepHandler metricHandler);
 
     /**
@@ -334,6 +378,7 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      * @param flags additional flags describing this attribute
      *
      * @throws IllegalArgumentException if {@code attributeName} or {@code metricHandler} are {@code null}
+     * @deprecated use {@link ManagementResourceRegistration#registerMetric(org.jboss.as.controller.AttributeDefinition, org.jboss.as.controller.OperationStepHandler)}
      */
     void registerMetric(String attributeName, OperationStepHandler metricHandler, EnumSet<AttributeAccess.Flag> flags);
 
@@ -361,7 +406,22 @@ public interface ManagementResourceRegistration extends ImmutableManagementResou
      */
     void unregisterProxyController(PathElement address);
 
-    //String getValueString();
+    /**
+     * Register an alias registration to another part of the model
+     *
+     * @param address the child of this registry that is an alias
+     * @param aliasEntry the target model
+     * @deprecated Might change before AS 7.2.0
+     */
+    @Deprecated
+    void registerAlias(PathElement address, AliasEntry aliasEntry);
+
+    /**
+     * Unregister an alias
+     *
+     * @param address the child of this registry that is an alias
+     */
+    void unregisterAlias(PathElement address);
 
     /**
      * A factory for creating a new, root model node registration.

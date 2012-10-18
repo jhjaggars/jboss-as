@@ -27,6 +27,7 @@ import java.util.Deque;
 import org.jboss.as.cli.CommandFormatException;
 import org.jboss.as.cli.parsing.ParsingContext;
 import org.jboss.as.cli.parsing.ParsingStateCallbackHandler;
+import org.jboss.as.cli.parsing.QuotesState;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
 
@@ -58,6 +59,8 @@ public class ArgumentValueCallbackHandler implements ParsingStateCallbackHandler
                 } else {
                     currentState = new DefaultValueState(currentState.isList());
                 }
+            } else if(ctx.getCharacter() == '{') {
+                currentState = new DefaultValueState(false, true);
             } else {
                 currentState = new DefaultValueState(false);
             }
@@ -73,6 +76,16 @@ public class ArgumentValueCallbackHandler implements ParsingStateCallbackHandler
             currentState.itemSeparator();
         } else if(NameValueSeparatorState.ID.equals(stateId)) {
             currentState.nameSeparator();
+        } else if(QuotesState.ID.equals(stateId)) {
+            if(currentState != null) {
+                if (stack == null) {
+                    stack = new ArrayDeque<ValueState>();
+                }
+                stack.push(currentState);
+                currentState = new DefaultValueState(currentState.isList());
+            } else {
+                currentState = new DefaultValueState(false);
+            }
         }
     }
 
@@ -164,6 +177,9 @@ public class ArgumentValueCallbackHandler implements ParsingStateCallbackHandler
         }
         @Override
         public void itemSeparator() {
+            if(buf.length() == 0) {
+                return;
+            }
             if(wrapper == null) {
                 wrapper = new ModelNode();
             }

@@ -25,6 +25,8 @@ package org.jboss.as.controller;
 import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.persistence.SubsystemMarshallingContext;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
+import org.jboss.as.controller.transform.ResourceTransformer;
+import org.jboss.as.controller.transform.TransformersSubRegistration;
 import org.jboss.as.controller.transform.SubsystemTransformer;
 import org.jboss.staxmapper.XMLElementWriter;
 
@@ -43,7 +45,9 @@ public interface SubsystemRegistration {
      * @param descriptionProvider provider of the description of the subsystem's root management resource
      *
      * @return the subsystem-level model node registration
+     * @deprecated use {@link SubsystemRegistration#registerSubsystemModel(ResourceDefinition)}
      */
+    @Deprecated
     ManagementResourceRegistration registerSubsystemModel(DescriptionProvider descriptionProvider);
 
     /**
@@ -59,7 +63,9 @@ public interface SubsystemRegistration {
      *
      * @param descriptionProvider  provider of the description of the subsystem's root deployment-level management resource
      * @return the deployment-level model node registration
+     * @deprecated use {@link SubsystemRegistration#registerDeploymentModel(ResourceDefinition)}
      */
+    @Deprecated
     ManagementResourceRegistration registerDeploymentModel(DescriptionProvider descriptionProvider);
 
     /**
@@ -80,11 +86,12 @@ public interface SubsystemRegistration {
     void registerXMLElementWriter(XMLElementWriter<SubsystemMarshallingContext> writer);
 
     /**
-     * Registers subsystem model transformer
-     * @param subsystemTransformer - transformer of model
+     * Register transformers for a specific model versions.
      *
-     * @deprecated experimental method; may be removed or changed without warning. Should not be used outside the main JBoss AS codebase
+     * @param version the model version range
+     * @param resourceTransformer the subsystem resource transformer
+     * @return the transformers registry
      */
-    @Deprecated
-    void registerSubsystemTransformer(SubsystemTransformer subsystemTransformer);
+    TransformersSubRegistration registerModelTransformers(ModelVersionRange version, ResourceTransformer resourceTransformer);
+
 }

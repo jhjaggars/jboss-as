@@ -22,8 +22,16 @@
 
 package org.jboss.as.txn.subsystem;
 
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ADD;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.DESCRIBE;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.WRITE_ATTRIBUTE_OPERATION;
+import static org.jboss.as.txn.TransactionLogger.ROOT_LOGGER;
+
+import javax.management.MBeanServer;
+
 import org.jboss.as.controller.Extension;
 import org.jboss.as.controller.ExtensionContext;
+import org.jboss.as.controller.ModelVersion;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.SubsystemRegistration;
@@ -33,15 +41,13 @@ import org.jboss.as.controller.operations.common.GenericSubsystemDescribeHandler
 import org.jboss.as.controller.parsing.ExtensionParsingContext;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
 import org.jboss.as.controller.registry.OperationEntry;
+import org.jboss.as.controller.transform.RejectExpressionValuesTransformer;
+import org.jboss.as.controller.transform.ResourceTransformer;
+import org.jboss.as.controller.transform.TransformersSubRegistration;
 import org.jboss.as.txn.TransactionMessages;
 import org.jboss.msc.service.ServiceController;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.ServiceRegistry;
-
-import javax.management.MBeanServer;
-
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.DESCRIBE;
-import static org.jboss.as.txn.TransactionLogger.ROOT_LOGGER;
 
 /**
  * The transaction management extension.
@@ -55,6 +61,10 @@ public class TransactionExtension implements Extension {
     public static final String SUBSYSTEM_NAME = "transactions";
 
     private static final String RESOURCE_NAME = TransactionExtension.class.getPackage().getName() + ".LocalDescriptions";
+
+    private static final int MANAGEMENT_API_MAJOR_VERSION = 1;
+    private static final int MANAGEMENT_API_MINOR_VERSION = 1;
+    private static final int MANAGEMENT_API_MICRO_VERSION = 1;
 
     private static final ServiceName MBEAN_SERVER_SERVICE_NAME = ServiceName.JBOSS.append("mbean", "server");
     static final PathElement LOG_STORE_PATH = PathElement.pathElement(LogStoreConstants.LOG_STORE, LogStoreConstants.LOG_STORE);
@@ -87,10 +97,11 @@ public class TransactionExtension implements Extension {
         ROOT_LOGGER.debug("Initializing Transactions Extension");
         final LogStoreResource resource = new LogStoreResource();
         final boolean registerRuntimeOnly = context.isRuntimeOnlyRegistrationValid();
-        final SubsystemRegistration subsystem = context.registerSubsystem(SUBSYSTEM_NAME, 1, 1);
+        final SubsystemRegistration subsystem = context.registerSubsystem(SUBSYSTEM_NAME, MANAGEMENT_API_MAJOR_VERSION,
+                MANAGEMENT_API_MINOR_VERSION, MANAGEMENT_API_MICRO_VERSION);
 
         final ManagementResourceRegistration registration = subsystem.registerSubsystemModel(new TransactionSubsystemRootResourceDefinition(registerRuntimeOnly));
-        registration.registerOperationHandler(DESCRIBE, GenericSubsystemDescribeHandler.INSTANCE, GenericSubsystemDescribeHandler.INSTANCE, false, OperationEntry.EntryType.PRIVATE);
+        registration.registerOperationHandler(GenericSubsystemDescribeHandler.DEFINITION, GenericSubsystemDescribeHandler.INSTANCE);
 
 
         ManagementResourceRegistration logStoreChild = registration.registerSubModel(new LogStoreDefinition(resource));
@@ -100,6 +111,9 @@ public class TransactionExtension implements Extension {
         }
 
         subsystem.registerXMLElementWriter(TransactionSubsystem12Parser.INSTANCE);
+
+        // Register the model transformers
+        registerTransformers(subsystem);
     }
 
     /**
@@ -109,6 +123,31 @@ public class TransactionExtension implements Extension {
         context.setSubsystemXmlMapping(SUBSYSTEM_NAME, Namespace.TRANSACTIONS_1_0.getUriString(), TransactionSubsystem10Parser.INSTANCE);
         context.setSubsystemXmlMapping(SUBSYSTEM_NAME, Namespace.TRANSACTIONS_1_1.getUriString(), TransactionSubsystem11Parser.INSTANCE);
         context.setSubsystemXmlMapping(SUBSYSTEM_NAME, Namespace.TRANSACTIONS_1_2.getUriString(), TransactionSubsystem12Parser.INSTANCE);
+    }
+
+    // Transformation
+
+    /**
+     * Register the transformers for older model versions.
+     *
+     * @param subsystem the subsystems registration
+     */
+    private static void registerTransformers(final SubsystemRegistration subsystem) {
+
+        // Check the resource and operations for expressions
+
+        // Transformations to the 1.1.0 Model:
+        final ModelVersion version110 = ModelVersion.create(1, 1, 0);
+        // We need to reject all expressions, since they can't be resolved on the client
+        // However, a slave running 1.1.0 has no way to tell us at registration that it has ignored a resource,
+        // so we can't agressively fail on resource transformation
+        final ResourceTransformer resourceTransformer = ResourceTransformer.DEFAULT;
+        final RejectExpressionValuesTransformer operationTransformer =
+                new RejectExpressionValuesTransformer(TransactionSubsystemRootResourceDefinition.attributes);
+        final TransformersSubRegistration registration = subsystem.registerModelTransformers(version110, resourceTransformer);
+        registration.registerOperationTransformer(ADD, operationTransformer);
+        registration.registerOperationTransformer(WRITE_ATTRIBUTE_OPERATION, operationTransformer.getWriteAttributeTransformer());
+
     }
 
 }

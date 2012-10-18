@@ -22,14 +22,27 @@
 
 package org.jboss.as.messaging.jms;
 
+import static org.jboss.as.messaging.MessagingMessages.MESSAGES;
+
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+
+import org.hornetq.api.core.BroadcastEndpointFactoryConfiguration;
 import org.hornetq.api.core.DiscoveryGroupConfiguration;
 import org.hornetq.api.core.TransportConfiguration;
+import org.hornetq.api.core.UDPBroadcastGroupConfiguration;
 import org.hornetq.core.server.HornetQServer;
-import org.jboss.as.connector.util.ConnectorServices;
 import org.jboss.as.connector.services.mdr.AS7MetadataRepository;
-import org.jboss.as.connector.services.resourceadapters.deployment.registry.ResourceAdapterDeploymentRegistry;
 import org.jboss.as.connector.services.resourceadapters.ResourceAdapterActivatorService;
+import org.jboss.as.connector.services.resourceadapters.deployment.registry.ResourceAdapterDeploymentRegistry;
 import org.jboss.as.connector.subsystems.jca.JcaSubsystemConfiguration;
+import org.jboss.as.connector.util.ConnectorServices;
 import org.jboss.as.naming.service.NamingService;
 import org.jboss.as.network.SocketBinding;
 import org.jboss.as.security.service.SubjectFactoryService;
@@ -90,17 +103,6 @@ import org.jboss.msc.service.StopContext;
 import org.jboss.msc.value.InjectedValue;
 import org.jboss.security.SubjectFactory;
 
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-
-import static org.jboss.as.messaging.MessagingMessages.MESSAGES;
-
 /**
  * A service which translates a pooled connection factory into a resource adapter driven connection pool
  *
@@ -113,8 +115,8 @@ import static org.jboss.as.messaging.MessagingMessages.MESSAGES;
 public class PooledConnectionFactoryService implements Service<Void> {
 
     private static final List<LocalizedXsdString> EMPTY_LOCL = Collections.emptyList();
-    private static final String CONNECTOR_CLASSNAME = "ConnectorClassName";
-    private static final String CONNECTION_PARAMETERS = "ConnectionParameters";
+    public static final String CONNECTOR_CLASSNAME = "connectorClassName";
+    public static final String CONNECTION_PARAMETERS = "connectionParameters";
     private static final String HQ_ACTIVATION = "org.hornetq.ra.inflow.HornetQActivationSpec";
     private static final String HQ_CONN_DEF = "HornetQConnectionDefinition";
     private static final String HQ_ADAPTER = "org.hornetq.ra.HornetQResourceAdapter";
@@ -132,10 +134,13 @@ public class PooledConnectionFactoryService implements Service<Void> {
     private static final String TRY_LOCK = "UseTryLock";
     private static final String JMS_MESSAGE_LISTENER = "javax.jms.MessageListener";
     private static final String DEFAULT_MAX_RECONNECTS = "5";
-    private static final String GROUP_ADDRESS = "discoveryAddress";
-    private static final String DISCOVERY_INITIAL_WAIT_TIMEOUT = "discoveryInitialWaitTimeout";
-    private static final String GROUP_PORT = "discoveryPort";
-    private static final String REFRESH_TIMEOUT = "discoveryRefreshTimeout";
+    public static final String GROUP_ADDRESS = "discoveryAddress";
+    public static final String DISCOVERY_INITIAL_WAIT_TIMEOUT = "discoveryInitialWaitTimeout";
+    public static final String GROUP_PORT = "discoveryPort";
+    public static final String REFRESH_TIMEOUT = "discoveryRefreshTimeout";
+    public static final String DISCOVERY_LOCAL_BIND_ADDRESS = "discoveryLocalBindAddress";
+    public static final String TRANSACTION_MANAGER_LOCATOR_METHOD = "transactionManagerLocatorMethod";
+    public static final String TRANSACTION_MANAGER_LOCATOR_CLASS = "transactionManagerLocatorClass";
 
     private static final Collection<String> JMS_ACTIVATION_CONFIG_PROPERTIES = new HashSet<String>();
 
@@ -226,14 +231,21 @@ public class PooledConnectionFactoryService implements Service<Void> {
 
             if(discoveryGroupName != null) {
                 DiscoveryGroupConfiguration discoveryGroupConfiguration = hornetQService.getValue().getConfiguration().getDiscoveryGroupConfigurations().get(discoveryGroupName);
-                properties.add(simpleProperty15(GROUP_ADDRESS, STRING_TYPE, discoveryGroupConfiguration.getGroupAddress()));
+                BroadcastEndpointFactoryConfiguration bgCfg = discoveryGroupConfiguration.getBroadcastEndpointFactoryConfiguration();
+                if (bgCfg instanceof UDPBroadcastGroupConfiguration) {
+                    UDPBroadcastGroupConfiguration udpCfg = (UDPBroadcastGroupConfiguration) bgCfg;
+                    properties.add(simpleProperty15(GROUP_ADDRESS, STRING_TYPE, udpCfg.getGroupAddress()));
+                    properties.add(simpleProperty15(GROUP_PORT, INTEGER_TYPE, "" + udpCfg.getGroupPort()));
+                    properties.add(simpleProperty15(DISCOVERY_LOCAL_BIND_ADDRESS, STRING_TYPE, "" + udpCfg.getLocalBindAddress()));
+                } else {
+                    // FIXME HORNETQ-1048 HornetQ RA does not allow to set a JGroups channel
+                }
                 properties.add(simpleProperty15(DISCOVERY_INITIAL_WAIT_TIMEOUT, LONG_TYPE, "" + discoveryGroupConfiguration.getDiscoveryInitialWaitTimeout()));
-                properties.add(simpleProperty15(GROUP_PORT, INTEGER_TYPE, "" + discoveryGroupConfiguration.getGroupPort()));
                 properties.add(simpleProperty15(REFRESH_TIMEOUT, LONG_TYPE, "" + discoveryGroupConfiguration.getRefreshTimeout()));
             }
 
             boolean hasReconnect = false;
-            final String reconnectName = JMSServices.RECONNECT_ATTEMPTS_METHOD;
+            final String reconnectName = ConnectionFactoryAttributes.Pooled.RECONNECT_ATTEMPTS_PROP_NAME;
             for (PooledConnectionFactoryConfigProperties adapterParam : adapterParams) {
                 hasReconnect |= reconnectName.equals(adapterParam.getName());
 
@@ -247,8 +259,8 @@ public class PooledConnectionFactoryService implements Service<Void> {
 
             TransactionManagerLocator.container = container;
             AS7RecoveryRegistry.container = container;
-            properties.add(simpleProperty15("TransactionManagerLocatorClass", STRING_TYPE, TransactionManagerLocator.class.getName()));
-            properties.add(simpleProperty15("TransactionManagerLocatorMethod", STRING_TYPE, "getTransactionManager"));
+            properties.add(simpleProperty15(TRANSACTION_MANAGER_LOCATOR_CLASS, STRING_TYPE, TransactionManagerLocator.class.getName()));
+            properties.add(simpleProperty15(TRANSACTION_MANAGER_LOCATOR_METHOD, STRING_TYPE, "getTransactionManager"));
 
             OutboundResourceAdapter outbound = createOutbound();
             InboundResourceAdapter inbound = createInbound();
@@ -325,7 +337,6 @@ public class PooledConnectionFactoryService implements Service<Void> {
     }
 
     private InboundResourceAdapter createInbound() {
-        InboundResourceAdapter inbound;
         List<RequiredConfigProperty> destination = Collections.singletonList(new RequiredConfigProperty(EMPTY_LOCL, str("destination"), null));
         // setup the JMS activation config properties
         final List<ConfigProperty> jmsActivationConfigProps = new ArrayList<ConfigProperty>(JMS_ACTIVATION_CONFIG_PROPERTIES.size());

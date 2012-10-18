@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +38,7 @@ import org.jboss.as.protocol.ProtocolLogger;
 import org.jboss.as.protocol.ProtocolMessages;
 import org.jboss.as.protocol.StreamUtils;
 import org.jboss.remoting3.Channel;
+import org.jboss.remoting3.CloseHandler;
 import org.jboss.remoting3.MessageOutputStream;
 import org.jboss.threads.AsyncFuture;
 import org.xnio.Cancellable;
@@ -46,7 +48,7 @@ import org.xnio.Cancellable;
  *
  * @author Emanuel Muckenhuber
  */
-public abstract class AbstractMessageHandler extends ActiveOperationSupport implements ManagementMessageHandler {
+public abstract class AbstractMessageHandler extends ActiveOperationSupport implements ManagementMessageHandler, CloseHandler<Channel> {
 
     private final ExecutorService executorService;
     private final AtomicInteger requestID = new AtomicInteger();
@@ -165,8 +167,7 @@ public abstract class AbstractMessageHandler extends ActiveOperationSupport impl
                     return header;
                 }
 
-                @Override
-                public void executeAsync(final AsyncTask<A> task) {
+                Runnable createAsyncTaskRunner(final AsyncTask<A> task) {
                     final ManagementRequestContext<A> context = this;
                     final AsyncTaskRunner runner = new AsyncTaskRunner() {
                         @Override
@@ -180,7 +181,17 @@ public abstract class AbstractMessageHandler extends ActiveOperationSupport impl
                         }
                     };
                     support.addCancellable(runner);
-                    getExecutor().execute(runner);
+                    return runner;
+                }
+
+                @Override
+                public void executeAsync(final AsyncTask<A> task) {
+                    executeAsync(task, getExecutor());
+                }
+
+                @Override
+                public void executeAsync(AsyncTask<A> task, Executor executor) {
+                    executor.execute(createAsyncTaskRunner(task));
                 }
 
                 @Override
@@ -263,8 +274,7 @@ public abstract class AbstractMessageHandler extends ActiveOperationSupport impl
                     return header;
                 }
 
-                @Override
-                public void executeAsync(final AsyncTask<A> task) {
+                Runnable createAsyncTaskRunner(final AsyncTask<A> task) {
                     final ManagementRequestContext<A> context = this;
                     final AsyncTaskRunner runner = new AsyncTaskRunner() {
                         @Override
@@ -285,10 +295,6 @@ public abstract class AbstractMessageHandler extends ActiveOperationSupport impl
                                 } else {*/
                                     task.execute(context);
                                 //}
-                            } catch (RejectedExecutionException e) {
-                                if(resultHandler.failed(e)) {
-                                    safeWriteErrorResponse(channel, header, e);
-                                }
                             } catch (Exception e) {
                                 ProtocolLogger.ROOT_LOGGER.debugf(e, " failed to process async request for %s on channel %s", task, channel);
                                 if(resultHandler.failed(e)) {
@@ -298,7 +304,23 @@ public abstract class AbstractMessageHandler extends ActiveOperationSupport impl
                         }
                     };
                     support.addCancellable(runner);
-                    getExecutor().execute(runner);
+                    return runner;
+                }
+
+                @Override
+                public void executeAsync(final AsyncTask<A> task) {
+                    executeAsync(task, getExecutor());
+                }
+
+                @Override
+                public void executeAsync(final AsyncTask<A> task, final Executor executor) {
+                    try {
+                        executor.execute(createAsyncTaskRunner(task));
+                    } catch (RejectedExecutionException e) {
+                        if(resultHandler.failed(e)) {
+                            safeWriteErrorResponse(channel, header, e);
+                        }
+                    }
                 }
 
                 @Override
@@ -337,6 +359,11 @@ public abstract class AbstractMessageHandler extends ActiveOperationSupport impl
     @Override
     public boolean awaitCompletion(long timeout, TimeUnit unit) throws InterruptedException {
         return super.awaitCompletion(timeout, unit);
+    }
+
+    @Override
+    public void handleClose(final Channel closed, final IOException exception) {
+        handleChannelClosed(closed, exception);
     }
 
     /**
@@ -484,7 +511,7 @@ public abstract class AbstractMessageHandler extends ActiveOperationSupport impl
         @Override
         public void run() {
             if(cancelled.get()) {
-                return;
+                Thread.currentThread().interrupt();
             }
             this.thread = Thread.currentThread();
             try {

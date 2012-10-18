@@ -22,15 +22,22 @@
 
 package org.jboss.as.web;
 
+import java.util.concurrent.TimeoutException;
+
+import org.jboss.as.controller.OperationFailedException;
+import org.jboss.as.server.deployment.DeploymentUnit;
+import org.jboss.as.server.deployment.DeploymentUnitProcessingException;
 import org.jboss.jandex.AnnotationTarget;
 import org.jboss.jandex.DotName;
-import org.jboss.logging.Cause;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageBundle;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageBundle;
 import org.jboss.logging.Messages;
+import org.jboss.modules.ModuleIdentifier;
+import org.jboss.msc.service.ServiceName;
 import org.jboss.vfs.VirtualFile;
 
-/** *
+/**
  * This module is using message IDs in the range 18000-18099 and 18200-18399.
  * <p/>
  * This file is using the subset 18000-18199 for non-logger messages.
@@ -126,7 +133,7 @@ public interface WebMessages {
     IllegalStateException nullHostName();
 
     @Message(id = 18026, value = "Failed to resolve module for deployment %s")
-    String failedToResolveModule(VirtualFile deploymentRoot);
+    String failedToResolveModule(Object deploymentHandle);
 
     @Message(id = 18027, value = "Failed to add JBoss Web deployment service")
     String failedToAddWebDeployment();
@@ -196,9 +203,6 @@ public interface WebMessages {
 
     @Message(id = 18049, value = "Instance destruction failed")
     RuntimeException instanceDestructionFailed(@Cause Throwable t);
-
-    @Message(id = 18050, value = "@ManagedBean is only allowed at class level %s")
-    String invalidManagedBeanAnnotation(AnnotationTarget target);
 
     @Message(id = 18051, value = "Authentication Manager has not been set")
     IllegalStateException noAuthenticationManager();
@@ -275,7 +279,7 @@ public interface WebMessages {
     @Message(id = 18075, value = "Number of active sessions exceeds limit %s trying to create session %s")
     IllegalStateException tooManyActiveSessions(int limit, String id);
 
-    @Message(id = 18076, value = "Exception expiring or passivating sesion %s")
+    @Message(id = 18076, value = "Exception expiring or passivating session %s")
     String errorPassivatingSession(String id);
 
     @Message(id = 18077, value = "Failed to load session %s for passivation")
@@ -341,25 +345,28 @@ public interface WebMessages {
     @Message(id = 18097, value = "TLD file %s not contained in root %s")
     String tldFileNotContainedInRoot(String tldPath, String rootPath);
 
-    /**
-     * A message indicating the metric is unknown.
-     *
-     * @param metric the unknown metric.
-     *
-     * @return the message.
-     */
     @Message(id = 18098, value = "Unknown metric %s")
     String unknownMetric(Object metric);
 
-    /**
-     * A message indicating the {@link org.jboss.as.web.session.AbstractSessionManager#processExpirationPassivation()}
-     * failed.
-     *
-     * @param message the message from the cause
-     *
-     * @return the message.
-     */
     @Message(id = 18099, value = "processExpirationPassivation(): failed with exception: %s")
     String processExpirationPassivationException(String message);
+
+    @Message(id = 18100, value = "Timeout context service activation: %s")
+    TimeoutException timeoutContextActivation(ServiceName service);
+
+    @Message(id = 18101, value = "Version 1.1.0 of the web subsystem had a bug meaning referencing virtual-server from connector is not supported. See https://issues.jboss.org/browse/JBPAPP-9314")
+    String transformationVersion_1_1_0_JBPAPP_9314();
+
+    @Message(id = 18102, value = "Error loading SCI from module: %s")
+    DeploymentUnitProcessingException errorLoadingSCIFromModule(ModuleIdentifier identifier, @Cause Exception e);
+
+    @Message(id = 18103, value = "Unable to resolve annotation index for deployment unit: %s")
+    DeploymentUnitProcessingException unableToResolveAnnotationIndex(DeploymentUnit deploymentUnit);
+
+    @Message(id = 18104, value = "Deployment error processing SCI for jar: %s")
+    DeploymentUnitProcessingException errorProcessingSCI(String jar, @Cause Exception e);
+
+    @Message(id = 18105, value = "Not applicable")
+    RuntimeException notApplicable();
 
 }

@@ -28,7 +28,7 @@ import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
 import org.jboss.as.controller.descriptions.StandardResourceDescriptionResolver;
 import org.jboss.as.controller.operations.global.WriteAttributeHandlers;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
-import org.jboss.as.host.controller.descriptions.HostDescriptionProviders;
+import org.jboss.as.host.controller.descriptions.HostEnvironmentResourceDescription;
 
 /**
  *
@@ -44,7 +44,7 @@ public class JvmResourceDefinition extends SimpleResourceDefinition {
 
     protected JvmResourceDefinition(boolean server) {
         super(PathElement.pathElement(ModelDescriptionConstants.JVM),
-                new StandardResourceDescriptionResolver("jvm", HostDescriptionProviders.class.getPackage().getName() + ".LocalDescriptions", HostDescriptionProviders.class.getClassLoader(), true, false),
+                new StandardResourceDescriptionResolver("jvm", HostEnvironmentResourceDescription.class.getPackage().getName() + ".LocalDescriptions", HostEnvironmentResourceDescription.class.getClassLoader(), true, false),
                 new JVMAddHandler(JvmAttributes.getAttributes(server)),
                 JVMRemoveHandler.INSTANCE);
         this.server = server;
@@ -60,8 +60,8 @@ public class JvmResourceDefinition extends SimpleResourceDefinition {
     @Override
     public void registerOperations(ManagementResourceRegistration resourceRegistration) {
         super.registerOperations(resourceRegistration);
-        resourceRegistration.registerOperationHandler(JVMOptionAddHandler.OPERATION_NAME, JVMOptionAddHandler.INSTANCE, JVMOptionAddHandler.INSTANCE, false);
-        resourceRegistration.registerOperationHandler(JVMOptionRemoveHandler.OPERATION_NAME, JVMOptionRemoveHandler.INSTANCE, JVMOptionRemoveHandler.INSTANCE, false);
+        resourceRegistration.registerOperationHandler(JVMOptionAddHandler.DEFINITION, JVMOptionAddHandler.INSTANCE);
+        resourceRegistration.registerOperationHandler(JVMOptionRemoveHandler.DEFINITION, JVMOptionRemoveHandler.INSTANCE);
 
         //AS7-4437 is scheduled for 7.2.0 so uncomment these once we have decided on the format of the operation names
         //There are some tests in AbstractJvmModelTest for these which need uncommenting as well

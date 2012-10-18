@@ -24,6 +24,7 @@ package org.jboss.as.web.security;
 
 import java.io.IOException;
 import java.security.Principal;
+import java.util.Map;
 
 import javax.security.jacc.PolicyContext;
 import javax.servlet.ServletException;
@@ -46,6 +47,7 @@ import org.jboss.security.SecurityConstants;
 import org.jboss.security.SecurityContext;
 import org.jboss.security.SecurityRolesAssociation;
 import org.jboss.security.SecurityUtil;
+import org.jboss.security.SimplePrincipal;
 
 /**
  * A {@code Valve} that creates a {@code SecurityContext} if one doesn't exist and sets the security information based on the
@@ -58,19 +60,33 @@ import org.jboss.security.SecurityUtil;
  */
 public class SecurityContextAssociationValve extends ValveBase {
 
-    private final DeploymentUnit deploymentUnit;
+    private final String securityDomain;
+    private final Map<String, RunAsIdentityMetaData> runAsIdentity;
+    private final String contextId;
 
     private static final ThreadLocal<Request> activeRequest = new ThreadLocal<Request>();
 
     public SecurityContextAssociationValve(DeploymentUnit deploymentUnit) {
-        this.deploymentUnit = deploymentUnit;
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public void invoke(Request request, Response response) throws IOException, ServletException {
         final WarMetaData warMetaData = deploymentUnit.getAttachment(WarMetaData.ATTACHMENT_KEY);
         JBossWebMetaData metaData = warMetaData.getMergedJBossWebMetaData();
+        String securityDomain = SecurityUtil.unprefixSecurityDomain(metaData.getSecurityDomain());
+        if (securityDomain == null) {
+            securityDomain = SecurityConstants.DEFAULT_WEB_APPLICATION_POLICY;
+        }
+        String contextId = deploymentUnit.getName();
+        if (deploymentUnit.getParent() != null) {
+            contextId = deploymentUnit.getParent().getName() + "!" + contextId;
+        }
+        this.securityDomain = securityDomain;
+        this.runAsIdentity = metaData.getRunAsIdentity();
+        this.contextId = contextId;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void invoke(Request request, Response response) throws IOException, ServletException {
         activeRequest.set(request);
 
         Session session = null;
@@ -86,9 +102,6 @@ public class SecurityContextAssociationValve extends ValveBase {
         SecurityContext sc = SecurityActions.getSecurityContext();
         if (sc == null) {
             createdSecurityContext = true;
-            String securityDomain = SecurityUtil.unprefixSecurityDomain(metaData.getSecurityDomain());
-            if (securityDomain == null)
-                securityDomain = SecurityConstants.DEFAULT_WEB_APPLICATION_POLICY;
             sc = SecurityActions.createSecurityContext(securityDomain);
             SecurityActions.setSecurityContextOnAssociation(sc);
         }
@@ -99,7 +112,7 @@ public class SecurityContextAssociationValve extends ValveBase {
                 servlet = request.getWrapper();
                 if (servlet != null) {
                     String name = servlet.getName();
-                    RunAsIdentityMetaData identity = metaData.getRunAsIdentity(name);
+                    RunAsIdentityMetaData identity = runAsIdentity.get(name);
                     RunAsIdentity runAsIdentity = null;
                     if (identity != null) {
                         WebLogger.WEB_SECURITY_LOGGER.tracef(name + ", runAs: " + identity);
@@ -126,7 +139,7 @@ public class SecurityContextAssociationValve extends ValveBase {
                     if (principal == null) {
                         Session sessionInternal = request.getSessionInternal(false);
                         if (sessionInternal != null) {
-                           principal = (JBossGenericPrincipal) sessionInternal.getNote(Constants.FORM_PRINCIPAL_NOTE);
+                            principal = (JBossGenericPrincipal) sessionInternal.getNote(Constants.FORM_PRINCIPAL_NOTE);
                         }
                     }
                 } else {
@@ -138,7 +151,7 @@ public class SecurityContextAssociationValve extends ValveBase {
                 if (principal != null) {
                     WebLogger.WEB_SECURITY_LOGGER.tracef("Restoring principal info from cache");
                     if (createdSecurityContext) {
-                        sc.getUtil().createSubjectInfo(principal.getUserPrincipal(), principal.getCredentials(),
+                        sc.getUtil().createSubjectInfo(new SimplePrincipal(principal.getName()), principal.getCredentials(),
                                 principal.getSubject());
                     }
                 }
@@ -147,7 +160,7 @@ public class SecurityContextAssociationValve extends ValveBase {
                 WebLogger.WEB_SECURITY_LOGGER.debug("Failed to determine servlet", e);
             }
             // set JACC contextID
-            PolicyContext.setContextID(deploymentUnit.getName());
+            PolicyContext.setContextID(contextId);
 
             // Perform the request
             getNext().invoke(request, response);

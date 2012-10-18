@@ -22,15 +22,15 @@
 
 package org.jboss.as.logging;
 
-import org.jboss.as.controller.AttributeDefinition;
-
 import java.util.HashMap;
 import java.util.Map;
+
+import org.jboss.as.controller.AttributeDefinition;
 
 /**
  *
  */
-public enum Element {
+enum Element {
 
     UNKNOWN((String) null),
 
@@ -53,6 +53,8 @@ public enum Element {
     LEVEL(CommonAttributes.LEVEL),
     LEVEL_RANGE(CommonAttributes.LEVEL_RANGE),
     LOGGER(CommonAttributes.LOGGER),
+    LOGGING_PROFILE(CommonAttributes.LOGGING_PROFILE),
+    LOGGING_PROFILES(CommonAttributes.LOGGING_PROFILES),
     MATCH(CommonAttributes.MATCH),
     MAX_BACKUP_INDEX(CommonAttributes.MAX_BACKUP_INDEX),
     NOT(CommonAttributes.NOT),
