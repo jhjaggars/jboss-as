@@ -21,14 +21,18 @@
  */
 package org.jboss.as.jdr;
 
+import org.apache.commons.io.FileUtils;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.jdr.commands.JdrCommand;
 import org.jboss.as.jdr.commands.JdrEnvironment;
-import org.jboss.as.jdr.plugins.BasePlugin;
+import org.jboss.as.jdr.plugins.JdrPlugin;
 import org.jboss.as.jdr.util.JdrZipFile;
 
+import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
 import static org.jboss.as.jdr.JdrLogger.ROOT_LOGGER;
 import static org.jboss.as.jdr.JdrMessages.MESSAGES;
@@ -57,13 +61,30 @@ public class JdrRunner implements JdrReportCollector {
             throw MESSAGES.couldNotCreateZipfile();
         }
 
-        List<JdrCommand> commands;
+        List<JdrCommand> commands = new ArrayList<JdrCommand>();
+
 
         try {
-            commands = new BasePlugin().getCommands();
+            InputStream is = FileUtils.openInputStream(
+                    FileUtils.getFile(
+                            this.env.getJbossHome(), "modules", "org", "jboss", "as", "jdr", "main", "plugins.properties"
+                    )
+            );
+            Properties plugins = new Properties();
+            plugins.load(is);
+            for (String pluginName : plugins.stringPropertyNames()) {
+                Class pluginClass = Class.forName(pluginName);
+                JdrPlugin plugin = (JdrPlugin) pluginClass.newInstance();
+                commands.addAll(plugin.getCommands());
+            }
         } catch (Exception e) {
             ROOT_LOGGER.couldNotConfigureJDR(e);
             throw MESSAGES.couldNotConfigureJDR();
+        }
+
+        if (commands.size() < 1) {
+            ROOT_LOGGER.noCommandsToRun();
+            throw MESSAGES.noCommandsToRun();
         }
 
         JdrReport report = new JdrReport();

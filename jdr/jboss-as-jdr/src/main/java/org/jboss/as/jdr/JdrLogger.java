@@ -102,4 +102,11 @@ public interface JdrLogger extends BasicLogger {
     @LogMessage(level = ERROR)
     @Message(id=13307, value="Could not configure JDR.")
     void couldNotConfigureJDR(@Cause Throwable cause);
+
+    /**
+     * No Commands to run, probably no valid plugin loaded
+     */
+    @LogMessage(level = ERROR)
+    @Message(id = 13308, value = "No JDR commands were loaded. Be sure that a valid Plugin class is specified in plugins.properties.")
+    void noCommandsToRun();
 }

@@ -69,4 +69,7 @@ interface JdrMessages {
 
     @Message(id = 13353, value = "Could not configure JDR. At least one configuration step failed.")
     OperationFailedException couldNotConfigureJDR();
+
+    @Message(id = 13354, value = "No JDR commands were loaded. Be sure that a valid Plugin class is specified in plugins.properties.")
+    OperationFailedException noCommandsToRun();
 }
