@@ -418,6 +418,9 @@ public class DistributableSessionManager<O extends OutgoingDistributableSessionD
 
         resetStats();
 
+        // Notify our interested LifecycleListeners
+        lifecycle.fireLifecycleEvent(BEFORE_STOP_EVENT, this);
+
         clearSessions();
 
         this.distributedCacheManager.stop();
@@ -1305,7 +1308,7 @@ public class DistributableSessionManager<O extends OutgoingDistributableSessionD
                 }
             }
         } catch (Exception ex) {
-            log.error("processExpirationPassivation(): failed with exception: " + ex, ex);
+            log.error(MESSAGES.processExpirationPassivationException(ex.getLocalizedMessage()), ex);
         } finally {
             SessionInvalidationTracker.resume();
         }

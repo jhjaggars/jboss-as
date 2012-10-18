@@ -12,14 +12,14 @@
             <xsl:apply-templates select="maven-resource"/>
         </xsl:if>
     </xsl:template>
-    
+
     <xsl:template match="//maven-resource">
         <xsl:value-of select="@group"/>:<xsl:value-of select="@artifact"/>
         <xsl:text>
 </xsl:text>
     </xsl:template>
-    
-    
+
+
     <!-- Skip everything else. -->
     <xsl:template match="@*|node()">
         <xsl:apply-templates select="@*|node()"/>

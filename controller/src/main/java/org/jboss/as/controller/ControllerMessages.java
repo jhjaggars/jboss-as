@@ -2476,4 +2476,9 @@ public interface ControllerMessages {
     @Message(id = 14859, value = "Failed to rename temp file %s to %s")
     ConfigurationPersistenceException failedToRenameTempFile(@Cause Throwable cause, File temp, File file);
 
+    @Message(id = 14860, value = "Invalid locale format:  %s")
+    String invalidLocaleString(String unparsed);
+
+    @Message(id = 14861, value = "<one or more transitive dependencies>")
+    String transitiveDependencies();
 }

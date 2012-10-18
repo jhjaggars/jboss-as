@@ -21,13 +21,17 @@
  */
 package org.jboss.as.ejb3.remote;
 
-import java.io.IOException;
+
 import java.lang.reflect.Method;
+import java.net.InetAddress;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.transaction.xa.XAException;
@@ -50,9 +54,13 @@ import org.jboss.as.ejb3.deployment.DeploymentRepository;
 import org.jboss.as.ejb3.deployment.DeploymentRepositoryListener;
 import org.jboss.as.ejb3.deployment.EjbDeploymentInformation;
 import org.jboss.as.ejb3.deployment.ModuleDeployment;
+import org.jboss.as.ejb3.util.ServiceLookupValue;
 import org.jboss.as.network.ClientMapping;
+import org.jboss.as.network.SocketBinding;
 import org.jboss.ejb.client.ClusterContext;
 import org.jboss.ejb.client.ClusterNodeManager;
+import org.jboss.ejb.client.EJBClientConfiguration;
+import org.jboss.ejb.client.EJBClientContext;
 import org.jboss.ejb.client.EJBClientInvocationContext;
 import org.jboss.ejb.client.EJBLocator;
 import org.jboss.ejb.client.EJBReceiver;
@@ -62,7 +70,9 @@ import org.jboss.ejb.client.EntityEJBLocator;
 import org.jboss.ejb.client.SessionID;
 import org.jboss.ejb.client.StatefulEJBLocator;
 import org.jboss.ejb.client.TransactionID;
+import org.jboss.ejb.client.remoting.NetworkUtil;
 import org.jboss.invocation.InterceptorContext;
+import org.jboss.logging.Logger;
 import org.jboss.marshalling.cloner.ClassLoaderClassCloner;
 import org.jboss.marshalling.cloner.ClonerConfiguration;
 import org.jboss.marshalling.cloner.ObjectCloner;
@@ -74,8 +84,10 @@ import org.jboss.msc.service.StartContext;
 import org.jboss.msc.service.StartException;
 import org.jboss.msc.service.StopContext;
 import org.jboss.msc.value.InjectedValue;
+import org.jboss.remoting3.Endpoint;
 import org.jboss.security.SecurityContext;
 import org.jboss.security.SecurityContextAssociation;
+
 
 /**
  * {@link EJBReceiver} for local same-VM invocations. This handles all invocations on remote interfaces
@@ -85,6 +97,7 @@ import org.jboss.security.SecurityContextAssociation;
  */
 public class LocalEjbReceiver extends EJBReceiver implements Service<LocalEjbReceiver>, RegistryCollector.Listener<String, List<ClientMapping>> {
 
+    private static final Logger logger = Logger.getLogger(LocalEjbReceiver.class);
     public static final ServiceName DEFAULT_LOCAL_EJB_RECEIVER_SERVICE_NAME = ServiceName.JBOSS.append("ejb").append("default-local-ejb-receiver-service");
     public static final ServiceName BY_VALUE_SERVICE_NAME = ServiceName.JBOSS.append("ejb3", "localEjbReceiver", "value");
     public static final ServiceName BY_REFERENCE_SERVICE_NAME = ServiceName.JBOSS.append("ejb3", "localEjbReceiver", "reference");
@@ -97,16 +110,30 @@ public class LocalEjbReceiver extends EJBReceiver implements Service<LocalEjbRec
     private final InjectedValue<RegistryCollector> clusterRegistryCollector = new InjectedValue<RegistryCollector>();
     private final Listener deploymentListener = new Listener();
     private final boolean allowPassByReference;
+    private final ServiceLookupValue<Endpoint> endpointValue;
+    private final ServiceLookupValue<EJBRemoteConnectorService> ejbRemoteConnectorServiceValue;
+    private final Set<ClusterTopologyUpdateListener> clusterTopologyUpdateListeners = Collections.synchronizedSet(new HashSet<ClusterTopologyUpdateListener>());
 
-    public LocalEjbReceiver(final String nodeName, final boolean allowPassByReference) {
+
+    public LocalEjbReceiver(final String nodeName, final boolean allowPassByReference, final ServiceLookupValue<Endpoint> endpointValue, final ServiceLookupValue<EJBRemoteConnectorService> ejbRemoteConnectorServiceValue) {
         super(nodeName);
         this.allowPassByReference = allowPassByReference;
+        this.endpointValue = endpointValue;
+        this.ejbRemoteConnectorServiceValue = ejbRemoteConnectorServiceValue;
     }
 
-
     @Override
-    protected void associate(final EJBReceiverContext context) {
-        this.contexts.add(context);
+    protected void associate(final EJBReceiverContext receiverContext) {
+        this.contexts.add(receiverContext);
+
+        final RegistryCollector<String, List<ClientMapping>> clusters = this.clusterRegistryCollector.getOptionalValue();
+        if (clusters == null) {
+            return;
+        }
+        // for each cluster update the EJB client context with the current nodes in the cluster
+        for (final Registry<String, List<ClientMapping>> cluster : clusters.getRegistries()) {
+            this.addClusterNodes(receiverContext.getClientContext(), cluster.getName(), cluster.getEntries());
+        }
     }
 
     @Override
@@ -299,8 +326,20 @@ public class LocalEjbReceiver extends EJBReceiver implements Service<LocalEjbRec
         deploymentRepository.getValue().addListener(deploymentListener);
         // register ourselves as a listener to new cluster formations/removal
         @SuppressWarnings("unchecked")
-        RegistryCollector<String, List<ClientMapping>> collector = this.clusterRegistryCollector.getValue();
-        collector.addListener(this);
+        final RegistryCollector<String, List<ClientMapping>> clusters = this.clusterRegistryCollector.getValue();
+        // register for cluster formation/removal events
+        clusters.addListener(this);
+        // for each cluster add a listener for cluster node addition/removal events and also
+        // update the EJB client context with the current nodes in the cluster
+        for (final Registry<String, List<ClientMapping>> cluster : clusters.getRegistries()) {
+            this.addClusterNodes(cluster.getName(), cluster.getEntries());
+
+            final ClusterTopologyUpdateListener clusterTopologyUpdateListener = new ClusterTopologyUpdateListener(cluster);
+            cluster.addListener(clusterTopologyUpdateListener);
+            // keep track of this update listener so that we cleanup properly
+            this.clusterTopologyUpdateListeners.add(clusterTopologyUpdateListener);
+
+        }
     }
 
     @Override
@@ -314,6 +353,11 @@ public class LocalEjbReceiver extends EJBReceiver implements Service<LocalEjbRec
         @SuppressWarnings("unchecked")
         RegistryCollector<String, List<ClientMapping>> collector = this.clusterRegistryCollector.getValue();
         collector.removeListener(this);
+        // we no longer are interested in cluster topology updates, so unregister the update listener
+        for (final ClusterTopologyUpdateListener clusterTopologyUpdateListener : this.clusterTopologyUpdateListeners) {
+            clusterTopologyUpdateListener.unregisterListener();
+        }
+
     }
 
     @Override
@@ -326,18 +370,14 @@ public class LocalEjbReceiver extends EJBReceiver implements Service<LocalEjbRec
     }
 
     @Override
-    public void registryAdded(Registry<String, List<ClientMapping>> registry) {
-        final String clusterName = registry.getName();
-        for (final EJBReceiverContext receiverContext : this.contexts) {
-            final ClusterContext clusterContext = receiverContext.getClientContext().getOrCreateClusterContext(clusterName);
-            // TODO: we currently don't take into account any nodes in the cluster for Local EJB receiver.
-            // We just register the current local receiver for the cluster context which effectively means that
-            // any invocations via the LocalEJBReceiver for any clusters will be pinned to the current local node.
-            // We need to decide whether we want to create remote ejb receiver(s) for the cluster nodes, out of this
-            // local receiver
-            clusterContext.addClusterNode(this.getNodeName(), new LocalClusterNodeManager());
-        }
-        // TODO: We also should register a listener for listening to removed/added nodes from the cluster
+    public void registryAdded(Registry<String, List<ClientMapping>> cluster) {
+        final String clusterName = cluster.getName();
+        this.addClusterNodes(clusterName, cluster.getEntries());
+        // Register a listener for listening to removed/added nodes from the cluster
+        final ClusterTopologyUpdateListener clusterTopologyUpdateListener = new ClusterTopologyUpdateListener(cluster);
+        cluster.addListener(clusterTopologyUpdateListener);
+        // keep track of this update listener so that we cleanup properly
+        this.clusterTopologyUpdateListeners.add(clusterTopologyUpdateListener);
     }
 
     @Override
@@ -355,6 +395,81 @@ public class LocalEjbReceiver extends EJBReceiver implements Service<LocalEjbRec
     @SuppressWarnings("rawtypes")
     public Injector<RegistryCollector> getClusterRegistryCollectorInjector() {
         return this.clusterRegistryCollector;
+    }
+
+    private void addClusterNodes(final String clusterName, final Map<String, List<ClientMapping>> addedNodes) {
+        if (addedNodes == null || addedNodes.isEmpty()) {
+            return;
+        }
+        final List<EJBReceiverContext> receiverContexts = this.contexts;
+        for (final EJBReceiverContext receiverContext : receiverContexts) {
+            this.addClusterNodes(receiverContext.getClientContext(), clusterName, addedNodes);
+        }
+    }
+
+    private void addClusterNodes(final EJBClientContext ejbClientContext, final String clusterName, final Map<String, List<ClientMapping>> addedNodes) {
+        if (addedNodes == null || addedNodes.isEmpty()) {
+            return;
+        }
+        final EJBRemoteConnectorService ejbRemoteConnectorService = this.ejbRemoteConnectorServiceValue.getOptionalValue();
+        final Endpoint endpoint = this.endpointValue.getOptionalValue();
+        if(ejbRemoteConnectorService == null || endpoint == null) {
+            return;
+        }
+        final SocketBinding ejbRemoteConnectorSocketBinding = ejbRemoteConnectorService.getEJBRemoteConnectorSocketBinding();
+        final InetAddress bindAddress = ejbRemoteConnectorSocketBinding.getAddress();
+        final ClusterContext clusterContext = ejbClientContext.getOrCreateClusterContext(clusterName);
+        // add the nodes to the cluster context
+        for (Map.Entry<String, List<ClientMapping>> entry : addedNodes.entrySet()) {
+            final String addedNodeName = entry.getKey();
+            // if the current node is being added, then let the local receiver handle it
+            if (LocalEjbReceiver.this.getNodeName().equals(addedNodeName)) {
+                clusterContext.addClusterNodes(new LocalClusterNodeManager());
+                continue;
+            }
+            // if the EJB client context is the default server level EJB client context
+            // which can only handle local receiver and no remote receivers (due to lack of configurations
+            // to connect to them), then skip that context
+            if (this.isLocalOnlyEJBClientContext(ejbClientContext)) {
+                logger.debug("Skipping cluster node additions to EJB client context " + ejbClientContext + " since it can only handle local node");
+                continue;
+            }
+            // find a matching client mapping for our bind address
+            final List<ClientMapping> clientMappings = entry.getValue();
+            ClientMapping resolvedClientMapping = null;
+            for (final ClientMapping clientMapping : clientMappings) {
+                final InetAddress sourceNetworkAddress = clientMapping.getSourceNetworkAddress();
+                final int netMask = clientMapping.getSourceNetworkMaskBits();
+                final boolean match = NetworkUtil.belongsToNetwork(bindAddress, sourceNetworkAddress, (byte) (netMask & 0xff));
+                if (match) {
+                    resolvedClientMapping = clientMapping;
+                    logger.debug("Client mapping " + clientMapping + " matches client address " + bindAddress);
+                    break;
+                }
+            }
+            if (resolvedClientMapping == null) {
+                EjbLogger.ROOT_LOGGER.cannotAddClusterNodeDueToUnresolvableClientMapping(addedNodeName, clusterName, bindAddress);
+                continue;
+            }
+            final ClusterNodeManager remotingClusterNodeManager = new RemotingConnectionClusterNodeManager(clusterContext, endpoint, addedNodeName, resolvedClientMapping.getDestinationAddress(), resolvedClientMapping.getDestinationPort());
+            clusterContext.addClusterNodes(remotingClusterNodeManager);
+        }
+
+    }
+
+    /**
+     * Returns true if the passed {@link EJBClientContext} can have only {@link LocalEjbReceiver}s.
+     * Else returns false
+     *
+     * @param ejbClientContext The EJB client context.
+     * @return
+     */
+    private boolean isLocalOnlyEJBClientContext(final EJBClientContext ejbClientContext) {
+        final EJBClientConfiguration clientConfiguration = ejbClientContext.getEJBClientConfiguration();
+        if (clientConfiguration instanceof DefaultEjbClientContextService.LocalOnlyEjbClientConfiguration) {
+            return true;
+        }
+        return false;
     }
 
     private static class ImmediateResultProducer implements EJBReceiverInvocationContext.ResultProducer {
@@ -424,6 +539,7 @@ public class LocalEjbReceiver extends EJBReceiver implements Service<LocalEjbRec
             }
         });
     }
+
     private static void clearSecurityContextOnAssociation() {
         AccessController.doPrivileged(new PrivilegedAction<Void>() {
 
@@ -433,5 +549,43 @@ public class LocalEjbReceiver extends EJBReceiver implements Service<LocalEjbRec
                 return null;
             }
         });
+    }
+
+    private class ClusterTopologyUpdateListener implements Registry.Listener<String, List<ClientMapping>> {
+
+        private final Registry<String, List<ClientMapping>> cluster;
+
+        ClusterTopologyUpdateListener(final Registry<String, List<ClientMapping>> cluster) {
+            this.cluster = cluster;
+        }
+
+        @Override
+        public void addedEntries(Map<String, List<ClientMapping>> addedNodes) {
+            LocalEjbReceiver.this.addClusterNodes(this.cluster.getName(), addedNodes);
+        }
+
+        @Override
+        public void updatedEntries(Map<String, List<ClientMapping>> updated) {
+            // We don't support client mapping updates just yet
+        }
+
+        @Override
+        public void removedEntries(Set<String> removedNodes) {
+            final List<EJBReceiverContext> receiverContexts = LocalEjbReceiver.this.contexts;
+            for (final EJBReceiverContext receiverContext : receiverContexts) {
+                final ClusterContext clusterContext = receiverContext.getClientContext().getClusterContext(this.cluster.getName());
+                if (clusterContext == null) {
+                    continue;
+                }
+                // remove the nodes from the cluster context
+                for (final String removedNodeName : removedNodes) {
+                    clusterContext.removeClusterNode(removedNodeName);
+                }
+            }
+        }
+
+        private void unregisterListener() {
+            this.cluster.removeListener(this);
+        }
     }
 }

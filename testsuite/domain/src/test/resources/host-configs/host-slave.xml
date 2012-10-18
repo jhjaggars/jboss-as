@@ -43,7 +43,7 @@
             <security-realm name="ApplicationRealm">
                 <authentication>
                     <local default-user="$local" allowed-users="*" />
-                    <properties path="application-users.properties" relative-to="jboss.domain.config.dir" />
+                    <properties path="domain/configuration/application-users.properties" relative-to="jboss.home.dir" />
                 </authentication>
             </security-realm>
         </security-realms>
@@ -90,7 +90,7 @@
        </jvm>
  	</jvms>
 
-    <servers>
+    <servers directory-grouping="by-type">
         <server name="main-three" group="main-server-group">
             <socket-bindings socket-binding-group="standard-sockets" port-offset="350"/>
             <jvm name="default"/>

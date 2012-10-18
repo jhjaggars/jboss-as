@@ -21,7 +21,7 @@
   -->
 <jboss-ejb-client xmlns="urn:jboss:ejb-client:1.2">
     <!-- A 1 second invocation timeout which will be tested in EJBClientDescriptorTestCase -->
-    <client-context invocation-timeout="1000">
+    <client-context invocation-timeout="1000" deployment-node-selector="org.jboss.as.test.integration.ejb.client.descriptor.DummyDeploymentNodeSelector">
         <ejb-receivers exclude-local-receiver="true">
             <remoting-ejb-receiver outbound-connection-ref="ejb-client-descriptor-test-remote-outbound-connection"
                     connect-timeout="7000">

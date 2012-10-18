@@ -51,6 +51,7 @@ import org.jboss.logging.MessageBundle;
 import org.jboss.logging.Messages;
 import org.jboss.metadata.ejb.spec.MethodParametersMetaData;
 import org.jboss.msc.service.ServiceController;
+import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.StartException;
 
 /**
@@ -2074,4 +2075,15 @@ public interface EjbMessages {
     // STOP!!! Don't add message ids greater that 14599!!! If you need more first check what EjbLogger is
     // using and take more (lower) numbers from the available range for this module. If the range for the module is
     // all used, go to https://community.jboss.org/docs/DOC-16810 and allocate another block for this subsystem
+
+
+    // *Exception messages* greater >= 14225 start here.
+    @Message(id = 14225, value = "Could not create an instance of deployment node selector %s")
+    DeploymentUnitProcessingException failedToCreateDeploymentNodeSelector(@Cause Exception e, String deploymentNodeSelectorClassName);
+
+    // Don't add exception messages greater that 14299!!! If you need more go to
+    // https://community.jboss.org/docs/DOC-16810 and allocate another block for this subsystem
+
+    @Message(id = 14226, value = "Could not lookup service %s")
+    IllegalStateException serviceNotFound(ServiceName serviceName);
 }
