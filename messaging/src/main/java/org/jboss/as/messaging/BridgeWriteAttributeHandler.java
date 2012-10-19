@@ -22,12 +22,12 @@
 
 package org.jboss.as.messaging;
 
-import java.util.EnumSet;
+import static org.jboss.as.controller.OperationContext.Stage.MODEL;
 
-import org.jboss.as.controller.AttributeDefinition;
+import org.jboss.as.controller.OperationContext;
+import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.ReloadRequiredWriteAttributeHandler;
-import org.jboss.as.controller.registry.AttributeAccess;
-import org.jboss.as.controller.registry.ManagementResourceRegistration;
+import org.jboss.dmr.ModelNode;
 
 /**
  * Write attribute handler for attributes that update a bridge resource.
@@ -39,16 +39,13 @@ public class BridgeWriteAttributeHandler extends ReloadRequiredWriteAttributeHan
     public static final BridgeWriteAttributeHandler INSTANCE = new BridgeWriteAttributeHandler();
 
     private BridgeWriteAttributeHandler() {
-        super(CommonAttributes.BRIDGE_ATTRIBUTES);
+        super(BridgeDefinition.ATTRIBUTES);
     }
 
-    public void registerAttributes(final ManagementResourceRegistration registry, boolean registerRuntimeOnly) {
-        final EnumSet<AttributeAccess.Flag> flags = EnumSet.of(AttributeAccess.Flag.RESTART_ALL_SERVICES);
-        for (AttributeDefinition attr : CommonAttributes.BRIDGE_ATTRIBUTES) {
-            if (registerRuntimeOnly || !attr.getFlags().contains(AttributeAccess.Flag.STORAGE_RUNTIME)) {
-                registry.registerReadWriteAttribute(attr.getName(), null, this, flags);
-            }
-        }
-    }
+    @Override
+    public void execute(OperationContext context, ModelNode operation) throws OperationFailedException {
+        context.addStep(new AlternativeAttributeCheckHandler(BridgeDefinition.ATTRIBUTES), MODEL);
 
+        super.execute(context, operation);
+    }
 }

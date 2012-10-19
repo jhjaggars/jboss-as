@@ -61,12 +61,12 @@ public abstract class BaseOperationCommand extends CommandHandlerWithHelp implem
     private Boolean addressAvailable;
     private String requiredType;
 
-    protected ArgumentWithValue headers;
+    protected final ArgumentWithValue headers;
 
     public BaseOperationCommand(CommandContext ctx, String command, boolean connectionRequired) {
         super(command, connectionRequired);
         ctx.addEventListener(this);
-        headers = new ArgumentWithValue(this, HeadersCompleter.INSTANCE, new HeadersArgumentValueConverter(ctx), "--headers");
+        headers = new ArgumentWithValue(this, HeadersCompleter.INSTANCE, HeadersArgumentValueConverter.INSTANCE, "--headers");
     }
 
     /**
@@ -199,7 +199,6 @@ public abstract class BaseOperationCommand extends CommandHandlerWithHelp implem
     protected void doHandle(CommandContext ctx) throws CommandLineException {
 
         final ModelNode request = buildRequest(ctx);
-        addHeaders(ctx, request);
 
         final ModelControllerClient client = ctx.getModelControllerClient();
         final ModelNode response;
@@ -216,6 +215,11 @@ public abstract class BaseOperationCommand extends CommandHandlerWithHelp implem
 
     @Override
     public ModelNode buildRequest(CommandContext ctx) throws CommandFormatException {
+        recognizeArguments(ctx);
+        return buildRequestWOValidation(ctx);
+    }
+
+    protected ModelNode buildRequestWOValidation(CommandContext ctx) throws CommandFormatException {
         final ModelNode request = buildRequestWithoutHeaders(ctx);
         addHeaders(ctx, request);
         return request;
@@ -228,7 +232,7 @@ public abstract class BaseOperationCommand extends CommandHandlerWithHelp implem
             return;
         }
         final String headersValue = headers.getValue(ctx.getParsedCommandLine());
-        final ModelNode headersNode = headers.getValueConverter().fromString(headersValue);
+        final ModelNode headersNode = headers.getValueConverter().fromString(ctx, headersValue);
         final ModelNode opHeaders = request.get(Util.OPERATION_HEADERS);
         opHeaders.set(headersNode);
     }

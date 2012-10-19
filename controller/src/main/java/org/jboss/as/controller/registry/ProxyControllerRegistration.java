@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.jboss.as.controller.AttributeDefinition;
+import org.jboss.as.controller.OperationDefinition;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.ProxyController;
@@ -113,6 +114,11 @@ final class ProxyControllerRegistration extends AbstractResourceRegistration imp
     }
 
     @Override
+    public void registerOperationHandler(OperationDefinition definition, OperationStepHandler handler, boolean inherited) {
+        throw alreadyRegistered();
+    }
+
+    @Override
     public void unregisterOperationHandler(final String operationName) {
 
     }
@@ -164,7 +170,7 @@ final class ProxyControllerRegistration extends AbstractResourceRegistration imp
 
     @Override
     public void unregisterAttribute(String attributeName) {
-        alreadyRegistered();
+        throw alreadyRegistered();
     }
 
     @Override
@@ -174,6 +180,16 @@ final class ProxyControllerRegistration extends AbstractResourceRegistration imp
 
     @Override
     public void unregisterProxyController(final PathElement address) throws IllegalArgumentException {
+        throw alreadyRegistered();
+    }
+
+    @Override
+    public void registerAlias(PathElement address, AliasEntry alias) {
+        throw alreadyRegistered();
+    }
+
+    @Override
+    public void unregisterAlias(PathElement address) {
         throw alreadyRegistered();
     }
 
@@ -241,5 +257,15 @@ final class ProxyControllerRegistration extends AbstractResourceRegistration imp
 
     private IllegalArgumentException alreadyRegistered() {
         return MESSAGES.proxyHandlerAlreadyRegistered(getLocationString());
+    }
+
+    @Override
+    public AliasEntry getAliasEntry() {
+        return null;
+    }
+
+    @Override
+    protected void registerAlias(PathElement address, AliasEntry alias, AbstractResourceRegistration target) {
+        throw MESSAGES.proxyHandlerAlreadyRegistered(getLocationString());
     }
 }

@@ -1,5 +1,11 @@
 package org.jboss.as.messaging.deployment;
 
+import static org.jboss.as.messaging.CommonAttributes.DURABLE;
+import static org.jboss.as.messaging.CommonAttributes.HORNETQ_SERVER;
+import static org.jboss.as.messaging.CommonAttributes.JMS_QUEUE;
+import static org.jboss.as.messaging.CommonAttributes.JMS_TOPIC;
+import static org.jboss.as.messaging.CommonAttributes.SELECTOR;
+
 import java.util.List;
 
 import org.jboss.as.controller.PathAddress;
@@ -7,13 +13,14 @@ import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
 import org.jboss.as.controller.registry.Resource;
+import org.jboss.as.messaging.CommonAttributes;
 import org.jboss.as.messaging.MessagingExtension;
 import org.jboss.as.messaging.MessagingServices;
 import org.jboss.as.messaging.jms.JMSQueueAdd;
-import org.jboss.as.messaging.jms.JMSTopicAdd;
 import org.jboss.as.messaging.jms.JMSQueueConfigurationRuntimeHandler;
+import org.jboss.as.messaging.jms.JMSServices;
+import org.jboss.as.messaging.jms.JMSTopicAdd;
 import org.jboss.as.messaging.jms.JMSTopicConfigurationRuntimeHandler;
-import org.jboss.as.messaging.jms.JndiEntriesAttribute;
 import org.jboss.as.server.deployment.DeploymentModelUtils;
 import org.jboss.as.server.deployment.DeploymentPhaseContext;
 import org.jboss.as.server.deployment.DeploymentUnit;
@@ -21,13 +28,6 @@ import org.jboss.as.server.deployment.DeploymentUnitProcessingException;
 import org.jboss.as.server.deployment.DeploymentUnitProcessor;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.ServiceName;
-
-import static org.jboss.as.messaging.CommonAttributes.DURABLE;
-import static org.jboss.as.messaging.CommonAttributes.ENTRIES;
-import static org.jboss.as.messaging.CommonAttributes.HORNETQ_SERVER;
-import static org.jboss.as.messaging.CommonAttributes.JMS_QUEUE;
-import static org.jboss.as.messaging.CommonAttributes.JMS_TOPIC;
-import static org.jboss.as.messaging.CommonAttributes.SELECTOR;
 
 /**
  * Processor that handles the installation of the messaging subsystems deployable XML
@@ -46,9 +46,9 @@ public class MessagingXmlInstallDeploymentUnitProcessor implements DeploymentUni
             for (final JmsDestination topic : parseResult.getTopics()) {
                 final ServiceName hqServiceName = MessagingServices.getHornetQServiceName(topic.getServer());
                 String[] jndiBindings = null;
-                if (topic.getDestination().hasDefined(ENTRIES.getName())) {
-                    final ModelNode entries = topic.getDestination().resolve().get(ENTRIES.getName());
-                    jndiBindings = JndiEntriesAttribute.getJndiBindings(entries);
+                if (topic.getDestination().hasDefined(CommonAttributes.DESTINATION_ENTRIES.getName())) {
+                    final ModelNode entries = topic.getDestination().resolve().get(CommonAttributes.DESTINATION_ENTRIES.getName());
+                    jndiBindings = JMSServices.getJndiBindings(entries);
                 }
                 JMSTopicAdd.INSTANCE.installServices(null, null, topic.getName(), hqServiceName, phaseContext.getServiceTarget(), jndiBindings);
 
@@ -67,9 +67,9 @@ public class MessagingXmlInstallDeploymentUnitProcessor implements DeploymentUni
                 final ServiceName hqServiceName = MessagingServices.getHornetQServiceName(queue.getServer());
                 String[] jndiBindings = null;
                 final ModelNode destination = queue.getDestination();
-                if (destination.hasDefined(ENTRIES.getName())) {
-                    final ModelNode entries = destination.resolve().get(ENTRIES.getName());
-                    jndiBindings = JndiEntriesAttribute.getJndiBindings(entries);
+                if (destination.hasDefined(CommonAttributes.DESTINATION_ENTRIES.getName())) {
+                    final ModelNode entries = destination.resolve().get(CommonAttributes.DESTINATION_ENTRIES.getName());
+                    jndiBindings = JMSServices.getJndiBindings(entries);
                 }
                 final String selector = destination.hasDefined(SELECTOR.getName()) ? destination.get(SELECTOR.getName()).resolve().asString() : null;
                 final boolean durable = destination.hasDefined(DURABLE.getName()) ? destination.get(DURABLE.getName()).resolve().asBoolean() : false;

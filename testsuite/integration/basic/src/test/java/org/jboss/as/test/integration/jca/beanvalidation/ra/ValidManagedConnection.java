@@ -37,9 +37,9 @@ import javax.security.auth.Subject;
 import javax.transaction.xa.XAResource;
 
 /**
+ * Managed connection
  * 
- * 
- * @version $Revision: $
+ * @author <a href="mailto:vrastsel@redhat.com">Vladimir Rastseluev</a> 
  */
 public class ValidManagedConnection implements ManagedConnection {
     /** The logwriter */

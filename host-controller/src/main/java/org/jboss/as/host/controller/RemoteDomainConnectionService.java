@@ -25,20 +25,11 @@ package org.jboss.as.host.controller;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.DOMAIN_MODEL;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.EXTENSION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.FAILURE_DESCRIPTION;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.MANAGEMENT_MAJOR_VERSION;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.MANAGEMENT_MINOR_VERSION;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.NAME;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OPERATION_HEADERS;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OUTCOME;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.PRODUCT_NAME;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.PRODUCT_VERSION;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RELEASE_CODENAME;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RELEASE_VERSION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUCCESS;
-import org.jboss.as.controller.extension.ExtensionRegistry;
-import org.jboss.as.controller.extension.SubsystemInformation;
 import static org.jboss.as.host.controller.HostControllerLogger.ROOT_LOGGER;
 import static org.jboss.as.host.controller.HostControllerMessages.MESSAGES;
 
@@ -47,12 +38,13 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 
 import javax.net.ssl.SSLHandshakeException;
@@ -64,15 +56,19 @@ import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.controller.client.Operation;
 import org.jboss.as.controller.client.OperationAttachments;
 import org.jboss.as.controller.client.OperationMessageHandler;
+import org.jboss.as.controller.extension.ExtensionRegistry;
 import org.jboss.as.controller.remote.ExistingChannelModelControllerClient;
 import org.jboss.as.controller.remote.TransactionalProtocolOperationHandler;
 import org.jboss.as.domain.controller.LocalHostControllerInfo;
 import org.jboss.as.domain.controller.SlaveRegistrationException;
+import org.jboss.as.domain.controller.operations.ApplyExtensionsHandler;
 import org.jboss.as.domain.controller.operations.ApplyRemoteMasterDomainModelHandler;
 import org.jboss.as.domain.management.SecurityRealm;
 import org.jboss.as.domain.management.security.SecurityRealmService;
+import org.jboss.as.host.controller.ignored.IgnoredDomainResourceRegistry;
 import org.jboss.as.host.controller.mgmt.DomainControllerProtocol;
 import org.jboss.as.host.controller.mgmt.DomainRemoteFileRequestAndHandler;
+import org.jboss.as.host.controller.mgmt.HostInfo;
 import org.jboss.as.network.NetworkUtils;
 import org.jboss.as.protocol.ProtocolChannelClient;
 import org.jboss.as.protocol.StreamUtils;
@@ -86,7 +82,6 @@ import org.jboss.as.repository.HostFileRepository;
 import org.jboss.as.repository.RemoteFileRequestAndHandler.CannotCreateLocalDirectoryException;
 import org.jboss.as.repository.RemoteFileRequestAndHandler.DidNotReadEntireFileException;
 import org.jboss.as.version.ProductConfig;
-import org.jboss.as.version.Version;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.Service;
 import org.jboss.msc.service.ServiceBuilder;
@@ -103,6 +98,7 @@ import org.jboss.threads.AsyncFuture;
 import org.jboss.threads.AsyncFutureTask;
 import org.jboss.threads.JBossThreadFactory;
 import org.xnio.OptionMap;
+import org.xnio.Options;
 
 /**
  * Establishes the connection from a slave {@link org.jboss.as.domain.controller.DomainController} to the master
@@ -112,8 +108,20 @@ import org.xnio.OptionMap;
  */
 public class RemoteDomainConnectionService implements MasterDomainControllerClient, Service<MasterDomainControllerClient> {
 
+    public static final String DOMAIN_CONNECTION_ID = "domain-connection-id";
+
+    private static final int CONNECTION_TIMEOUT_DEFAULT = 30000;
+    private static final String CONNECTION_TIMEOUT_PROPERTY = "jboss.host.domain.connection.timeout";
+    private static final int CONNECTION_TIMEOUT = getSystemProperty(CONNECTION_TIMEOUT_PROPERTY, CONNECTION_TIMEOUT_DEFAULT);
+
+    private static final ModelNode APPLY_EXTENSIONS = new ModelNode();
     private static final ModelNode APPLY_DOMAIN_MODEL = new ModelNode();
     static {
+        APPLY_EXTENSIONS.get(OP).set(ApplyExtensionsHandler.OPERATION_NAME);
+        APPLY_EXTENSIONS.get(OPERATION_HEADERS, "execute-for-coordinator").set(true);
+        APPLY_EXTENSIONS.get(OP_ADDR).setEmptyList();
+        APPLY_EXTENSIONS.protect();
+
         APPLY_DOMAIN_MODEL.get(OP).set(ApplyRemoteMasterDomainModelHandler.OPERATION_NAME);
         //FIXME this makes the op work after boot (i.e. slave connects to restarted master), but does not make the slave resync the servers
         APPLY_DOMAIN_MODEL.get(OPERATION_HEADERS, "execute-for-coordinator").set(true);
@@ -126,6 +134,7 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
     private final ProductConfig productConfig;
     private final LocalHostControllerInfo localHostInfo;
     private final RemoteFileRepository remoteFileRepository;
+    private final IgnoredDomainResourceRegistry ignoredDomainResourceRegistry;
 
     /** Used to invoke ModelController ops on the master */
     private volatile ModelControllerClient masterProxy;
@@ -134,26 +143,32 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
     private final InjectedValue<Endpoint> endpointInjector = new InjectedValue<Endpoint>();
     private final InjectedValue<SecurityRealm> securityRealmInjector = new InjectedValue<SecurityRealm>();
 
-    private final ThreadFactory threadFactory = new JBossThreadFactory(new ThreadGroup("domain-connection-threads"), Boolean.FALSE, null, "%G - %t", null, null, AccessController.getContext());
-    private final ExecutorService executor = Executors.newCachedThreadPool(threadFactory);
+    private ExecutorService executor;
+    private ScheduledExecutorService scheduledExecutorService;
 
     private RemoteDomainConnection connection;
     private ManagementChannelHandler handler;
 
-    private RemoteDomainConnectionService(final ModelController controller, final ExtensionRegistry extensionRegistry, final LocalHostControllerInfo localHostControllerInfo, final ProductConfig productConfig, final RemoteFileRepository remoteFileRepository){
+    private RemoteDomainConnectionService(final ModelController controller, final ExtensionRegistry extensionRegistry,
+                                          final LocalHostControllerInfo localHostControllerInfo, final ProductConfig productConfig,
+                                          final RemoteFileRepository remoteFileRepository,
+                                          final IgnoredDomainResourceRegistry ignoredDomainResourceRegistry){
         this.controller = controller;
         this.extensionRegistry = extensionRegistry;
         this.productConfig = productConfig;
         this.localHostInfo = localHostControllerInfo;
         this.remoteFileRepository = remoteFileRepository;
         remoteFileRepository.setRemoteFileRepositoryExecutor(remoteFileRepositoryExecutor);
+        this.ignoredDomainResourceRegistry = ignoredDomainResourceRegistry;
     }
 
     public static Future<MasterDomainControllerClient> install(final ServiceTarget serviceTarget, final ModelController controller, final ExtensionRegistry extensionRegistry,
                                                                final LocalHostControllerInfo localHostControllerInfo, final ProductConfig productConfig,
-                                                               final String securityRealm, final RemoteFileRepository remoteFileRepository) {
-        RemoteDomainConnectionService service = new RemoteDomainConnectionService(controller, extensionRegistry, localHostControllerInfo, productConfig, remoteFileRepository);
-        ServiceBuilder builder = serviceTarget.addService(MasterDomainControllerClient.SERVICE_NAME, service)
+                                                               final String securityRealm, final RemoteFileRepository remoteFileRepository,
+                                                               final IgnoredDomainResourceRegistry ignoredDomainResourceRegistry) {
+        RemoteDomainConnectionService service = new RemoteDomainConnectionService(controller, extensionRegistry, localHostControllerInfo,
+                productConfig, remoteFileRepository, ignoredDomainResourceRegistry);
+        ServiceBuilder<MasterDomainControllerClient> builder = serviceTarget.addService(MasterDomainControllerClient.SERVICE_NAME, service)
                 .addDependency(ManagementRemotingServices.MANAGEMENT_ENDPOINT, Endpoint.class, service.endpointInjector)
                 .setInitialMode(ServiceController.Mode.ACTIVE);
 
@@ -169,15 +184,13 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
     /** {@inheritDoc} */
     public synchronized void register() throws IOException {
         boolean connected = false;
-        //This takes about 30 seconds should be enough to start up master if booted at the same time
-        final long timeout = 30000;
+        final long timeout = CONNECTION_TIMEOUT;
         final long endTime = System.currentTimeMillis() + timeout;
         int retries = 0;
         while (!connected) {
-            RemoteDomainConnection.RegistrationResult result = null;
             try {
                 // Try to connect to the domain controller
-                result = connection.connect();
+                connection.connect();
                 connected = true;
             } catch (IOException e) {
                 Throwable cause = e;
@@ -187,6 +200,8 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
                         throw MESSAGES.authenticationFailureUnableToConnect(cause);
                     } else if (cause instanceof SSLHandshakeException) {
                         throw MESSAGES.sslFailureUnableToConnect(cause);
+                    } else if (cause instanceof SlaveRegistrationException) {
+                        throw new IOException(cause);
                     }
                 }
                 if (System.currentTimeMillis() > endTime) {
@@ -198,15 +213,6 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
                     retries++;
                 } catch (InterruptedException ie) {
                     throw MESSAGES.connectionToMasterInterrupted();
-                }
-            }
-            // If it's not ok
-            if(result != null && ! result.isOK()) {
-                switch (result.getCode()) {
-                    case HOST_ALREADY_EXISTS:
-                        throw new HostAlreadyExistsException(result.getMessage());
-                    default:
-                        throw new IOException(new SlaveRegistrationException(result.getCode(), result.getMessage()).marshal());
                 }
             }
         }
@@ -269,9 +275,17 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
         final RemoteDomainConnection connection;
         final ManagementChannelHandler handler;
         try {
+
+            ThreadFactory threadFactory = new JBossThreadFactory(new ThreadGroup("domain-connection-threads"), Boolean.FALSE, null, "%G - %t", null, null, AccessController.getContext());
+            this.executor = Executors.newCachedThreadPool(threadFactory);
+            ThreadFactory scheduledThreadFactory = new JBossThreadFactory(new ThreadGroup("domain-connection-pinger-threads"), Boolean.TRUE, null, "%G - %t", null, null, AccessController.getContext());
+            this.scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(scheduledThreadFactory);
+
             // Include additional local host information when registering at the DC
-            final ModelNode hostInfo = createLocalHostHostInfo(localHostInfo, productConfig);
-            final OptionMap options = OptionMap.EMPTY;
+            final ModelNode hostInfo = HostInfo.createLocalHostHostInfo(localHostInfo, productConfig, ignoredDomainResourceRegistry);
+            final OptionMap options = OptionMap.builder().set(RemotingOptions.HEARTBEAT_INTERVAL, 15000)
+                    .set(Options.READ_TIMEOUT, 45000)
+                    .set(RemotingOptions.RECEIVE_WINDOW_SIZE, ProtocolChannelClient.Configuration.WINDOW_SIZE).getMap();
 
             // Gather the required information to connect to the remote DC
             final ProtocolChannelClient.Configuration configuration = new ProtocolChannelClient.Configuration();
@@ -282,7 +296,7 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
             final SecurityRealm realm = securityRealmInjector.getOptionalValue();
             // Create the remote domain channel strategy
             connection = new RemoteDomainConnection(localHostInfo.getLocalHostName(), hostInfo, configuration, realm,
-                    localHostInfo.getRemoteDomainControllerUsername(), executor,
+                    localHostInfo.getRemoteDomainControllerUsername(), executor, scheduledExecutorService,
                     new RemoteDomainConnection.HostRegistrationCallback() {
 
                 @Override
@@ -302,7 +316,7 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
                 }
             });
             // Setup the management channel handler
-            handler = connection.getHandler();
+            handler = connection.getChannelHandler();
         } catch (Exception e) {
             throw new StartException(e);
         } finally {
@@ -326,7 +340,7 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
             e.get("domain-resource-address").add(EXTENSION, extension.asString());
             bootOperations.add(e);
         }
-        final ModelNode operation = APPLY_DOMAIN_MODEL.clone();
+        final ModelNode operation = APPLY_EXTENSIONS.clone();
         operation.get(DOMAIN_MODEL).set(bootOperations);
         final ModelNode result = controller.execute(operation, OperationMessageHandler.logging, ModelController.OperationTransactionControl.COMMIT, OperationAttachments.EMPTY);
         if (!SUCCESS.equals(result.get(OUTCOME).asString())) {
@@ -362,8 +376,26 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
 
     /** {@inheritDoc} */
     @Override
-    public synchronized void stop(StopContext context) {
-        StreamUtils.safeClose(connection);
+    public synchronized void stop(final StopContext context) {
+
+        context.asynchronous();
+        Thread executorShutdown = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    StreamUtils.safeClose(connection);
+                    scheduledExecutorService.shutdownNow();
+                } finally {
+                    try {
+                        executor.shutdown();
+                    } finally {
+                        context.complete();
+                    }
+                }
+            }
+        }, RemoteDomainConnectionService.class.getSimpleName() + " ExecutorService Shutdown Thread");
+
+        executorShutdown.start();
     }
 
     /** {@inheritDoc} */
@@ -446,14 +478,18 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
 
         @Override
         public final File[] getDeploymentFiles(byte[] deploymentHash) {
-            String hex = deploymentHash == null ? "" : HashUtil.bytesToHexString(deploymentHash);
-            return getFile(hex, DomainControllerProtocol.PARAM_ROOT_ID_DEPLOYMENT).listFiles();
+            final File root = getDeploymentRoot(deploymentHash);
+            return root.listFiles();
         }
 
         @Override
         public File getDeploymentRoot(byte[] deploymentHash) {
             String hex = deploymentHash == null ? "" : HashUtil.bytesToHexString(deploymentHash);
-            return getFile(hex, DomainControllerProtocol.PARAM_ROOT_ID_DEPLOYMENT);
+            final File file = localFileRepository.getDeploymentRoot(deploymentHash);
+            if(! file.exists()) {
+                return getFile(hex, DomainControllerProtocol.PARAM_ROOT_ID_DEPLOYMENT);
+            }
+            return file;
         }
 
         private File getFile(final String relativePath, final byte repoId) {
@@ -470,7 +506,7 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
         }
     }
 
-    static interface RemoteFileRepositoryExecutor {
+    interface RemoteFileRepositoryExecutor {
         File getFile(final String relativePath, final byte repoId, HostFileRepository localFileRepository);
     }
 
@@ -499,39 +535,18 @@ public class RemoteDomainConnectionService implements MasterDomainControllerClie
         }
     }
 
-    private static class HostAlreadyExistsException extends IOException {
-
-        private static final long serialVersionUID = 1L;
-
-        public HostAlreadyExistsException(String msg) {
-            super(msg);
+    private static int getSystemProperty(final String name, final int defaultValue) {
+        final SecurityManager sm = System.getSecurityManager();
+        if(sm == null) {
+            return Integer.getInteger(name, defaultValue);
+        } else {
+            return AccessController.doPrivileged( new PrivilegedAction<Integer>() {
+                @Override
+                public Integer run() {
+                    return Integer.getInteger(name, defaultValue);
+                }
+            });
         }
-
-    }
-
-    /**
-     * Create the metadata which gets send to the DC when registering.
-     *
-     * @param hostInfo the local host info
-     * @param productConfig the product config
-     * @return the host info
-     */
-    static ModelNode createLocalHostHostInfo(final LocalHostControllerInfo hostInfo, final ProductConfig productConfig) {
-        final ModelNode info = new ModelNode();
-        info.get(NAME).set(hostInfo.getLocalHostName());
-        info.get(RELEASE_VERSION).set(Version.AS_VERSION);
-        info.get(RELEASE_CODENAME).set(Version.AS_RELEASE_CODENAME);
-        info.get(MANAGEMENT_MAJOR_VERSION).set(Version.MANAGEMENT_MAJOR_VERSION);
-        info.get(MANAGEMENT_MINOR_VERSION).set(Version.MANAGEMENT_MINOR_VERSION);
-        final String productName = productConfig.getProductName();
-        final String productVersion = productConfig.getProductVersion();
-        if(productName != null) {
-            info.get(PRODUCT_NAME).set(productName);
-        }
-        if(productVersion != null) {
-            info.get(PRODUCT_VERSION).set(productVersion);
-        }
-        return info;
     }
 
 }

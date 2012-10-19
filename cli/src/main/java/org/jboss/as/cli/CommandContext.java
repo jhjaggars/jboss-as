@@ -104,6 +104,14 @@ public interface CommandContext {
     Object get(String key);
 
     /**
+     * Removes the value the key was associated with using the set(key, value) method above.
+     * If the key isn't associated with any value, the method will return null.
+     * @param key the key to be removed
+     * @return the value associated with the key or null, if the key wasn't associated with any non-null value.
+     */
+    Object remove(String key);
+
+    /**
      * Returns the model controller client or null if it hasn't been initialized.
      * @return the model controller client or null if it hasn't been initialized.
      */
@@ -311,4 +319,28 @@ public interface CommandContext {
      * @param dir  the new default directory
      */
     void setCurrentDir(File dir);
+
+    /**
+     * Command argument or operation parameter values may contain system properties.
+     * If this method returns true then the CLI will try to resolve
+     * the system properties before sending the operation request to the controller.
+     * Otherwise, the resolution will happen on the server side.
+     *
+     * @return true if system properties in the operation parameter values
+     * should be resolved by the CLI before the request is sent to the controller,
+     * false if system properties should be resolved on the server side.
+     */
+    boolean isResolveParameterValues();
+
+    /**
+     * Command argument or operation parameter values may contain system properties.
+     * If this property is set to true then the CLI will try to resolve
+     * the system properties before sending the operation request to the controller.
+     * Otherwise, the resolution will happen on the server side.
+     *
+     * @param resolve  true if system properties in the operation parameter values
+     * should be resolved by the CLI before the request is sent to the controller,
+     * false if system properties should be resolved on the server side.
+     */
+    void setResolveParameterValues(boolean resolve);
 }

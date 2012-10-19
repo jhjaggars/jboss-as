@@ -24,8 +24,10 @@ package org.jboss.as.osgi.parser;
 import static org.jboss.as.osgi.OSGiLogger.LOGGER;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.ServiceLoader;
 
 import org.jboss.as.controller.AbstractBoottimeAddStepHandler;
 import org.jboss.as.controller.OperationContext;
@@ -34,19 +36,25 @@ import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.ServiceVerificationHandler;
 import org.jboss.as.controller.registry.Resource;
-import org.jboss.as.osgi.deployment.BundleContextBindingProcessor;
+import org.jboss.as.osgi.SubsystemExtension;
+import org.jboss.as.osgi.deployment.BundleActivateProcessor;
 import org.jboss.as.osgi.deployment.BundleDeploymentProcessor;
 import org.jboss.as.osgi.deployment.BundleInstallProcessor;
+import org.jboss.as.osgi.deployment.BundleResolveProcessor;
+import org.jboss.as.osgi.deployment.BundleSubDeploymentMarkingProcessor;
+import org.jboss.as.osgi.deployment.DeferredPhaseProcessor;
+import org.jboss.as.osgi.deployment.FrameworkActivateProcessor;
 import org.jboss.as.osgi.deployment.ModuleRegisterProcessor;
 import org.jboss.as.osgi.deployment.OSGiBundleInfoParseProcessor;
+import org.jboss.as.osgi.deployment.OSGiComponentParseProcessor;
 import org.jboss.as.osgi.deployment.OSGiManifestStructureProcessor;
 import org.jboss.as.osgi.deployment.OSGiXServiceParseProcessor;
 import org.jboss.as.osgi.management.OSGiRuntimeResource;
 import org.jboss.as.osgi.parser.SubsystemState.Activation;
-import org.jboss.as.osgi.service.BundleInstallIntegration;
+import org.jboss.as.osgi.service.FrameworkActivator;
 import org.jboss.as.osgi.service.FrameworkBootstrapService;
-import org.jboss.as.osgi.service.PersistentBundlesIntegration;
-import org.jboss.as.osgi.service.PersistentBundlesIntegration.InitialDeploymentTracker;
+import org.jboss.as.osgi.service.InitialDeploymentTracker;
+import org.jboss.as.osgi.service.ModuleRegistrationTracker;
 import org.jboss.as.server.AbstractDeploymentChainStep;
 import org.jboss.as.server.DeploymentProcessorTarget;
 import org.jboss.as.server.deployment.Phase;
@@ -78,44 +86,68 @@ class OSGiSubsystemAdd extends AbstractBoottimeAddStepHandler {
         return resource;
     }
 
+    @Override
     protected void populateModel(final ModelNode operation, final ModelNode model) {
         if (operation.has(ModelConstants.ACTIVATION)) {
             model.get(ModelConstants.ACTIVATION).set(operation.get(ModelConstants.ACTIVATION));
         }
     }
 
+    @Override
     protected void performBoottime(final OperationContext context, final ModelNode operation, final ModelNode model,
             final ServiceVerificationHandler verificationHandler, final List<ServiceController<?>> newControllers) {
 
         LOGGER.infoActivatingSubsystem();
 
+        final Activation activation = getActivationMode(operation);
         final ServiceTarget serviceTarget = context.getServiceTarget();
-        final Activation activationMode = getActivationMode(operation);
-        final InitialDeploymentTracker deploymentTracker = new InitialDeploymentTracker(context, activationMode);
+        final InitialDeploymentTracker deploymentTracker = new InitialDeploymentTracker(context, verificationHandler);
+        final ModuleRegistrationTracker registrationTracker = new ModuleRegistrationTracker();
+
+        // Collect the subsystem extensions
+        final List<SubsystemExtension> extensions = new ArrayList<SubsystemExtension>();
+        final Iterator<SubsystemExtension> services = ServiceLoader.load(SubsystemExtension.class, getClass().getClassLoader()).iterator();
+        while(services.hasNext()) {
+            extensions.add(services.next());
+        }
+
+        // Create the framework activator
+        FrameworkActivator.create(serviceTarget, activation == Activation.LAZY);
 
         context.addStep(new OperationStepHandler() {
+            @Override
             public void execute(OperationContext context, ModelNode operation) throws OperationFailedException {
-                newControllers.add(BundleInstallIntegration.addService(serviceTarget));
-                newControllers.add(FrameworkBootstrapService.addService(serviceTarget, resource, verificationHandler));
-                newControllers.add(PersistentBundlesIntegration.addService(serviceTarget, deploymentTracker));
-                context.completeStep();
+                newControllers.add(FrameworkBootstrapService.addService(serviceTarget, resource, extensions, verificationHandler));
+                newControllers.add(registrationTracker.install(serviceTarget, verificationHandler));
+                context.completeStep(OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER);
             }
         }, OperationContext.Stage.RUNTIME);
 
         context.addStep(new AbstractDeploymentChainStep() {
+            @Override
             protected void execute(DeploymentProcessorTarget processorTarget) {
                 processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.STRUCTURE, Phase.STRUCTURE_OSGI_MANIFEST, new OSGiManifestStructureProcessor());
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.STRUCTURE, Phase.STRUCTURE_BUNDLE_SUB_DEPLOYMENT, new BundleSubDeploymentMarkingProcessor());
                 processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.PARSE, Phase.PARSE_OSGI_BUNDLE_INFO, new OSGiBundleInfoParseProcessor());
-                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.PARSE, Phase.PARSE_OSGI_XSERVICE_PROPERTIES, new OSGiXServiceParseProcessor());
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.PARSE, Phase.PARSE_OSGI_PROPERTIES, new OSGiXServiceParseProcessor());
                 processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.PARSE, Phase.PARSE_OSGI_DEPLOYMENT, new BundleDeploymentProcessor());
-                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.INSTALL, Phase.INSTALL_BUNDLE_CONTEXT_BINDING, new BundleContextBindingProcessor());
-                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.INSTALL, Phase.INSTALL_OSGI_DEPLOYMENT, new BundleInstallProcessor(deploymentTracker));
-                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.INSTALL, Phase.INSTALL_OSGI_MODULE, new ModuleRegisterProcessor());
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.PARSE, Phase.PARSE_OSGI_COMPONENTS, new OSGiComponentParseProcessor());
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.PARSE, Phase.PARSE_OSGI_SUBSYSTEM_ACTIVATOR, new FrameworkActivateProcessor(deploymentTracker));
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.REGISTER, Phase.REGISTER_BUNDLE_INSTALL, new BundleInstallProcessor(deploymentTracker));
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.CONFIGURE_MODULE, Phase.CONFIGURE_RESOLVE_BUNDLE, new BundleResolveProcessor());
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.CONFIGURE_MODULE, Phase.CONFIGURE_DEFERRED_PHASE, new DeferredPhaseProcessor());
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.INSTALL, Phase.INSTALL_RESOLVER_MODULE, new ModuleRegisterProcessor(registrationTracker));
+                processorTarget.addDeploymentProcessor(OSGiExtension.SUBSYSTEM_NAME, Phase.INSTALL, Phase.INSTALL_BUNDLE_ACTIVATE, new BundleActivateProcessor());
             }
         }, OperationContext.Stage.RUNTIME);
 
+        // Perform boottime on subsystem extensions
+        for(SubsystemExtension extension : extensions) {
+            extension.performBoottime(context, operation, model, verificationHandler, newControllers);
+        }
+
         // Add the subsystem state as a service
-        newControllers.add(SubsystemState.addService(serviceTarget, activationMode));
+        newControllers.add(SubsystemState.addService(serviceTarget, activation));
     }
 
     private Activation getActivationMode(ModelNode operation) {

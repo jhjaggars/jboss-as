@@ -26,11 +26,16 @@
         </ejb-receivers>
         <clusters>
             <cluster name="ejb" max-allowed-connected-nodes="20" cluster-node-selector="org.jboss.as.test.manualmode.ejb.client.cluster.ApplicationSpecificClusterNodeSelector"
-                     connect-timeout="5000" username="user1" security-realm="PasswordRealm">
+                     connect-timeout="15000" username="user1" security-realm="PasswordRealm">
                 <connection-creation-options>
                     <property name="org.xnio.Options.SSL_ENABLED" value="false"/>
                     <property name="org.xnio.Options.SASL_POLICY_NOANONYMOUS" value="true"/>
                 </connection-creation-options>
+            </cluster>
+            <!-- A dummy cluster configuration. It's here to make sure that such a cluster configuration
+                which doesn't have any specific configurations, doesn't result in deployment errors like the
+                one reported in https://issues.jboss.org/browse/AS7-4943 -->
+            <cluster name="dummy">
             </cluster>
         </clusters>
     </client-context>

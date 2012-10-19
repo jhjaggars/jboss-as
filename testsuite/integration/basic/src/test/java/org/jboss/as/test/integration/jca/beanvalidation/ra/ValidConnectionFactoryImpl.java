@@ -27,9 +27,9 @@ import javax.resource.ResourceException;
 import javax.resource.spi.ConnectionManager;
 
 /**
+ * Connection factory implementation
  *
- * 
- * @version $Revision: $
+ * @author <a href="mailto:vrastsel@redhat.com">Vladimir Rastseluev</a>
  */
 public class ValidConnectionFactoryImpl implements ValidConnectionFactory {
     /** The serial version UID */

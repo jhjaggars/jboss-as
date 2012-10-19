@@ -24,6 +24,7 @@ package org.jboss.as.subsystem.test;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -44,6 +45,10 @@ public abstract class AbstractSubsystemBaseTest extends AbstractSubsystemTest {
 
     public AbstractSubsystemBaseTest(final String mainSubsystemName, final Extension mainExtension) {
         super(mainSubsystemName, mainExtension);
+    }
+
+    public AbstractSubsystemBaseTest(final String mainSubsystemName, final Extension mainExtension, final Comparator<PathAddress> removeOrderComparator) {
+        super(mainSubsystemName, mainExtension, removeOrderComparator);
     }
 
     /**
@@ -178,13 +183,5 @@ public abstract class AbstractSubsystemBaseTest extends AbstractSubsystemTest {
      */
     protected Set<PathAddress> getIgnoredChildResourcesForRemovalTest() {
         return Collections.<PathAddress>emptySet();
-    }
-    protected void testConverter(final ModelNode expected, int major, int minor) throws Exception {
-        KernelServices service = super.installInController(AdditionalInitialization.MANAGEMENT, getSubsystemXml());
-        ModelNode transformed = service.readTransformedModel(major,minor).get(ModelDescriptionConstants.SUBSYSTEM, mainSubsystemName);
-        /*SubsystemTransformer transformer = controllerExtensionRegistry.getTransformerRegistry().getSubsystemTransformer(super.mainSubsystemName, major, minor);
-        ModelNode original = service.readWholeModel().get(ModelDescriptionConstants.SUBSYSTEM, mainSubsystemName);
-        ModelNode transformed = transformer.transformModel(null, original);*/
-        compare(expected, transformed);
     }
 }

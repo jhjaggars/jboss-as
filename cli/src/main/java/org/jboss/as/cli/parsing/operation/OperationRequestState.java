@@ -24,6 +24,7 @@ package org.jboss.as.cli.parsing.operation;
 import org.jboss.as.cli.CommandFormatException;
 import org.jboss.as.cli.parsing.CharacterHandler;
 import org.jboss.as.cli.parsing.DefaultParsingState;
+import org.jboss.as.cli.parsing.LineBreakHandler;
 import org.jboss.as.cli.parsing.OutputTargetState;
 import org.jboss.as.cli.parsing.ParsingContext;
 
@@ -45,9 +46,9 @@ public class OperationRequestState extends DefaultParsingState {
             final HeaderListState headerList, final OutputTargetState outRedirect) {
         super(ID);
         //setDefaultHandler(new EnterStateCharacterHandler(nodeState));
-        setDefaultHandler(new CharacterHandler(){
+        setDefaultHandler(new LineBreakHandler(false, false){
             @Override
-            public void handle(ParsingContext ctx) throws CommandFormatException {
+            public void doHandle(ParsingContext ctx) throws CommandFormatException {
                 final CharacterHandler handler = enterStateHandlers.getHandler(ctx.getCharacter());
                 if(handler == null) {
                     ctx.enterState(nodeState);
@@ -61,8 +62,7 @@ public class OperationRequestState extends DefaultParsingState {
         enterState(OutputTargetState.OUTPUT_REDIRECT_CHAR, outRedirect);
         setReturnHandler(new CharacterHandler(){
             @Override
-            public void handle(ParsingContext ctx)
-                    throws CommandFormatException {
+            public void handle(ParsingContext ctx) throws CommandFormatException {
                 if(ctx.isEndOfContent()) {
                     return;
                 }

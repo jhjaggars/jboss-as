@@ -29,9 +29,9 @@ import org.infinispan.configuration.cache.CacheMode;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.persistence.ConfigurationPersistenceException;
 import org.jboss.as.network.OutboundSocketBinding;
-import org.jboss.logging.Cause;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageBundle;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageBundle;
 import org.jboss.logging.Messages;
 import org.jboss.msc.inject.InjectionException;
 import org.jboss.msc.service.StartException;
@@ -70,10 +70,10 @@ public interface InfinispanMessages {
      * @param cause          the cause of the error.
      * @param cacheStoreName the name of the cache store.
      *
-     * @return an {@link IllegalArgumentException} for the error.
+     * @return an {@link OperationFailedException} for the error.
      */
     @Message(id = 10292, value = "%s is not a valid cache store")
-    IllegalArgumentException invalidCacheStore(@Cause Throwable cause, String cacheStoreName);
+    OperationFailedException invalidCacheStore(@Cause Throwable cause, String cacheStoreName);
 
     /**
      * Creates an exception indicating an invalid cache store.
@@ -84,7 +84,7 @@ public interface InfinispanMessages {
      * @return an {@link IllegalArgumentException} for the error.
      */
     @Message(id = 10293, value = "%s is not a valid default cache. The %s cache container does not contain a cache with that name")
-    IllegalArgumentException invalidCacheStore(String cacheStoreName, String cacheContainerName);
+    IllegalArgumentException invalidDefaultCache(String cacheName, String cacheContainerName);
 
     /**
      * Creates an exception indicating the an executor property is invalid.

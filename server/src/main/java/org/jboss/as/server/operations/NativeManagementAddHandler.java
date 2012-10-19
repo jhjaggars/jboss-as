@@ -22,6 +22,7 @@
 
 package org.jboss.as.server.operations;
 
+import org.jboss.as.protocol.ProtocolChannelClient;
 import org.jboss.as.remoting.management.ManagementChannelRegistryService;
 import static org.jboss.as.server.mgmt.NativeManagementResourceDefinition.ATTRIBUTE_DEFINITIONS;
 import static org.jboss.as.server.mgmt.NativeManagementResourceDefinition.INTERFACE;
@@ -53,7 +54,9 @@ import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.ServiceController;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.ServiceTarget;
+import org.jboss.remoting3.RemotingOptions;
 import org.xnio.OptionMap;
+import org.xnio.Options;
 
 
 /**
@@ -66,6 +69,9 @@ public class NativeManagementAddHandler extends AbstractAddStepHandler {
 
     public static final NativeManagementAddHandler INSTANCE = new NativeManagementAddHandler();
     public static final String OPERATION_NAME = ModelDescriptionConstants.ADD;
+
+    private static final int WINDOW_SIZE = ProtocolChannelClient.Configuration.WINDOW_SIZE;
+    private static final OptionMap options = OptionMap.create(RemotingOptions.RECEIVE_WINDOW_SIZE, WINDOW_SIZE);
 
     protected void populateModel(ModelNode operation, ModelNode model) throws OperationFailedException {
         for (AttributeDefinition definition : ATTRIBUTE_DEFINITIONS) {
@@ -86,7 +92,7 @@ public class NativeManagementAddHandler extends AbstractAddStepHandler {
 
         final ServiceName endpointName = ManagementRemotingServices.MANAGEMENT_ENDPOINT;
         final String hostName = SecurityActions.getSystemProperty(ServerEnvironment.NODE_NAME);
-        ManagementRemotingServices.installRemotingEndpoint(serviceTarget, ManagementRemotingServices.MANAGEMENT_ENDPOINT, hostName, EndpointService.EndpointType.MANAGEMENT, verificationHandler, newControllers);
+        ManagementRemotingServices.installRemotingEndpoint(serviceTarget, ManagementRemotingServices.MANAGEMENT_ENDPOINT, hostName, EndpointService.EndpointType.MANAGEMENT, options, verificationHandler, newControllers);
         installNativeManagementConnector(context, model, endpointName, serviceTarget, verificationHandler, newControllers);
 
         ManagementChannelRegistryService.addService(serviceTarget, endpointName);
@@ -172,13 +178,15 @@ public class NativeManagementAddHandler extends AbstractAddStepHandler {
 
         ServiceName tmpDirPath = ServiceName.JBOSS.append("server", "path", "jboss.server.temp.dir");
         RemotingServices.installSecurityServices(serviceTarget, ManagementRemotingServices.MANAGEMENT_CONNECTOR, realmSvcName, null, tmpDirPath, verificationHandler, newControllers);
+//        final OptionMap options = OptionMap.builder().set(RemotingOptions.HEARTBEAT_INTERVAL, 30000).set(Options.READ_TIMEOUT, 65000).getMap();
+        final OptionMap options = OptionMap.EMPTY;
         if (socketBindingServiceName == null) {
             ManagementRemotingServices.installConnectorServicesForNetworkInterfaceBinding(serviceTarget, endpointName,
-                    ManagementRemotingServices.MANAGEMENT_CONNECTOR, interfaceSvcName, port, OptionMap.EMPTY, verificationHandler, newControllers);
+                    ManagementRemotingServices.MANAGEMENT_CONNECTOR, interfaceSvcName, port, options, verificationHandler, newControllers);
         } else {
             ManagementRemotingServices.installConnectorServicesForSocketBinding(serviceTarget, endpointName,
                     ManagementRemotingServices.MANAGEMENT_CONNECTOR,
-                    socketBindingServiceName, OptionMap.EMPTY, verificationHandler, newControllers);
+                    socketBindingServiceName, options, verificationHandler, newControllers);
         }
     }
 

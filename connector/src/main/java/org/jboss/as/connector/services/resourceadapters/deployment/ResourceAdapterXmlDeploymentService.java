@@ -93,7 +93,7 @@ public final class ResourceAdapterXmlDeploymentService extends AbstractResourceA
 
             final ServiceContainer container = context.getController().getServiceContainer();
             final AS7RaXmlDeployer raDeployer = new AS7RaXmlDeployer(context.getChildTarget(), connectorXmlDescriptor.getUrl(),
-                raName, root, module.getClassLoader(), cmd, raxml, null);
+                raName, root, module.getClassLoader(), cmd, raxml, null, deploymentServiceName);
 
             raDeployer.setConfiguration(config.getValue());
 
@@ -111,13 +111,13 @@ public final class ResourceAdapterXmlDeploymentService extends AbstractResourceA
                 unregisterAll(raName);
                 throw MESSAGES.failedToStartRaDeployment(t, raName);
             }
+            ServiceName raServiceName = ConnectorServices.registerResourceAdapter(raName);
 
-            value = new ResourceAdapterDeployment(raxmlDeployment);
+            value = new ResourceAdapterDeployment(raxmlDeployment, raName, raServiceName);
             managementRepository.getValue().getConnectors().add(value.getDeployment().getConnector());
 
             registry.getValue().registerResourceAdapterDeployment(value);
 
-            ServiceName raServiceName = ConnectorServices.registerResourceAdapter(raName);
 
             context.getChildTarget()
                     .addService(raServiceName,
@@ -162,9 +162,10 @@ public final class ResourceAdapterXmlDeploymentService extends AbstractResourceA
         private final ResourceAdapter ra;
         private final IronJacamar ijmd;
 
+
         public AS7RaXmlDeployer(ServiceTarget serviceTarget, URL url, String deploymentName, File root, ClassLoader cl,
-                Connector cmd, ResourceAdapter ra, IronJacamar ijmd) {
-            super(serviceTarget, url, deploymentName, root, cl, cmd);
+                Connector cmd, ResourceAdapter ra, IronJacamar ijmd,  final ServiceName deploymentServiceName) {
+            super(serviceTarget, url, deploymentName, root, cl, cmd, deploymentServiceName);
             this.ra = ra;
             this.ijmd = ijmd;
         }

@@ -21,15 +21,21 @@
  */
 package org.jboss.as.jdr;
 
+import org.apache.commons.io.FileUtils;
+import org.jboss.as.controller.OperationFailedException;
+import org.jboss.as.controller.client.ModelControllerClient;
+import org.jboss.as.jdr.commands.JdrCommand;
+import org.jboss.as.jdr.commands.JdrEnvironment;
+import org.jboss.as.jdr.plugins.JdrPlugin;
+import org.jboss.as.jdr.util.JdrZipFile;
+
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+
 import static org.jboss.as.jdr.JdrLogger.ROOT_LOGGER;
 import static org.jboss.as.jdr.JdrMessages.MESSAGES;
-
-import org.jboss.as.controller.client.ModelControllerClient;
-import org.jboss.as.controller.OperationFailedException;
-
-import java.util.Arrays;
-import java.util.List;
-import java.io.File;
 
 public class JdrRunner implements JdrReportCollector {
 
@@ -39,43 +45,46 @@ public class JdrRunner implements JdrReportCollector {
     }
 
     public JdrRunner(String user, String pass, String host, String port) {
-        this.env.username = user;
-        this.env.password = pass;
-        this.env.host = host;
-        this.env.port = port;
+        this.env.setUsername(user);
+        this.env.setPassword(pass);
+        this.env.setHost(host);
+        this.env.setPort(port);
     }
 
     public JdrReport collect() throws OperationFailedException {
 
         try {
-            this.env.zip = new JdrZipFile(new JdrEnvironment(this.env));
+            this.env.setZip(new JdrZipFile(new JdrEnvironment(this.env)));
         }
         catch (Exception e) {
             ROOT_LOGGER.couldNotCreateZipfile(e);
             throw MESSAGES.couldNotCreateZipfile();
         }
 
-        List<JdrCommand> commands;
+        List<JdrCommand> commands = new ArrayList<JdrCommand>();
+
 
         try {
-            Sanitizer xmlSanitizer = new XMLSanitizer("//password");
-            Sanitizer passwordSanitizer = new PatternSanitizer("password=*");
-
-            commands = Arrays.asList(
-                new TreeCommand(),
-                new JarCheck(),
-                new CallAS7("configuration").param("recursive", "true"),
-                new CallAS7("dump-services").resource("core-service", "service-container"),
-                new CallAS7("cluster-proxies-configuration").resource("subsystem", "modcluster"),
-                new CopyDir("*/standalone/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
-                new CopyDir("*/domain/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
-                new CopyDir("*.log"),
-                new CopyDir("*.properties").sanitizer(passwordSanitizer),
-                new CopyDir("*.xml").sanitizer(xmlSanitizer)
+            InputStream is = FileUtils.openInputStream(
+                    FileUtils.getFile(
+                            this.env.getJbossHome(), "modules", "org", "jboss", "as", "jdr", "main", "plugins.properties"
+                    )
             );
+            Properties plugins = new Properties();
+            plugins.load(is);
+            for (String pluginName : plugins.stringPropertyNames()) {
+                Class pluginClass = Class.forName(pluginName);
+                JdrPlugin plugin = (JdrPlugin) pluginClass.newInstance();
+                commands.addAll(plugin.getCommands());
+            }
         } catch (Exception e) {
             ROOT_LOGGER.couldNotConfigureJDR(e);
             throw MESSAGES.couldNotConfigureJDR();
+        }
+
+        if (commands.size() < 1) {
+            ROOT_LOGGER.noCommandsToRun();
+            throw MESSAGES.noCommandsToRun();
         }
 
         JdrReport report = new JdrReport();
@@ -91,33 +100,33 @@ public class JdrRunner implements JdrReportCollector {
         }
 
         try {
-            this.env.zip.close();
+            this.env.getZip().close();
         } catch (Exception e) {
             ROOT_LOGGER.debugf(e, "Could not close zipfile");
         }
 
         report.setEndTime();
-        report.setLocation(this.env.zip.name());
+        report.setLocation(this.env.getZip().name());
         return report;
     }
 
     public void setJbossHomeDir(String dir) {
-        this.env.jbossHome = dir;
+        this.env.setJbossHome(dir);
     }
 
     public void setReportLocationDir(String dir) {
-        this.env.outputDirectory = dir;
+        this.env.setOutputDirectory(dir);
     }
 
     public void setControllerClient(ModelControllerClient client) {
-        this.env.client = client;
+        this.env.setClient(client);
     }
 
     public void setHostControllerName(String name) {
-        this.env.hostControllerName = name;
+        this.env.setHostControllerName(name);
     }
 
     public void setServerName(String name) {
-        this.env.serverName = name;
+        this.env.setServerName(name);
     }
 }

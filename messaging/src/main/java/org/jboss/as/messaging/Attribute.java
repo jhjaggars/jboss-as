@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.jboss.as.controller.AttributeDefinition;
+import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
+import org.jboss.as.messaging.jms.bridge.JMSBridgeDefinition;
 
 /**
  *
@@ -11,23 +13,24 @@ import org.jboss.as.controller.AttributeDefinition;
 public enum Attribute {
    UNKNOWN((String) null),
    /* Messaging 1.0 attributes, in alpha order */
-   ALLOW_DIRECT_CONNECTIONS_ONLY(CommonAttributes.ALLOW_DIRECT_CONNECTIONS_ONLY),
+   ALLOW_DIRECT_CONNECTIONS_ONLY(ClusterConnectionDefinition.ALLOW_DIRECT_CONNECTIONS_ONLY),
    // backup-connector-name is no longer used by HornetQ configuration
    @Deprecated
    BACKUP_CONNECTOR_NAME("backup-connector-name"),
    CONNECTOR_NAME(CommonAttributes.CONNECTOR_NAME),
-   DISCOVERY_GROUP_NAME(CommonAttributes.DISCOVERY_GROUP_NAME),
    KEY(CommonAttributes.KEY),
    MATCH(CommonAttributes.MATCH),
    NAME(CommonAttributes.NAME),
-   PATH(CommonAttributes.PATH),
-   RELATIVE_TO(CommonAttributes.RELATIVE_TO),
+   PATH(ModelDescriptionConstants.PATH),
+   RELATIVE_TO(MessagingPathHandlers.RELATIVE_TO),
    ROLES_ATTR_NAME(CommonAttributes.ROLES_ATTR_NAME),
-   SERVER_ID(CommonAttributes.SERVER_ID),
-   SOCKET_BINDING(CommonAttributes.SOCKET_BINDING),
+   SERVER_ID(InVMTransportDefinition.SERVER_ID),
+   SOCKET_BINDING(RemoteTransportDefinition.SOCKET_BINDING),
    STRING(CommonAttributes.STRING),
    TYPE_ATTR_NAME(CommonAttributes.TYPE_ATTR_NAME),
-   VALUE(CommonAttributes.VALUE);
+   VALUE(CommonAttributes.VALUE),
+   MODULE(JMSBridgeDefinition.MODULE);
+
 
    private final String name;
    private final AttributeDefinition definition;

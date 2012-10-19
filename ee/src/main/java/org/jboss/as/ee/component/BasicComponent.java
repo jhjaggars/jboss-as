@@ -184,7 +184,7 @@ public class BasicComponent implements Component {
      * {@link #constructComponentInstance(ManagedReference, boolean, InterceptorFactoryContext)}.
      * <p/>
      *
-     * @return
+     * @return the component instance
      */
     protected BasicComponentInstance instantiateComponentInstance(final AtomicReference<ManagedReference> instanceReference, final Interceptor preDestroyInterceptor, final Map<Method, Interceptor> methodInterceptors, final InterceptorFactoryContext context) {
         // create and return the component instance
@@ -226,11 +226,9 @@ public class BasicComponent implements Component {
     /**
      * {@inheritDoc}
      *
-     * @param stopContext
      */
-    public void stop(final StopContext stopContext) {
+    public void stop() {
         if (stopping.compareAndSet(false, true)) {
-            stopContext.asynchronous();
             synchronized (this) {
                 gate = false;
                 //this.stopContext = stopContext;
@@ -238,7 +236,8 @@ public class BasicComponent implements Component {
             //TODO: only run this if there is no instances
             //TODO: trigger destruction of all component instances
             //TODO: this has lots of potential for race conditions unless we are careful
-            stopContext.complete();
+            //TODO: using stopContext.asynchronous() and then executing synchronously is pointless.
+            // Use org.jboss.as.server.Services#addServerExecutorDependency to inject an executor to do this async
         }
     }
 

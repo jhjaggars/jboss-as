@@ -32,8 +32,9 @@ import javax.resource.spi.ResourceAdapterAssociation;
 import org.hibernate.validator.constraints.*;
 
 /**
+ * Admin object implementation
  * 
- * @version $Revision: $
+ * @author <a href="mailto:vrastsel@redhat.com">Vladimir Rastseluev</a>
  */
 public class ValidAdminObjectImpl implements ValidAdminObjectInterface, ResourceAdapterAssociation, Referenceable, Serializable {
     /** Serial version uid */

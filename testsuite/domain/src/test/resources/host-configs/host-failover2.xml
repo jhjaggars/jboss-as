@@ -20,9 +20,9 @@
   ~ 02110-1301 USA, or see the FSF site: http://www.fsf.org.
   -->
 
-<host xmlns="urn:jboss:domain:1.3"
+<host xmlns="urn:jboss:domain:1.4"
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-      xsi:schemaLocation="urn:jboss:domain:1.3 jboss-as-config_1_3.xsd"
+      xsi:schemaLocation="urn:jboss:domain:1.4 jboss-as-config_1_4.xsd"
       name="failover2">
 
     <paths>
@@ -70,7 +70,7 @@
        <local/>
     </domain-controller>
     -->
-    
+
     <interfaces>
         <interface name="management">
             <inet-address value="${jboss.test.host.slave.address}"/>
@@ -90,7 +90,7 @@
         <server name="failover-two" group="main-server-group">
             <!-- server-two avoids port conflicts by incrementing the ports in
                  the default socket-group declared in the server-group -->
-            <socket-bindings port-offset="150"/>
+            <socket-bindings port-offset="350"/>
             <jvm name="default">
                 <heap size="64m" max-size="256m"/>
             </jvm>

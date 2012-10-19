@@ -46,4 +46,19 @@ public class CommandFormat implements CommandLineFormat {
     public String getPropertyListEnd() {
         return "";
     }
+
+    @Override
+    public boolean isPropertySeparator(char ch) {
+        return Character.isWhitespace(ch);
+    }
+
+    @Override
+    public String getNodeSeparator() {
+        return "";
+    }
+
+    @Override
+    public String getAddressOperationSeparator() {
+        return "";
+    }
 }

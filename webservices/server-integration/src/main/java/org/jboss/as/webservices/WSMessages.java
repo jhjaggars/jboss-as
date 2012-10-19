@@ -30,9 +30,9 @@ import javax.xml.ws.WebServiceException;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.server.deployment.DeploymentUnitProcessingException;
 import org.jboss.as.server.deployment.module.ResourceRoot;
-import org.jboss.logging.Cause;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageBundle;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageBundle;
 import org.jboss.logging.Messages;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.vfs.VirtualFile;
@@ -94,11 +94,11 @@ public interface WSMessages {
     @Message(id = 15518, value = "No metrics available")
     String noMetricsAvailable();
 
-    @Message(id = 15519, value = "EJB component view name cannot be null")
-    IllegalStateException missingEjbComponentViewName();
+    @Message(id = 15519, value = "Component view name cannot be null")
+    IllegalStateException missingComponentViewName();
 
-    @Message(id = 15520, value = "Cannot find ejb view: %s")
-    IllegalStateException cannotFindEjbView(ServiceName viewName);
+    @Message(id = 15520, value = "Cannot find component view: %s")
+    IllegalStateException cannotFindComponentView(ServiceName viewName);
 
     @Message(id = 15521, value = "Null root url")
     IllegalArgumentException nullRootUrl();
@@ -151,8 +151,8 @@ public interface WSMessages {
     @Message(id = 15536, value = "@WebServiceRef attribute 'type' is required for class level annotations.")
     DeploymentUnitProcessingException requiredServiceRefType();
 
-    @Message(id = 15585, value = "Endpoint config %s doesn't exist")
-    OperationFailedException missingEndpointConfig(String configName);
+    @Message(id = 15585, value = "Config %s doesn't exist")
+    OperationFailedException missingConfig(String configName);
 
     @Message(id = 15586, value = "Attributes %s, %s and %s are mutually exclusive")
     OperationFailedException mutuallyExclusiveHandlerChainAttributes(String attr1, String attr2, String attr3);
@@ -163,19 +163,16 @@ public interface WSMessages {
     @Message(id = 15588, value = "Cannot add new handler chain of type %s with id %s. This id is already used in config %s for another chain.")
     OperationFailedException multipleHandlerChainsWithSameId(String chainType, String handlerChainId, String configId);
 
-    @Message(id = 15589, value = "Endpoint config %s: %s handler chain with id %s doesn't exist")
+    @Message(id = 15589, value = "Config %s: %s handler chain with id %s doesn't exist")
     OperationFailedException missingHandlerChain(String configName, String handlerChainType, String handlerChainId);
 
-    @Message(id = 15590, value = "Endpoint config %s, %s handler chain %s: doesn't contain handler with name %s")
+    @Message(id = 15590, value = "Config %s, %s handler chain %s: doesn't contain handler with name %s")
     OperationFailedException missingHandler(String configName, String handlerChainType, String handlerChainId, String handlerName);
 
-    /**
-     * A message indicating the method invocation failed with an exception.
-     *
-     * @param message the message from the exception
-     *
-     * @return the message.
-     */
     @Message(id = 15594, value = "Method invocation failed with exception: %s")
     String methodInvocationFailed(String message);
+
+    @Message(id = 15595, value = "Unable to get URL for: %s")
+    DeploymentUnitProcessingException cannotGetURLForDescriptor(@Cause Throwable cause, String resourcePath);
+
 }

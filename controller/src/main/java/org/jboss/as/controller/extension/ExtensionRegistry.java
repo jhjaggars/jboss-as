@@ -22,10 +22,29 @@
 
 package org.jboss.as.controller.extension;
 
+import static org.jboss.as.controller.ControllerMessages.MESSAGES;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUBSYSTEM;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+import javax.xml.namespace.QName;
+
 import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.ControllerMessages;
 import org.jboss.as.controller.Extension;
 import org.jboss.as.controller.ExtensionContext;
+import org.jboss.as.controller.ModelVersionRange;
+import org.jboss.as.controller.OperationDefinition;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.PathElement;
@@ -40,42 +59,30 @@ import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
 import org.jboss.as.controller.descriptions.OverrideDescriptionProvider;
 import org.jboss.as.controller.parsing.ExtensionParsingContext;
+import org.jboss.as.controller.parsing.ProfileParsingCompletionHandler;
 import org.jboss.as.controller.persistence.SubsystemMarshallingContext;
 import org.jboss.as.controller.persistence.SubsystemXmlWriterRegistry;
+import org.jboss.as.controller.registry.AliasEntry;
 import org.jboss.as.controller.registry.AttributeAccess;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
 import org.jboss.as.controller.registry.OperationEntry;
 import org.jboss.as.controller.registry.Resource;
 import org.jboss.as.controller.services.path.PathManager;
-import org.jboss.as.controller.transform.SubsystemTransformer;
+import org.jboss.as.controller.transform.ResourceTransformer;
 import org.jboss.as.controller.transform.TransformerRegistry;
+import org.jboss.as.controller.transform.TransformersSubRegistration;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
 import org.jboss.staxmapper.XMLElementReader;
 import org.jboss.staxmapper.XMLElementWriter;
 import org.jboss.staxmapper.XMLMapper;
 
-import javax.xml.namespace.QName;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-
-import static org.jboss.as.controller.ControllerMessages.MESSAGES;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUBSYSTEM;
-
 /**
  * A registry for information about {@link Extension}s to the core application server.
  *
  * @author Brian Stansberry (c) 2011 Red Hat Inc.
  */
+@SuppressWarnings("deprecation")
 public class ExtensionRegistry {
 
     private final ProcessType processType;
@@ -92,9 +99,7 @@ public class ExtensionRegistry {
     // protected by extensions
     private boolean unnamedMerged;
     private final ConcurrentHashMap<String, SubsystemInformation> subsystemsInfo = new ConcurrentHashMap<String, SubsystemInformation>();
-    /*private ModelTransformer modelTransformer = new SimpleModelTransformer();
-    private Map<String,SubsystemModelTransformer> subsystemTransformers = new HashMap<String, SubsystemModelTransformer>();*/
-    private final TransformerRegistry transformerRegistry = TransformerRegistry.Factory.create(this);
+    private volatile TransformerRegistry transformerRegistry = TransformerRegistry.Factory.create(this);
 
     public ExtensionRegistry(ProcessType processType, RunningModeControl runningModeControl) {
         this.processType = processType;
@@ -211,8 +216,6 @@ public class ExtensionRegistry {
      *
      * @return  the {@link ExtensionContext}.  Will not return {@code null}
      *
-     * @param moduleName the name of the extension's module. Cannot be {@code null}
-     * @return the {@link ExtensionContext}.  Will not return {@code null}
      * @throws IllegalStateException if no {@link #setSubsystemParentResourceRegistrations(ManagementResourceRegistration, ManagementResourceRegistration)} profile resource registration has been set}
      */
     public ExtensionContext getExtensionContext(final String moduleName) {
@@ -242,6 +245,19 @@ public class ExtensionRegistry {
         }
 
         return result;
+    }
+
+    public Set<ProfileParsingCompletionHandler> getProfileParsingCompletionHandlers() {
+        Set<ProfileParsingCompletionHandler> result = new HashSet<ProfileParsingCompletionHandler>();
+
+        for (ExtensionInfo extensionInfo : extensions.values()) {
+            synchronized (extensionInfo) {
+                if (extensionInfo.parsingCompletionHandler != null) {
+                    result.add(extensionInfo.parsingCompletionHandler);
+                }
+            }
+        }
+        return Collections.unmodifiableSet(result);
     }
 
     /**
@@ -301,6 +317,7 @@ public class ExtensionRegistry {
         synchronized (extensions) {    // we synchronize just to guard unnamedMerged
             profileRegistration = null;
             deploymentsRegistration = null;
+            transformerRegistry = TransformerRegistry.Factory.create(this);
             extensions.clear();
             reverseMap.clear();
             unnamedMerged = false;
@@ -384,6 +401,7 @@ public class ExtensionRegistry {
 
 
         @Override
+        @SuppressWarnings("deprecation")
         public void setSubsystemXmlMapping(String namespaceUri, XMLElementReader<List<ModelNode>> reader) {
             assert namespaceUri != null : "namespaceUri is null";
             synchronized (extensions) { // we synchronize just to protect unnamedMerged
@@ -410,13 +428,23 @@ public class ExtensionRegistry {
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void setDeploymentXmlMapping(String namespaceUri, XMLElementReader<ModelNode> reader) {
             // ignored
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void setDeploymentXmlMapping(String subsystemName, String namespaceUri, XMLElementReader<ModelNode> reader) {
             // ignored
+        }
+
+        @Override
+        public void setProfileParsingCompletionHandler(ProfileParsingCompletionHandler handler) {
+            assert handler != null : "handler is null";
+            synchronized (extension) {
+                extension.parsingCompletionHandler = handler;
+            }
         }
     }
 
@@ -424,7 +452,6 @@ public class ExtensionRegistry {
 
         private final ExtensionInfo extension;
         private final PathManager pathManager;
-        private String subsystemName;
 
         private ExtensionContextImpl(String extensionName, PathManager pathManager) {
             assert pathManager != null || !processType.isServer() : "pathManager is null";
@@ -435,12 +462,17 @@ public class ExtensionRegistry {
 
         @Override
         public SubsystemRegistration registerSubsystem(String name, int majorVersion, int minorVersion) throws IllegalArgumentException, IllegalStateException {
+            return registerSubsystem(name, majorVersion, minorVersion, 0);
+        }
+
+        @Override
+        public SubsystemRegistration registerSubsystem(String name, int majorVersion, int minorVersion, int microVersion) {
             assert name != null : "name is null";
-            this.subsystemName = name;
             checkNewSubystem(extension.extensionModuleName, name);
             SubsystemInformationImpl info = extension.getSubsystemInfo(name);
             info.setMajorVersion(majorVersion);
             info.setMinorVersion(minorVersion);
+            info.setMicroVersion(microVersion);
             subsystemsInfo.put(name, info);
             return new SubsystemRegistrationImpl(name);
         }
@@ -473,6 +505,7 @@ public class ExtensionRegistry {
 
         private Integer majorVersion;
         private Integer minorVersion;
+        private Integer microVersion;
         private final List<String> parsingNamespaces = new ArrayList<String>();
 
         @Override
@@ -501,6 +534,15 @@ public class ExtensionRegistry {
         private void setMinorVersion(Integer minorVersion) {
             this.minorVersion = minorVersion;
         }
+
+        @Override
+        public Integer getManagementInterfaceMicroVersion() {
+            return microVersion;
+        }
+
+        private void setMicroVersion(Integer microVersion) {
+            this.microVersion = microVersion;
+        }
     }
 
     public class SubsystemRegistrationImpl implements SubsystemRegistration {
@@ -511,6 +553,7 @@ public class ExtensionRegistry {
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public ManagementResourceRegistration registerSubsystemModel(final DescriptionProvider descriptionProvider) {
             assert descriptionProvider != null : "descriptionProvider is null";
             PathElement pathElement = PathElement.pathElement(ModelDescriptionConstants.SUBSYSTEM, name);
@@ -532,6 +575,7 @@ public class ExtensionRegistry {
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public ManagementResourceRegistration registerDeploymentModel(final DescriptionProvider descriptionProvider) {
             assert descriptionProvider != null : "descriptionProvider is null";
             PathElement pathElement = PathElement.pathElement(ModelDescriptionConstants.SUBSYSTEM, name);
@@ -554,9 +598,8 @@ public class ExtensionRegistry {
         }
 
         @Override
-        public void registerSubsystemTransformer(SubsystemTransformer subsystemTransformer) {
-            transformerRegistry.registerSubsystemTransformer(name, subsystemTransformer);
-
+        public TransformersSubRegistration registerModelTransformers(final ModelVersionRange range, final ResourceTransformer subsystemTransformer) {
+            return transformerRegistry.registerSubsystemTransformers(name, range, subsystemTransformer);
         }
 
         private ManagementResourceRegistration getDummyRegistration() {
@@ -575,6 +618,7 @@ public class ExtensionRegistry {
         private final Set<String> unnamedParsers = new HashSet<String>();
         private final String extensionModuleName;
         private XMLMapper xmlMapper;
+        private ProfileParsingCompletionHandler parsingCompletionHandler;
 
         public ExtensionInfo(String extensionModuleName) {
             this.extensionModuleName = extensionModuleName;
@@ -693,6 +737,7 @@ public class ExtensionRegistry {
             return deployments.getSubModel(address);
         }
 
+        @SuppressWarnings("deprecation")
         @Override
         public ManagementResourceRegistration registerSubModel(PathElement address, DescriptionProvider descriptionProvider) {
             ManagementResourceRegistration depl = deployments.registerSubModel(address, descriptionProvider);
@@ -732,39 +777,56 @@ public class ExtensionRegistry {
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void registerOperationHandler(String operationName, OperationStepHandler handler, DescriptionProvider descriptionProvider) {
             deployments.registerOperationHandler(operationName, handler, descriptionProvider);
             subdeployments.registerOperationHandler(operationName, handler, descriptionProvider);
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void registerOperationHandler(String operationName, OperationStepHandler handler, DescriptionProvider descriptionProvider, EnumSet<OperationEntry.Flag> flags) {
             deployments.registerOperationHandler(operationName, handler, descriptionProvider, flags);
             subdeployments.registerOperationHandler(operationName, handler, descriptionProvider, flags);
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void registerOperationHandler(String operationName, OperationStepHandler handler, DescriptionProvider descriptionProvider, boolean inherited) {
             deployments.registerOperationHandler(operationName, handler, descriptionProvider, inherited);
             subdeployments.registerOperationHandler(operationName, handler, descriptionProvider, inherited);
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void registerOperationHandler(String operationName, OperationStepHandler handler, DescriptionProvider descriptionProvider, boolean inherited, OperationEntry.EntryType entryType) {
             deployments.registerOperationHandler(operationName, handler, descriptionProvider, inherited, entryType);
             subdeployments.registerOperationHandler(operationName, handler, descriptionProvider, inherited, entryType);
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void registerOperationHandler(String operationName, OperationStepHandler handler, DescriptionProvider descriptionProvider, boolean inherited, OperationEntry.EntryType entryType, EnumSet<OperationEntry.Flag> flags) {
             deployments.registerOperationHandler(operationName, handler, descriptionProvider, inherited, entryType, flags);
             subdeployments.registerOperationHandler(operationName, handler, descriptionProvider, inherited, entryType, flags);
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void registerOperationHandler(String operationName, OperationStepHandler handler, DescriptionProvider descriptionProvider, boolean inherited, EnumSet<OperationEntry.Flag> flags) {
             deployments.registerOperationHandler(operationName, handler, descriptionProvider, inherited, flags);
             subdeployments.registerOperationHandler(operationName, handler, descriptionProvider, inherited, flags);
+        }
+
+        @Override
+        public void registerOperationHandler(OperationDefinition definition, OperationStepHandler handler) {
+            registerOperationHandler(definition,handler,false);
+        }
+
+        @Override
+        public void registerOperationHandler(OperationDefinition definition, OperationStepHandler handler, boolean inherited) {
+            deployments.registerOperationHandler(definition, handler, inherited);
+            subdeployments.registerOperationHandler(definition, handler, inherited);
         }
 
         @Override
@@ -773,12 +835,14 @@ public class ExtensionRegistry {
             subdeployments.unregisterOperationHandler(operationName);
         }
 
+        @SuppressWarnings("deprecation")
         @Override
         public void registerReadWriteAttribute(String attributeName, OperationStepHandler readHandler, OperationStepHandler writeHandler, AttributeAccess.Storage storage) {
             deployments.registerReadWriteAttribute(attributeName, readHandler, writeHandler, storage);
             subdeployments.registerReadWriteAttribute(attributeName, readHandler, writeHandler, storage);
         }
 
+        @SuppressWarnings("deprecation")
         @Override
         public void registerReadWriteAttribute(String attributeName, OperationStepHandler readHandler, OperationStepHandler writeHandler, EnumSet<AttributeAccess.Flag> flags) {
             deployments.registerReadWriteAttribute(attributeName, readHandler, writeHandler, flags);
@@ -791,12 +855,14 @@ public class ExtensionRegistry {
             subdeployments.registerReadWriteAttribute(definition, readHandler, writeHandler);
         }
 
+        @SuppressWarnings("deprecation")
         @Override
         public void registerReadOnlyAttribute(String attributeName, OperationStepHandler readHandler, AttributeAccess.Storage storage) {
             deployments.registerReadOnlyAttribute(attributeName, readHandler, storage);
             subdeployments.registerReadOnlyAttribute(attributeName, readHandler, storage);
         }
 
+        @SuppressWarnings("deprecation")
         @Override
         public void registerReadOnlyAttribute(String attributeName, OperationStepHandler readHandler, EnumSet<AttributeAccess.Flag> flags) {
             deployments.registerReadOnlyAttribute(attributeName, readHandler, flags);
@@ -809,6 +875,7 @@ public class ExtensionRegistry {
             subdeployments.registerReadOnlyAttribute(definition, readHandler);
         }
 
+        @SuppressWarnings("deprecation")
         @Override
         public void registerMetric(String attributeName, OperationStepHandler metricHandler) {
             deployments.registerMetric(attributeName, metricHandler);
@@ -821,6 +888,7 @@ public class ExtensionRegistry {
             subdeployments.registerMetric(definition, metricHandler);
         }
 
+        @SuppressWarnings("deprecation")
         @Override
         public void registerMetric(String attributeName, OperationStepHandler metricHandler, EnumSet<AttributeAccess.Flag> flags) {
             deployments.registerMetric(attributeName, metricHandler, flags);
@@ -843,6 +911,29 @@ public class ExtensionRegistry {
         public void unregisterProxyController(PathElement address) {
             deployments.unregisterProxyController(address);
             subdeployments.unregisterProxyController(address);
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        public void registerAlias(PathElement address, AliasEntry alias) {
+            deployments.registerAlias(address, alias);
+            subdeployments.registerAlias(address, alias);
+        }
+
+        @Override
+        public void unregisterAlias(PathElement address) {
+            deployments.unregisterAlias(address);
+            subdeployments.unregisterAlias(address);
+        }
+
+        @Override
+        public AliasEntry getAliasEntry() {
+            return deployments.getAliasEntry();
+        }
+
+        @Override
+        public boolean isAlias() {
+            return deployments.isAlias();
         }
     }
 }

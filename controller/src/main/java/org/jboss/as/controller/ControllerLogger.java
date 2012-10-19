@@ -27,19 +27,17 @@ import static org.jboss.logging.Logger.Level.WARN;
 
 import java.io.Closeable;
 import java.net.InetAddress;
-import java.net.NetworkInterface;
 import java.util.Set;
-
 import javax.xml.stream.XMLStreamWriter;
 
 import org.jboss.dmr.ModelNode;
 import org.jboss.logging.BasicLogger;
-import org.jboss.logging.Cause;
-import org.jboss.logging.LogMessage;
 import org.jboss.logging.Logger;
 import org.jboss.logging.Logger.Level;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageLogger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
 
 /**
  * This module is using message IDs in the range 14600-14899.
@@ -75,6 +73,11 @@ public interface ControllerLogger extends BasicLogger {
      * A logger with the category {@code org.jboss.server.management}
      */
     ControllerLogger SERVER_MANAGEMENT_LOGGER = Logger.getMessageLogger(ControllerLogger.class, "org.jboss.server.management");
+
+    /**
+     * A logger for logging deprecated resources usage
+     */
+    ControllerLogger DEPRECATED_LOGGER = Logger.getMessageLogger(ControllerLogger.class, ControllerLogger.class.getPackage().getName() + ".management-deprecated");
 
     /**
      * Logs a warning message indicating the address, represented by the {@code address} parameter, could not be
@@ -381,4 +384,15 @@ public interface ControllerLogger extends BasicLogger {
     @LogMessage(level = Level.WARN)
     @Message(id = 14625, value = "We have no transformer for subsystem: %s-%d.%d model transfer can break!")
     void transformerNotFound(String subsystemName, int major, int minor);
+
+    /**
+     * Logs a warning message indicating that an operation was interrupted before service stability was reached
+     */
+    @LogMessage(level = Level.WARN)
+    @Message(id = 14626, value = "Operation was interrupted before stability could be reached")
+    void interruptedWaitingStability();
+
+    @LogMessage(level = Level.INFO)
+    @Message(id = 14627, value = "Attribute %s is deprecated, and it might be removed in future version!")
+    void attributeDeprecated(String name);
 }

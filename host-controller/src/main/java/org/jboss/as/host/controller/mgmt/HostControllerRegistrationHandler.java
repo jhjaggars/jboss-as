@@ -22,36 +22,38 @@
 
 package org.jboss.as.host.controller.mgmt;
 
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.EXTENSION;
+import static org.jboss.as.host.controller.HostControllerLogger.DOMAIN_LOGGER;
+import static org.jboss.as.process.protocol.ProtocolUtils.expectHeader;
+
+import java.io.DataInput;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.jboss.as.controller.ModelController;
+import org.jboss.as.controller.ModelVersion;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.PathElement;
-import org.jboss.as.controller.ProxyOperationAddressTranslator;
+import org.jboss.as.controller.RunningMode;
 import org.jboss.as.controller.client.OperationAttachments;
 import org.jboss.as.controller.client.OperationMessageHandler;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
-
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.EXTENSION;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.MANAGEMENT_MAJOR_VERSION;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.MANAGEMENT_MINOR_VERSION;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.PRODUCT_NAME;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.PRODUCT_VERSION;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RELEASE_CODENAME;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RELEASE_VERSION;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUBSYSTEM;
 import org.jboss.as.controller.registry.Resource;
 import org.jboss.as.controller.transform.TransformationTarget;
 import org.jboss.as.controller.transform.TransformationTargetImpl;
+import org.jboss.as.controller.transform.TransformerRegistry;
 import org.jboss.as.controller.transform.Transformers;
 import org.jboss.as.domain.controller.DomainController;
 import org.jboss.as.domain.controller.DomainControllerMessages;
 import org.jboss.as.domain.controller.SlaveRegistrationException;
 import org.jboss.as.domain.controller.operations.ReadMasterDomainModelHandler;
-import static org.jboss.as.host.controller.HostControllerLogger.DOMAIN_LOGGER;
-import static org.jboss.as.process.protocol.ProtocolUtils.expectHeader;
-
 import org.jboss.as.host.controller.HostControllerMessages;
 import org.jboss.as.protocol.ProtocolLogger;
 import org.jboss.as.protocol.StreamUtils;
@@ -64,17 +66,11 @@ import org.jboss.as.protocol.mgmt.ManagementRequestHandler;
 import org.jboss.as.protocol.mgmt.ManagementRequestHandlerFactory;
 import org.jboss.as.protocol.mgmt.ManagementRequestHeader;
 import org.jboss.as.protocol.mgmt.ManagementResponseHeader;
-import org.jboss.as.version.ProductConfig;
 import org.jboss.dmr.ModelNode;
+import org.jboss.dmr.Property;
 import org.jboss.remoting3.Channel;
 import org.jboss.remoting3.CloseHandler;
 import org.jboss.threads.AsyncFutureTask;
-
-import java.io.DataInput;
-import java.io.IOException;
-import java.util.Collection;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Handler responsible for the host-controller registration process. This may involve assembling the correct
@@ -94,11 +90,13 @@ public class HostControllerRegistrationHandler implements ManagementRequestHandl
     private final ManagementChannelHandler handler;
     private final OperationExecutor operationExecutor;
     private final DomainController domainController;
+    private final Executor registrations;
 
-    public HostControllerRegistrationHandler(ManagementChannelHandler handler, DomainController domainController, OperationExecutor operationExecutor) {
+    public HostControllerRegistrationHandler(ManagementChannelHandler handler, DomainController domainController, OperationExecutor operationExecutor, Executor registrations) {
         this.handler = handler;
         this.operationExecutor = operationExecutor;
         this.domainController = domainController;
+        this.registrations = registrations;
     }
 
     @Override
@@ -107,7 +105,7 @@ public class HostControllerRegistrationHandler implements ManagementRequestHandl
         switch (operationId) {
             case DomainControllerProtocol.REGISTER_HOST_CONTROLLER_REQUEST:
                 // Start the registration process
-                final RegistrationContext context = new RegistrationContext();
+                final RegistrationContext context = new RegistrationContext(domainController.getExtensionRegistry().getTransformerRegistry());
                 context.activeOperation = handlers.registerActiveOperation(header.getBatchId(), context, context);
                 return new InitiateRegistrationHandler();
             case DomainControllerProtocol.REQUEST_SUBSYSTEM_VERSIONS:
@@ -151,37 +149,23 @@ public class HostControllerRegistrationHandler implements ManagementRequestHandl
 
             final RegistrationContext registration = context.getAttachment();
             registration.initialize(hostName, hostInfo, context);
-            if(domainController.isHostRegistered(hostName)) {
-                registration.failed(SlaveRegistrationException.ErrorCode.HOST_ALREADY_EXISTS, DomainControllerMessages.MESSAGES.slaveAlreadyRegistered(hostName));
+
+            if (domainController.getCurrentRunningMode() == RunningMode.ADMIN_ONLY) {
+                registration.failed(SlaveRegistrationException.ErrorCode.MASTER_IS_ADMIN_ONLY, DomainControllerMessages.MESSAGES.adminOnlyModeCannotAcceptSlaves(RunningMode.ADMIN_ONLY));
                 return;
             }
+            if (!domainController.getLocalHostInfo().isMasterDomainController()) {
+                registration.failed(SlaveRegistrationException.ErrorCode.HOST_IS_NOT_MASTER, DomainControllerMessages.MESSAGES.slaveControllerCannotAcceptOtherSlaves());
+                return;
+            }
+
             // Read the domain model async, this will block until the registration process is complete
             context.executeAsync(new ManagementRequestContext.AsyncTask<RegistrationContext>() {
                 @Override
                 public void execute(ManagementRequestContext<RegistrationContext> context) throws Exception {
-                    final Channel channel = context.getChannel();
-                    try {
-                        // The domain model is going to be sent as part of the prepared notification
-                        final OperationStepHandler handler = new HostRegistrationStepHandler(registration);
-                        operationExecutor.execute(READ_DOMAIN_MODEL, OperationMessageHandler.logging, registration, OperationAttachments.EMPTY, handler);
-                    } catch (Exception e) {
-                        registration.failed(e);
-                        return;
-                    }
-                    // Send a registered notification back
-                    registration.sendCompletedMessage();
-                    // Make sure that the host controller gets unregistered when the channel is closed
-                    channel.addCloseHandler(new CloseHandler<Channel>() {
-                        @Override
-                        public void handleClose(Channel closed, IOException exception) {
-                            if(domainController.isHostRegistered(hostName)) {
-                                DOMAIN_LOGGER.lostConnectionToRemoteHost(hostName);
-                            }
-                            domainController.unregisterRemoteHost(hostName);
-                        }
-                    });
+                    registration.processRegistration();
                 }
-            });
+            }, registrations);
 
         }
 
@@ -222,10 +206,11 @@ public class HostControllerRegistrationHandler implements ManagementRequestHandl
     }
 
     class HostRegistrationStepHandler implements OperationStepHandler {
-
-        private RegistrationContext registrationContext;
-        protected HostRegistrationStepHandler(final RegistrationContext registrationContext) {
+        private final TransformerRegistry transformerRegistry;
+        private final RegistrationContext registrationContext;
+        protected HostRegistrationStepHandler(final TransformerRegistry transformerRegistry, final RegistrationContext registrationContext) {
             this.registrationContext = registrationContext;
+            this.transformerRegistry = transformerRegistry;
         }
 
         @Override
@@ -237,42 +222,52 @@ public class HostControllerRegistrationHandler implements ManagementRequestHandl
                 final String failureDescription = DomainControllerMessages.MESSAGES.slaveAlreadyRegistered(registrationContext.hostName);
                 registrationContext.failed(SlaveRegistrationException.ErrorCode.HOST_ALREADY_EXISTS, failureDescription);
                 context.getFailureDescription().set(failureDescription);
-                context.completeStep();
+                context.stepCompleted();
                 return;
             }
-            // Read the domain root model
-            final Resource root = context.readResource(PathAddress.EMPTY_ADDRESS);
+            // Read the extensions (with recursive true, otherwise the entries are runtime=true - which are going to be ignored for transformation)
+            final Resource root = context.readResourceFromRoot(PathAddress.EMPTY_ADDRESS.append(PathElement.pathElement(EXTENSION)), true);
             // Check the mgmt version
-            final ModelNode hostInfo = registrationContext.hostInfo;
-            boolean as711 = hostInfo.get(MANAGEMENT_MAJOR_VERSION).asInt() == 1 && hostInfo.get(MANAGEMENT_MINOR_VERSION).asInt() == 1;
-            final Transformers transformers;
+            final HostInfo hostInfo = registrationContext.hostInfo;
+            final int major = hostInfo.getManagementMajorVersion();
+            final int minor = hostInfo.getManagementMinorVersion();
+            final int micro = hostInfo.getManagementMicroVersion();
+            boolean as711 = (major == 1 && minor == 1);
             if(as711) {
                 final OperationFailedException failure = HostControllerMessages.MESSAGES.unsupportedManagementVersionForHost(
-                        hostInfo.get(MANAGEMENT_MAJOR_VERSION).asInt(), hostInfo.get(MANAGEMENT_MINOR_VERSION).asInt(), 1, 2);
+                        major, minor, 1, 2);
                 registrationContext.failed(failure);
                 throw failure;
-            } else {
-                // Build the extensions list
-                final ModelNode extensions = new ModelNode();
-                final Collection<Resource.ResourceEntry> resources = root.getChildren(EXTENSION);
-                for(final Resource.ResourceEntry entry : resources) {
-                    extensions.add(entry.getName());
-                }
-                // Remotely resolve the subsystem versions and create the transformation
-                transformers = registrationContext.createTransfomers(extensions);
             }
+            // Initialize the transformers
+            final TransformationTarget target = TransformationTargetImpl.create(transformerRegistry, ModelVersion.create(major, minor, micro),
+                    Collections.<PathAddress, ModelVersion>emptyMap(), hostInfo, TransformationTarget.TransformationTargetType.HOST);
+            final Transformers transformers = Transformers.Factory.create(target);
+            // Build the extensions list
+            final ModelNode extensions = new ModelNode();
+            final Resource transformed = transformers.transformResource(Transformers.Factory.getTransformationContext(target, context), root);
+            final Collection<Resource.ResourceEntry> resources = transformed.getChildren(EXTENSION);
+            for(final Resource.ResourceEntry entry : resources) {
+                extensions.add(entry.getName());
+            }
+            if(! extensions.isDefined()) {
+                throw new OperationFailedException(extensions);
+            }
+            // Remotely resolve the subsystem versions and create the transformation
+            registrationContext.processSubsystems(transformers, extensions);
             // Now run the read-domain model operation
             final ReadMasterDomainModelHandler handler = new ReadMasterDomainModelHandler(transformers);
             context.addStep(READ_DOMAIN_MODEL, handler, OperationContext.Stage.MODEL);
             // Complete
-            context.completeStep(OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER);
+            context.stepCompleted();
         }
     }
 
-    class RegistrationContext implements ModelController.OperationTransactionControl, ActiveOperation.CompletedCallback<Void> {
+    private class RegistrationContext implements ModelController.OperationTransactionControl, ActiveOperation.CompletedCallback<Void> {
 
+        private final TransformerRegistry transformerRegistry;
         private String hostName;
-        private ModelNode hostInfo;
+        private HostInfo hostInfo;
         private ManagementRequestContext<RegistrationContext> responseChannel;
 
         private volatile IOTask<?> task;
@@ -281,9 +276,13 @@ public class HostControllerRegistrationHandler implements ManagementRequestHandl
         private ActiveOperation<Void, RegistrationContext> activeOperation;
         private final AtomicBoolean completed = new AtomicBoolean();
 
-        protected synchronized void initialize(final String hostName, final ModelNode hostInfo, final ManagementRequestContext<RegistrationContext> responseChannel) {
+        private RegistrationContext(TransformerRegistry transformerRegistry) {
+            this.transformerRegistry = transformerRegistry;
+        }
+
+        private synchronized void initialize(final String hostName, final ModelNode hostInfo, final ManagementRequestContext<RegistrationContext> responseChannel) {
             this.hostName = hostName;
-            this.hostInfo = hostInfo;
+            this.hostInfo = HostInfo.fromModelNode(hostInfo);
             this.responseChannel = responseChannel;
         }
 
@@ -321,13 +320,64 @@ public class HostControllerRegistrationHandler implements ManagementRequestHandl
         }
 
         /**
+         *  Process the registration of the slave whose informatin was provided to {@code initialize()}.
+         */
+        private void processRegistration() {
+
+            // Check for duplicate registrations
+            if (domainController.isHostRegistered(hostName)) {
+                // asynchronously ping the existing host to validate it's still connected
+                // If not, the ping will remove it and a subsequent attempt by the new host will succeed
+                // TODO look into doing the ping synchronously
+                domainController.pingRemoteHost(hostName);
+                // Quick hack -- wait a bit to let async ping detect a re-registration. This can easily be improved
+                // via the TODO above
+                boolean inter = false; // TODO this is not used
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt(); // TODO why not set inter = true and do this in finally?
+                } finally {
+                    // Now see if the existing registration has been removed
+                    if (domainController.isHostRegistered(hostName)) {
+                        failed(SlaveRegistrationException.ErrorCode.HOST_ALREADY_EXISTS, DomainControllerMessages.MESSAGES.slaveAlreadyRegistered(hostName));
+                    }
+                }
+            }
+
+            if (!failed) {
+                try {
+                    // The domain model is going to be sent as part of the prepared notification
+                    final OperationStepHandler handler = new HostRegistrationStepHandler(transformerRegistry, this);
+                    operationExecutor.execute(READ_DOMAIN_MODEL, OperationMessageHandler.logging, this, OperationAttachments.EMPTY, handler);
+                } catch (Exception e) {
+                    failed(e);
+                    return;
+                }
+                // Send a registered notification back
+                sendCompletedMessage();
+                // Make sure that the host controller gets unregistered when the channel is closed
+                responseChannel.getChannel().addCloseHandler(new CloseHandler<Channel>() {
+                    @Override
+                    public void handleClose(Channel closed, IOException exception) {
+                        if (domainController.isHostRegistered(hostName)) {
+                            DOMAIN_LOGGER.lostConnectionToRemoteHost(hostName);
+                        }
+                        domainController.unregisterRemoteHost(hostName, getRemoteConnectionId());
+                    }
+                });
+            }
+        }
+
+
+        /**
          * Create the transformers. This will remotely resolve the subsystem versions.
          *
          * @param extensions the extensions
-         * @return the transformers
          * @throws OperationFailedException
          */
-        protected Transformers createTransfomers(final ModelNode extensions) throws OperationFailedException {
+        private void processSubsystems(final Transformers transformers, final ModelNode extensions) throws OperationFailedException {
+            this.transformers = transformers;
             final ModelNode subsystems = executeBlocking(new IOTask<ModelNode>() {
                 @Override
                 void sendMessage(FlushableDataOutput output) throws IOException {
@@ -337,13 +387,12 @@ public class HostControllerRegistrationHandler implements ManagementRequestHandl
             if(failed) {
                 throw new OperationFailedException(new ModelNode("failed to setup transformers"));
             }
-            // Initialize the transformers
-            final int major = hostInfo.get(MANAGEMENT_MAJOR_VERSION).asInt();
-            final int minor = hostInfo.get(MANAGEMENT_MINOR_VERSION).asInt();
-            final TransformationTarget target = TransformationTargetImpl.create(major, minor, subsystems);
-            final Transformers transformers = Transformers.Factory.create(target);
-            this.transformers = transformers;
-            return transformers;
+            final TransformationTarget target = transformers.getTarget();
+            for(final Property subsystem : subsystems.asPropertyList()) {
+                final String subsystemName = subsystem.getName();
+                final ModelNode version = subsystem.getValue();
+                target.addSubsystemVersion(subsystemName, ModelVersion.fromString(version.asString()));
+            }
         }
 
         protected void setSubsystems(final ModelNode resolved, final ManagementRequestContext<RegistrationContext> responseChannel) {
@@ -373,11 +422,9 @@ public class HostControllerRegistrationHandler implements ManagementRequestHandl
                 return;
             }
             synchronized (this) {
-                // Create the proxy controller
-                final PathAddress addr = PathAddress.pathAddress(PathElement.pathElement(ModelDescriptionConstants.HOST, hostName));
-                final TransformingProxyController transforming = TransformingProxyController.Factory.create(handler, transformers, addr, ProxyOperationAddressTranslator.HOST);
-                // Register proxy controller
-                domainController.registerRemoteHost(transforming);
+                Long pingPongId = hostInfo.getRemoteConnectionId();
+                // Register the slave
+                domainController.registerRemoteHost(hostName, handler, transformers, pingPongId);
                 // Complete registration
                 if(! failed) {
                     transaction.commit();
@@ -386,18 +433,7 @@ public class HostControllerRegistrationHandler implements ManagementRequestHandl
                     return;
                 }
             }
-            final String productName;
-            if(hostInfo.hasDefined(PRODUCT_NAME)) {
-                final String name = hostInfo.get(PRODUCT_NAME).asString();
-                final String version1 = hostInfo.get(PRODUCT_VERSION).asString();
-                final String version2 = hostInfo.get(RELEASE_VERSION).asString();
-                productName = ProductConfig.getPrettyVersionString(name, version1, version2);
-            } else {
-                String version1 = hostInfo.get(RELEASE_VERSION).asString();
-                String version2 = hostInfo.get(RELEASE_CODENAME).asString();
-                productName = ProductConfig.getPrettyVersionString(null, version1, version2);
-            }
-            DOMAIN_LOGGER.registeredRemoteSlaveHost(hostName, productName);
+            DOMAIN_LOGGER.registeredRemoteSlaveHost(hostName, hostInfo.getPrettyProductName());
         }
 
         void completeRegistration(final ManagementRequestContext<RegistrationContext> responseChannel, boolean commit) {
@@ -435,6 +471,10 @@ public class HostControllerRegistrationHandler implements ManagementRequestHandl
                 }
                 activeOperation.getResultHandler().done(null);
             }
+        }
+
+        Long getRemoteConnectionId() {
+            return hostInfo.getRemoteConnectionId();
         }
 
         protected boolean completeTask(Object result) {

@@ -22,25 +22,25 @@
 
 package org.jboss.as.controller;
 
-import org.jboss.as.controller.client.helpers.MeasurementUnit;
-import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
-import org.jboss.as.controller.descriptions.ResourceDescriptionResolver;
-import org.jboss.as.controller.operations.validation.AllowedValuesValidator;
-import org.jboss.as.controller.operations.validation.MinMaxValidator;
-import org.jboss.as.controller.operations.validation.ObjectTypeValidator;
-import org.jboss.as.controller.operations.validation.ParameterValidator;
-import org.jboss.as.controller.registry.AttributeAccess;
-import org.jboss.dmr.ModelNode;
-import org.jboss.dmr.ModelType;
-
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
-import javax.xml.stream.XMLStreamWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
+
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.stream.XMLStreamWriter;
+
+import org.jboss.as.controller.client.helpers.MeasurementUnit;
+import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
+import org.jboss.as.controller.descriptions.ResourceDescriptionResolver;
+import org.jboss.as.controller.operations.validation.AllowedValuesValidator;
+import org.jboss.as.controller.operations.validation.MinMaxValidator;
+import org.jboss.as.controller.operations.validation.ParameterValidator;
+import org.jboss.as.controller.registry.AttributeAccess;
+import org.jboss.dmr.ModelNode;
+import org.jboss.dmr.ModelType;
 
 /**
  * Date: 15.11.2011
@@ -52,24 +52,13 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
     private final AttributeDefinition[] valueTypes;
     private final String suffix;
 
-    /**
-     * Constructor which enables validation via ObjectTypeValidator.
-     */
-    private ObjectTypeAttributeDefinition(final String name, final String xmlName, final String suffix, final AttributeDefinition[] valueTypes, final boolean allowNull, final ParameterCorrector corrector, final String[] alternatives, final String[] requires, final AttributeAccess.Flag... flags) {
-        super(name, xmlName, null, ModelType.OBJECT, allowNull, false, null, corrector, new ObjectTypeValidator(allowNull, valueTypes), false, alternatives, requires, flags);
-        this.valueTypes = valueTypes;
-        if (suffix == null) {
-            this.suffix = "";
-        } else {
-            this.suffix = suffix;
-        }
-    }
-
     /*
      * Constructor which allows specifying a custom ParameterValidator. Disabled by default.
      */
-    private ObjectTypeAttributeDefinition(final String name, final String xmlName, final String suffix, final AttributeDefinition[] valueTypes, final boolean allowNull, final ParameterValidator validator, final ParameterCorrector corrector, final String[] alternatives, final String[] requires, final AttributeAccess.Flag... flags) {
-        super(name, xmlName, null, ModelType.OBJECT, allowNull, false, null, corrector, validator, false, alternatives, requires, flags);
+    protected ObjectTypeAttributeDefinition(final String name, final String xmlName, final String suffix, final AttributeDefinition[] valueTypes, final boolean allowNull,
+                                            final ParameterValidator validator, final ParameterCorrector corrector, final String[] alternatives, final String[] requires,
+                                            final AttributeMarshaller attributeMarshaller, final boolean resourceOnly, final DeprecationData deprecated, final AttributeAccess.Flag... flags) {
+        super(name, xmlName, null, ModelType.OBJECT, allowNull, false, null, corrector, validator, false, alternatives, requires, attributeMarshaller, resourceOnly, deprecated, flags);
         this.valueTypes = valueTypes;
         if (suffix == null) {
             this.suffix = "";
@@ -88,7 +77,7 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
     @Override
     public ModelNode addResourceAttributeDescription(ResourceBundle bundle, String prefix, ModelNode resourceDescription) {
         final ModelNode result = super.addResourceAttributeDescription(bundle, prefix, resourceDescription);
-        addValueTypeDescription(result, prefix, bundle);
+        addValueTypeDescription(result, prefix, bundle, null, null);
         return result;
     }
 
@@ -96,14 +85,14 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
                                                       final ResourceDescriptionResolver resolver,
                                                       final Locale locale, final ResourceBundle bundle) {
         final ModelNode result = super.addOperationParameterDescription(resourceDescription, operationName, resolver, locale, bundle);
-        addValueTypeDescription(result, getName(), bundle);
+        addValueTypeDescription(result, getName(), bundle, resolver, locale);
         return result;
     }
 
     public ModelNode addResourceAttributeDescription(final ModelNode resourceDescription, final ResourceDescriptionResolver resolver,
                                                      final Locale locale, final ResourceBundle bundle) {
         final ModelNode result = super.addResourceAttributeDescription(resourceDescription, resolver, locale, bundle);
-        addValueTypeDescription(result, getName(), bundle);
+        addValueTypeDescription(result, getName(), bundle, resolver, locale);
         return result;
     }
 
@@ -111,30 +100,41 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
     @Override
     public ModelNode addOperationParameterDescription(ResourceBundle bundle, String prefix, ModelNode operationDescription) {
         final ModelNode result = super.addOperationParameterDescription(bundle, prefix, operationDescription);
-        addValueTypeDescription(result, prefix, bundle);
+        addValueTypeDescription(result, prefix, bundle, null, null);
         return result;
     }
 
-    protected void addValueTypeDescription(final ModelNode node, final String prefix, final ResourceBundle bundle) {
+    protected void addValueTypeDescription(final ModelNode node, final String prefix, final ResourceBundle bundle,
+                                           final ResourceDescriptionResolver resolver,
+                                           final Locale locale) {
         for (AttributeDefinition valueType : valueTypes) {
             // get the value type description of the attribute
             final ModelNode valueTypeDesc = getValueTypeDescription(valueType, false);
             final String p;
-            if ((prefix == null || prefix.isEmpty()) && (suffix != null && suffix.isEmpty())) {
+            boolean prefixUnuseable = prefix == null || prefix.isEmpty() ;
+            boolean suffixUnuseable = suffix == null || suffix.isEmpty() ;
+
+            if (prefixUnuseable && !suffixUnuseable) {
                 p = suffix;
-            } else if (suffix == null || suffix.isEmpty()) {
+            } else if (!prefixUnuseable && suffixUnuseable) {
                 p = prefix;
             } else {
                 p = String.format("%s.%s", prefix, suffix);
             }
+
             // get the text description of the attribute
-            valueTypeDesc.get(ModelDescriptionConstants.DESCRIPTION).set(valueType.getAttributeTextDescription(bundle, p));
+            if (resolver != null) {
+                final String key = String.format("%s.%s", p, valueType.getName());
+                valueTypeDesc.get(ModelDescriptionConstants.DESCRIPTION).set(resolver.getResourceAttributeDescription(key, locale, bundle));
+            } else {
+                valueTypeDesc.get(ModelDescriptionConstants.DESCRIPTION).set(valueType.getAttributeTextDescription(bundle, p));
+            }
             // set it as one of our value types, and return the value
             final ModelNode childType = node.get(ModelDescriptionConstants.VALUE_TYPE, valueType.getName()).set(valueTypeDesc);
             // if it is of type OBJECT itself (add its nested descriptions)
             // seeing that OBJECT represents a grouping, use prefix+"."+suffix for naming the entries
             if (valueType instanceof ObjectTypeAttributeDefinition) {
-                ObjectTypeAttributeDefinition.class.cast(valueType).addValueTypeDescription(childType, p, bundle);
+                ObjectTypeAttributeDefinition.class.cast(valueType).addValueTypeDescription(childType, p, bundle, resolver, locale);
             }
             // if it is of type LIST, and its value type
             // seeing that LIST represents a grouping, use prefix+"."+suffix for naming the entries
@@ -145,7 +145,7 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
     }
 
     @Override
-    public void marshallAsElement(final ModelNode resourceModel, final XMLStreamWriter writer) throws XMLStreamException {
+    public void marshallAsElement(final ModelNode resourceModel, final boolean marshalDefault, final XMLStreamWriter writer) throws XMLStreamException {
         if (resourceModel.hasDefined(getName())) {
             writer.writeStartElement(getXmlName());
             for (AttributeDefinition valueType : valueTypes) {
@@ -165,7 +165,7 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
         if (forOperation) {
             result.get(ModelDescriptionConstants.REQUIRED).set(!valueType.isAllowNull());
         }
-        result.get(ModelDescriptionConstants.NILLABLE).set(isAllowNull());
+        result.get(ModelDescriptionConstants.NILLABLE).set(valueType.isAllowNull());
         final ModelNode defaultValue = valueType.getDefaultValue();
         if (!forOperation && defaultValue != null && defaultValue.isDefined()) {
             result.get(ModelDescriptionConstants.DEFAULT).set(defaultValue);
@@ -195,6 +195,7 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
                     case STRING:
                     case LIST:
                     case OBJECT:
+                    case BYTES:
                         result.get(ModelDescriptionConstants.MIN_LENGTH).set(min);
                         break;
                     default:
@@ -207,6 +208,7 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
                     case STRING:
                     case LIST:
                     case OBJECT:
+                    case BYTES:
                         result.get(ModelDescriptionConstants.MAX_LENGTH).set(max);
                         break;
                     default:
@@ -227,22 +229,14 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
         return result;
     }
 
-    public static class Builder {
-        private final String name;
+    public static final class Builder extends AbstractAttributeDefinitionBuilder<Builder, ObjectTypeAttributeDefinition> {
         private String suffix;
         private final AttributeDefinition[] valueTypes;
-        private ParameterValidator validator;
-        private ParameterCorrector corrector;
-        private String xmlName;
-        private boolean allowNull;
-        private String[] alternatives;
-        private String[] requires;
-        private AttributeAccess.Flag[] flags;
 
         public Builder(final String name, final AttributeDefinition... valueTypes) {
-            this.name = name;
+            super(name, ModelType.OBJECT, true);
             this.valueTypes = valueTypes;
-            this.allowNull = true;
+
         }
 
         public static Builder of(final String name, final AttributeDefinition... valueTypes) {
@@ -250,7 +244,6 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
         }
 
         public static Builder of(final String name, final AttributeDefinition[] valueTypes, final AttributeDefinition[] moreValueTypes) {
-
             ArrayList<AttributeDefinition> list = new ArrayList<AttributeDefinition>(Arrays.asList(valueTypes));
             list.addAll(Arrays.asList(moreValueTypes));
             AttributeDefinition[] allValueTypes = new AttributeDefinition[list.size()];
@@ -261,36 +254,7 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
 
         public ObjectTypeAttributeDefinition build() {
             if (xmlName == null) { xmlName = name; }
-            return new ObjectTypeAttributeDefinition(name, xmlName, suffix, valueTypes, allowNull, validator, corrector, alternatives, requires, flags);
-        }
-
-        public Builder setAllowNull(final boolean allowNull) {
-            this.allowNull = allowNull;
-            return this;
-        }
-
-        public Builder setAlternates(final String... alternates) {
-            this.alternatives = alternates;
-            return this;
-        }
-
-        public Builder setCorrector(final ParameterCorrector corrector) {
-            this.corrector = corrector;
-            return this;
-        }
-
-        public void setValidator(ParameterValidator validator) {
-            this.validator = validator;
-        }
-
-        public Builder setFlags(final AttributeAccess.Flag... flags) {
-            this.flags = flags;
-            return this;
-        }
-
-        public Builder setRequires(final String... requires) {
-            this.requires = requires;
-            return this;
+            return new ObjectTypeAttributeDefinition(name, xmlName, suffix, valueTypes, allowNull, validator, corrector, alternatives, requires, attributeMarshaller, resourceOnly, deprecated, flags);
         }
 
         public Builder setSuffix(final String suffix) {
@@ -298,9 +262,13 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
             return this;
         }
 
-        public Builder setXmlName(final String xmlName) {
-            this.xmlName = xmlName;
-            return this;
+        /*
+       --------------------------
+       added for binary compatibility for running compatibilty tests
+        */
+        @Override
+        public Builder setAllowNull(boolean allowNull) {
+            return super.setAllowNull(allowNull);
         }
     }
 }

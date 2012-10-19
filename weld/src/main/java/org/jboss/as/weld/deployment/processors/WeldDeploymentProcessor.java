@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import javax.enterprise.inject.spi.Extension;
@@ -35,9 +36,11 @@ import javax.validation.ValidatorFactory;
 import org.jboss.as.ee.beanvalidation.BeanValidationAttachments;
 import org.jboss.as.ee.component.EEApplicationDescription;
 import org.jboss.as.ee.component.EEModuleDescription;
+import org.jboss.as.jpa.config.Configuration;
 import org.jboss.as.jpa.config.PersistenceUnitMetadataHolder;
 import org.jboss.as.jpa.service.PersistenceUnitServiceImpl;
 import org.jboss.as.jpa.spi.PersistenceUnitMetadata;
+import org.jboss.as.naming.deployment.JndiNamingDependencyProcessor;
 import org.jboss.as.security.service.SimpleSecurityManager;
 import org.jboss.as.security.service.SimpleSecurityManagerService;
 import org.jboss.as.server.deployment.Attachments;
@@ -56,6 +59,7 @@ import org.jboss.as.weld.WeldDeploymentMarker;
 import org.jboss.as.weld.WeldLogger;
 import org.jboss.as.weld.deployment.BeanDeploymentArchiveImpl;
 import org.jboss.as.weld.deployment.BeanDeploymentModule;
+import org.jboss.as.weld.deployment.CdiAnnotationMarker;
 import org.jboss.as.weld.deployment.WeldAttachments;
 import org.jboss.as.weld.deployment.WeldDeployment;
 import org.jboss.as.weld.services.TCCLSingletonService;
@@ -94,6 +98,12 @@ public class WeldDeploymentProcessor implements DeploymentUnitProcessor {
         final ServiceTarget serviceTarget = phaseContext.getServiceTarget();
         final ResourceRoot deploymentRoot = deploymentUnit.getAttachment(Attachments.DEPLOYMENT_ROOT);
         if (!WeldDeploymentMarker.isPartOfWeldDeployment(deploymentUnit)) {
+
+            //if there are CDI annotation present and this is the top level deployment we log a warning
+            if (deploymentUnit.getParent() == null && CdiAnnotationMarker.cdiAnnotationsPresent(deploymentUnit)) {
+                WeldLogger.DEPLOYMENT_LOGGER.cdiAnnotationsButNoBeansXML(deploymentUnit);
+            }
+
             return;
         }
 
@@ -206,6 +216,10 @@ public class WeldDeploymentProcessor implements DeploymentUnitProcessor {
         installTransactionService(serviceTarget, deploymentUnit, weldService, weldServiceBuilder);
 
         weldServiceBuilder.addDependencies(jpaServices);
+
+        //make sure JNDI bindings are up
+        weldServiceBuilder.addDependency(JndiNamingDependencyProcessor.serviceName(deploymentUnit));
+
         weldServiceBuilder.install();
 
     }
@@ -216,8 +230,13 @@ public class WeldDeploymentProcessor implements DeploymentUnitProcessor {
             final PersistenceUnitMetadataHolder persistenceUnits = root.getAttachment(PersistenceUnitMetadataHolder.PERSISTENCE_UNITS);
             if (persistenceUnits != null && persistenceUnits.getPersistenceUnits() != null) {
                 for (final PersistenceUnitMetadata pu : persistenceUnits.getPersistenceUnits()) {
-                    final ServiceName serviceName = PersistenceUnitServiceImpl.getPUServiceName(pu);
-                    jpaServices.add(serviceName);
+                    final Properties properties = pu.getProperties();
+                    final String jpaContainerManaged = properties.getProperty(Configuration.JPA_CONTAINER_MANAGED);
+                    final boolean deployPU = (jpaContainerManaged == null || Boolean.parseBoolean(jpaContainerManaged));
+                    if (deployPU) {
+                        final ServiceName serviceName = PersistenceUnitServiceImpl.getPUServiceName(pu);
+                        jpaServices.add(serviceName);
+                    }
                 }
             }
         }

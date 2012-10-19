@@ -22,41 +22,61 @@
 
 package org.jboss.as.osgi.deployment;
 
+import org.jboss.as.ee.structure.DeploymentType;
+import org.jboss.as.ee.structure.DeploymentTypeMarker;
+import org.jboss.as.osgi.OSGiConstants;
+import org.jboss.as.osgi.service.ModuleRegistrationTracker;
 import org.jboss.as.server.deployment.Attachments;
 import org.jboss.as.server.deployment.DeploymentPhaseContext;
 import org.jboss.as.server.deployment.DeploymentUnit;
 import org.jboss.as.server.deployment.DeploymentUnitProcessingException;
 import org.jboss.as.server.deployment.DeploymentUnitProcessor;
+import org.jboss.as.server.deployment.module.ModuleSpecification;
 import org.jboss.modules.Module;
 import org.jboss.osgi.metadata.OSGiMetaData;
+import org.jboss.osgi.resolver.XEnvironment;
 
 /**
  * Processes deployments that have a Module attached.
  *
- * If so, it creates an {@link ModuleRegisterService}.
+ * If so, register the module with the {@link XEnvironment}.
  *
  * @author Thomas.Diesler@jboss.com
  * @since 03-Jun-2011
  */
 public class ModuleRegisterProcessor implements DeploymentUnitProcessor {
 
+    private final ModuleRegistrationTracker registrationTracker;
+
+    public ModuleRegisterProcessor(ModuleRegistrationTracker tracker) {
+        this.registrationTracker = tracker;
+    }
+
     @Override
     public void deploy(final DeploymentPhaseContext phaseContext) throws DeploymentUnitProcessingException {
 
-        // Create the {@link ModuleRegisterService}
+        // Don't register EAR deployments
         final DeploymentUnit depUnit = phaseContext.getDeploymentUnit();
+        if (DeploymentTypeMarker.isType(DeploymentType.EAR, depUnit))
+            return;
+
+        // Don't register Bundle deployments
+        if (depUnit.hasAttachment(OSGiConstants.BUNDLE_KEY))
+            return;
+
+        // Don't register private module deployments
         final Module module = depUnit.getAttachment(Attachments.MODULE);
-        final OSGiMetaData metadata = OSGiMetaDataAttachment.getOSGiMetaData(depUnit);
-        if (module != null) {
-            ModuleRegisterService.addService(phaseContext, module, metadata);
-        }
+        final ModuleSpecification moduleSpecification = depUnit.getAttachment(Attachments.MODULE_SPECIFICATION);
+        if (module == null || moduleSpecification.isPrivateModule())
+            return;
+
+        OSGiMetaData metadata = depUnit.getAttachment(OSGiConstants.OSGI_METADATA_KEY);
+        registrationTracker.registerModule(module, metadata);
     }
 
     @Override
     public void undeploy(final DeploymentUnit depUnit) {
         final Module module = depUnit.getAttachment(Attachments.MODULE);
-        if (module != null) {
-            ModuleRegisterService.removeService(depUnit);
-        }
+        registrationTracker.unregisterModule(module);
     }
 }

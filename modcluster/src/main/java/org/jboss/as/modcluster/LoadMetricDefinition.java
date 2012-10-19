@@ -1,5 +1,7 @@
 package org.jboss.as.modcluster;
 
+import org.jboss.as.controller.AttributeDefinition;
+import org.jboss.as.controller.PropertiesAttributeDefinition;
 import org.jboss.as.controller.ReloadRequiredRemoveStepHandler;
 import org.jboss.as.controller.ReloadRequiredWriteAttributeHandler;
 import org.jboss.as.controller.SimpleAttributeDefinition;
@@ -28,15 +30,13 @@ public class LoadMetricDefinition extends SimpleResourceDefinition {
             .addFlag(AttributeAccess.Flag.RESTART_ALL_SERVICES)
             .setDefaultValue(new ModelNode(LoadMetric.DEFAULT_WEIGHT))
             .build();
-    static final SimpleAttributeDefinition CAPACITY = SimpleAttributeDefinitionBuilder.create(CommonAttributes.CAPACITY, ModelType.INT, true)
+    static final SimpleAttributeDefinition CAPACITY = SimpleAttributeDefinitionBuilder.create(CommonAttributes.CAPACITY, ModelType.DOUBLE, true)
+            .addFlag(AttributeAccess.Flag.RESTART_ALL_SERVICES)
             .setDefaultValue(new ModelNode(LoadMetric.DEFAULT_CAPACITY))
-            .addFlag(AttributeAccess.Flag.RESTART_ALL_SERVICES)
             .build();
-    static final SimpleAttributeDefinition PROPERTY = SimpleAttributeDefinitionBuilder.create(CommonAttributes.PROPERTY, ModelType.PROPERTY, true)
-            .addFlag(AttributeAccess.Flag.RESTART_ALL_SERVICES)
-            .build();
+    static final PropertiesAttributeDefinition PROPERTY = new PropertiesAttributeDefinition(CommonAttributes.PROPERTY, CommonAttributes.PROPERTY, true);
 
-    static final SimpleAttributeDefinition[] ATTRIBUTES = {
+    static final AttributeDefinition[] ATTRIBUTES = {
             TYPE, WEIGHT, CAPACITY, PROPERTY
     };
 
@@ -51,7 +51,7 @@ public class LoadMetricDefinition extends SimpleResourceDefinition {
 
     @Override
     public void registerAttributes(ManagementResourceRegistration resourceRegistration) {
-        for (SimpleAttributeDefinition def : ATTRIBUTES) {
+        for (AttributeDefinition def : ATTRIBUTES) {
             resourceRegistration.registerReadWriteAttribute(def, null, new ReloadRequiredWriteAttributeHandler(def));
         }
     }

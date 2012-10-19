@@ -29,7 +29,7 @@ import javax.ejb.Stateful;
  * User: jpai
  */
 @Stateful
-public class SFSBWithRemoveMethods {
+public class SFSBWithRemoveMethods extends BaseSFSB {
 
     @Remove
     public void remove() {

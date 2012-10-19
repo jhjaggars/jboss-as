@@ -163,6 +163,7 @@ import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
 import org.jboss.as.controller.descriptions.ResourceDescriptionResolver;
 import org.jboss.as.controller.descriptions.StandardResourceDescriptionResolver;
 import org.jboss.as.controller.descriptions.common.CommonDescriptions;
+import org.jboss.as.controller.operations.common.GenericSubsystemDescribeHandler;
 import org.jboss.as.controller.operations.common.Util;
 import org.jboss.as.controller.parsing.ExtensionParsingContext;
 import org.jboss.as.controller.persistence.SubsystemMarshallingContext;
@@ -201,6 +202,7 @@ public class DataSourcesExtension implements Extension {
 
     private static final int MANAGEMENT_API_MAJOR_VERSION = 1;
     private static final int MANAGEMENT_API_MINOR_VERSION = 1;
+    private static final int MANAGEMENT_API_MICRO_VERSION = 1;
 
     @Override
     public void initialize(final ExtensionContext context) {
@@ -209,7 +211,8 @@ public class DataSourcesExtension implements Extension {
         boolean registerRuntimeOnly = context.isRuntimeOnlyRegistrationValid();
 
         // Register the remoting subsystem
-        final SubsystemRegistration registration = context.registerSubsystem(SUBSYSTEM_NAME, MANAGEMENT_API_MAJOR_VERSION, MANAGEMENT_API_MINOR_VERSION);
+        final SubsystemRegistration registration = context.registerSubsystem(SUBSYSTEM_NAME, MANAGEMENT_API_MAJOR_VERSION,
+                MANAGEMENT_API_MINOR_VERSION, MANAGEMENT_API_MICRO_VERSION);
 
         registration.registerXMLElementWriter(DataSourceSubsystemParser.INSTANCE);
 
@@ -233,6 +236,7 @@ public class DataSourcesExtension implements Extension {
         jdbcDrivers.registerOperationHandler(REMOVE, JdbcDriverRemove.INSTANCE, REMOVE_JDBC_DRIVER_DESC, false);
         jdbcDrivers.registerReadOnlyAttribute(Constants.DRIVER_MAJOR_VERSION, null);
         jdbcDrivers.registerReadOnlyAttribute(Constants.DRIVER_MINOR_VERSION, null);
+        jdbcDrivers.registerReadOnlyAttribute(Constants.DRIVER_DATASOURCE_CLASS_NAME, null);
         jdbcDrivers.registerReadOnlyAttribute(Constants.XADATASOURCECLASS, null);
         jdbcDrivers.registerReadOnlyAttribute(Constants.DRIVER_CLASS_NAME, null);
         jdbcDrivers.registerReadOnlyAttribute(Constants.DRIVER_NAME, null);
@@ -924,12 +928,12 @@ public class DataSourcesExtension implements Extension {
                 }
             }
 
-            context.completeStep();
+            context.stepCompleted();
         }
 
         @Override
         public ModelNode getModelDescription(Locale locale) {
-            return CommonDescriptions.getSubsystemDescribeOperation(locale);
+            return GenericSubsystemDescribeHandler.DEFINITION.getDescriptionProvider().getModelDescription(locale);
         }
     }
 

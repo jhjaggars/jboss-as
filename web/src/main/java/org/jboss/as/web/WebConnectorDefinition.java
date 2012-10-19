@@ -1,8 +1,10 @@
 package org.jboss.as.web;
 
+import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.ReloadRequiredWriteAttributeHandler;
 import org.jboss.as.controller.SimpleAttributeDefinition;
 import org.jboss.as.controller.SimpleAttributeDefinitionBuilder;
+import org.jboss.as.controller.SimpleListAttributeDefinition;
 import org.jboss.as.controller.SimpleResourceDefinition;
 import org.jboss.as.controller.operations.validation.IntRangeValidator;
 import org.jboss.as.controller.operations.validation.StringLengthValidator;
@@ -95,7 +97,7 @@ public class WebConnectorDefinition extends SimpleResourceDefinition {
             new SimpleAttributeDefinitionBuilder(Constants.MAX_POST_SIZE, ModelType.INT)
                     .setXmlName(Constants.MAX_POST_SIZE)
                     .setAllowNull(true)
-                    .setValidator(new IntRangeValidator(1024, true))
+                    .setValidator(new IntRangeValidator(0, true))
                     .setFlags(AttributeAccess.Flag.RESTART_ALL_SERVICES)
                     .setDefaultValue(new ModelNode(2097152))
                     .build();
@@ -135,13 +137,16 @@ public class WebConnectorDefinition extends SimpleResourceDefinition {
                             //.setDefaultValue(new ModelNode(8433))
                     .build();
 
-    protected static final SimpleAttributeDefinition VIRTUAL_SERVER =
-            new SimpleAttributeDefinitionBuilder(Constants.VIRTUAL_SERVER, ModelType.STRING)
-                    .setXmlName(Constants.VIRTUAL_SERVER)
-                    .setAllowNull(true)
-                    .setFlags(AttributeAccess.Flag.RESTART_ALL_SERVICES)
-                    .setValidator(new StringLengthValidator(1, true))
-                    .build();
+    protected static final SimpleListAttributeDefinition VIRTUAL_SERVER =
+                SimpleListAttributeDefinition.Builder.of(Constants.VIRTUAL_SERVER,
+                        new SimpleAttributeDefinitionBuilder(Constants.VIRTUAL_SERVER, ModelType.STRING, false)
+                                .setXmlName(Constants.VIRTUAL_SERVER)
+                                .setAllowNull(false)
+                                .setValidator(new StringLengthValidator(1, false))
+                                .setFlags(AttributeAccess.Flag.RESTART_RESOURCE_SERVICES)
+                                .build())
+                        .setAllowNull(true)
+                        .build();
 
     protected static final SimpleAttributeDefinition[] CONNECTOR_ATTRIBUTES = {
             //NAME, // name is read-only
@@ -158,8 +163,7 @@ public class WebConnectorDefinition extends SimpleResourceDefinition {
             MAX_SAVE_POST_SIZE,
             ENABLED,
             EXECUTOR,
-            MAX_CONNECTIONS,
-            VIRTUAL_SERVER
+            MAX_CONNECTIONS
 
     };
 
@@ -174,9 +178,10 @@ public class WebConnectorDefinition extends SimpleResourceDefinition {
     @Override
     public void registerAttributes(ManagementResourceRegistration connectors) {
         connectors.registerReadOnlyAttribute(NAME, null);
-        for (SimpleAttributeDefinition def : CONNECTOR_ATTRIBUTES) {
+        for (AttributeDefinition def : CONNECTOR_ATTRIBUTES) {
             connectors.registerReadWriteAttribute(def, null, new ReloadRequiredWriteAttributeHandler(def));
         }
+        connectors.registerReadWriteAttribute(VIRTUAL_SERVER,null,new ReloadRequiredWriteAttributeHandler(VIRTUAL_SERVER));
 
         for (final SimpleAttributeDefinition def : WebConnectorMetrics.ATTRIBUTES) {
             connectors.registerMetric(def, WebConnectorMetrics.INSTANCE);

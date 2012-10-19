@@ -26,6 +26,7 @@ import java.util.Map;
 
 import javax.security.auth.callback.CallbackHandler;
 
+import org.jboss.as.controller.ProxyController;
 import org.jboss.as.controller.client.helpers.domain.ServerStatus;
 import org.jboss.as.process.ProcessInfo;
 import org.jboss.as.process.ProcessMessageHandler;
@@ -160,7 +161,7 @@ public interface ServerInventory {
      * @param running whether the process was running. If {@code false}, the existence of the server will be
      *                recorded but no attempt to contact it will be made
      */
-    void reconnectServer(final String serverName, final ModelNode domainModel, final boolean running);
+    void reconnectServer(final String serverName, final ModelNode domainModel, final boolean running, final boolean stopping);
 
     /**
      * Gets a callback handler security services can use for handling authentication data provided by
@@ -175,8 +176,9 @@ public interface ServerInventory {
      *
      * @param serverProcessName the name of the server process
      * @param channelHandler remoting channel to use for communicating with the server
+     * @return the server proxy
      */
-    void serverCommunicationRegistered(String serverProcessName, ManagementChannelHandler channelHandler);
+    ProxyController serverCommunicationRegistered(String serverProcessName, ManagementChannelHandler channelHandler);
 
     /**
      * Notification that a server has been reconnected.

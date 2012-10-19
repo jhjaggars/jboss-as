@@ -33,7 +33,7 @@ import org.jboss.as.controller.SimpleResourceDefinition;
 import org.jboss.as.controller.descriptions.DefaultResourceAddDescriptionProvider;
 import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
-import org.jboss.as.controller.descriptions.common.CommonDescriptions;
+import org.jboss.as.controller.descriptions.common.ControllerResolver;
 import org.jboss.as.controller.operations.validation.IntRangeValidator;
 import org.jboss.as.controller.operations.validation.MulticastAddressValidator;
 import org.jboss.as.controller.operations.validation.StringLengthValidator;
@@ -53,6 +53,7 @@ public abstract class AbstractSocketBindingResourceDefinition extends SimpleReso
     // Common attributes
 
     public static final SimpleAttributeDefinition NAME = new SimpleAttributeDefinitionBuilder(ModelDescriptionConstants.NAME, ModelType.STRING, false)
+            .setResourceOnly()
             .setValidator(new StringLengthValidator(1)).build();
 
     public static final SimpleAttributeDefinition INTERFACE = new SimpleAttributeDefinitionBuilder(ModelDescriptionConstants.INTERFACE, ModelType.STRING, true)
@@ -80,7 +81,7 @@ public abstract class AbstractSocketBindingResourceDefinition extends SimpleReso
 
     public AbstractSocketBindingResourceDefinition(final OperationStepHandler addHandler, final OperationStepHandler removeHandler) {
         super(PathElement.pathElement(ModelDescriptionConstants.SOCKET_BINDING),
-                CommonDescriptions.getResourceDescriptionResolver(ModelDescriptionConstants.SOCKET_BINDING),
+                ControllerResolver.getResolver(ModelDescriptionConstants.SOCKET_BINDING),
                 addHandler, removeHandler, OperationEntry.Flag.RESTART_ALL_SERVICES, OperationEntry.Flag.RESTART_ALL_SERVICES);
     }
 
@@ -94,22 +95,6 @@ public abstract class AbstractSocketBindingResourceDefinition extends SimpleReso
         resourceRegistration.registerReadWriteAttribute(MULTICAST_PORT, null, getMulticastPortWriteAttributeHandler());
         resourceRegistration.registerReadWriteAttribute(CLIENT_MAPPINGS, null, getClientMappingsWriteAttributeHandler());
 
-    }
-
-    protected void registerAddOperation(final ManagementResourceRegistration registration, final OperationStepHandler handler,
-                                        OperationEntry.Flag... flags) {
-        DescriptionProvider provider = new DefaultResourceAddDescriptionProvider(registration, getResourceDescriptionResolver()) {
-            @Override
-            public ModelNode getModelDescription(Locale locale) {
-                // "name" is not an operation parameter
-                final ModelNode result = super.getModelDescription(locale);
-                if (result.get(ModelDescriptionConstants.REQUEST_PROPERTIES).hasDefined(NAME.getName())) {
-                    result.get(ModelDescriptionConstants.REQUEST_PROPERTIES).remove(NAME.getName());
-                }
-                return result;
-            }
-        };
-        registration.registerOperationHandler(ModelDescriptionConstants.ADD, handler, provider, getFlagsSet(flags));
     }
 
     protected abstract OperationStepHandler getInterfaceWriteAttributeHandler();

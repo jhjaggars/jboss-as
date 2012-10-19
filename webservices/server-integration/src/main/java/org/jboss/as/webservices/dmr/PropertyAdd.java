@@ -24,6 +24,7 @@ package org.jboss.as.webservices.dmr;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.VALUE;
 import static org.jboss.as.webservices.WSMessages.MESSAGES;
+import static org.jboss.as.webservices.dmr.PackageUtils.getConfigs;
 import static org.jboss.as.webservices.dmr.PackageUtils.getServerConfig;
 
 import java.util.List;
@@ -32,14 +33,16 @@ import org.jboss.as.controller.AbstractAddStepHandler;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.PathAddress;
+import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.ServiceVerificationHandler;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.ServiceController;
 import org.jboss.wsf.spi.management.ServerConfig;
-import org.jboss.wsf.spi.metadata.config.EndpointConfig;
+import org.jboss.wsf.spi.metadata.config.CommonConfig;
 
 /**
  * @author <a href="mailto:ropalka@redhat.com">Richard Opalka</a>
+ * @author <a href="mailto:alessio.soldano@jboss.com">Alessio Soldano</a>
  */
 final class PropertyAdd extends AbstractAddStepHandler {
 
@@ -55,18 +58,20 @@ final class PropertyAdd extends AbstractAddStepHandler {
         if (config != null) {
             final PathAddress address = PathAddress.pathAddress(operation.require(OP_ADDR));
             final String propertyName = address.getElement(address.size() - 1).getValue();
-            final String configName = address.getElement(address.size() - 2).getValue();
+            final PathElement confElem = address.getElement(address.size() - 2);
+            final String configType = confElem.getKey();
+            final String configName = confElem.getValue();
             final String propertyValue = operation.has(VALUE) ? operation.get(VALUE).asString() : null;
-            for (final EndpointConfig endpointConfig : config.getEndpointConfigs()) {
-                if (configName.equals(endpointConfig.getConfigName())) {
-                    endpointConfig.setProperty(propertyName, propertyValue);
+            for (final CommonConfig cfg : getConfigs(config, configType)) {
+                if (configName.equals(cfg.getConfigName())) {
+                    cfg.setProperty(propertyName, propertyValue);
                     if (!context.isBooting()) {
                         context.restartRequired();
                     }
                     return;
                 }
             }
-            throw MESSAGES.missingEndpointConfig(configName);
+            throw MESSAGES.missingConfig(configName);
         }
     }
 
@@ -77,5 +82,4 @@ final class PropertyAdd extends AbstractAddStepHandler {
             model.get(VALUE).set(propertyValue);
         }
     }
-
 }

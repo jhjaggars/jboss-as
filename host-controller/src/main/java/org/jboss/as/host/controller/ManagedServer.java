@@ -36,16 +36,19 @@ import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.ProxyController;
 import org.jboss.as.controller.ProxyOperationAddressTranslator;
+import org.jboss.as.controller.TransformingProxyController;
 import org.jboss.as.controller.client.helpers.domain.ServerStatus;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.HOST;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.RUNNING_SERVER;
 
+import org.jboss.as.controller.transform.TransformationTarget;
+import org.jboss.as.controller.transform.Transformers;
 import static org.jboss.as.host.controller.HostControllerLogger.ROOT_LOGGER;
 
-import org.jboss.as.host.controller.mgmt.TransformingProxyController;
 import org.jboss.as.network.NetworkUtils;
 import org.jboss.as.process.ProcessControllerClient;
 import org.jboss.as.protocol.mgmt.ManagementChannelHandler;
+import org.jboss.as.server.DomainServerCommunicationServices;
 import org.jboss.as.server.ServerStartTask;
 import org.jboss.dmr.ModelNode;
 import org.jboss.marshalling.Marshaller;
@@ -110,6 +113,7 @@ class ManagedServer {
     private final InetSocketAddress managementSocket;
     private final ProcessControllerClient processControllerClient;
     private final ManagedServer.ManagedServerBootConfiguration bootConfiguration;
+    private final TransformationTarget transformationTarget;
 
     private volatile TransformingProxyController proxyController;
 
@@ -117,7 +121,8 @@ class ManagedServer {
     private volatile InternalState internalState = InternalState.STOPPED;
 
     ManagedServer(final String hostControllerName, final String serverName, final ProcessControllerClient processControllerClient,
-            final InetSocketAddress managementSocket, final ManagedServer.ManagedServerBootConfiguration bootConfiguration) {
+            final InetSocketAddress managementSocket, final ManagedServer.ManagedServerBootConfiguration bootConfiguration,
+            final TransformationTarget transformationTarget) {
 
         assert hostControllerName  != null : "hostControllerName is null";
         assert serverName  != null : "serverName is null";
@@ -130,6 +135,7 @@ class ManagedServer {
         this.processControllerClient = processControllerClient;
         this.managementSocket = managementSocket;
         this.bootConfiguration = bootConfiguration;
+        this.transformationTarget = transformationTarget;
 
         final byte[] authKey = new byte[16];
         new Random(new SecureRandom().nextLong()).nextBytes(authKey);
@@ -222,6 +228,22 @@ class ManagedServer {
     }
 
     /**
+     * On host controller reload, remove a not running server registered in the process controller declared as down.
+     */
+    protected synchronized void removeServerProcess() {
+        this.requiredState = InternalState.STOPPED;
+        internalSetState(new ProcessRemoveTask(), InternalState.STOPPED, InternalState.PROCESS_REMOVING);
+    }
+
+    /**
+     * On host controller reload, remove a not running server registered in the process controller declared as stopping.
+     */
+    protected synchronized void setServerProcessStopping() {
+        this.requiredState = InternalState.STOPPED;
+        internalSetState(null, InternalState.STOPPED, InternalState.PROCESS_STOPPING);
+    }
+
+    /**
      * Await a state.
      *
      * @param expected the expected state
@@ -267,16 +289,25 @@ class ManagedServer {
         finishTransition(InternalState.PROCESS_STARTING, InternalState.PROCESS_STARTED);
     }
 
-    protected synchronized void channelRegistered(final ManagementChannelHandler channelAssociation) {
-        internalSetState(new TransitionTask() {
-            @Override
-            public void execute(final ManagedServer server) throws Exception {
-                server.proxyController = TransformingProxyController.Factory.create(channelAssociation,
-                        PathAddress.pathAddress(PathElement.pathElement(HOST, hostControllerName), serverPath),
-                        ProxyOperationAddressTranslator.SERVER);
-            }
-        // TODO we just check that we are in the correct state, perhaps introduce a new state
-        }, InternalState.SERVER_STARTING, InternalState.SERVER_STARTING);
+    protected synchronized ProxyController channelRegistered(final ManagementChannelHandler channelAssociation) {
+        final InternalState current = this.internalState;
+        final TransformingProxyController proxy = TransformingProxyController.Factory.create(channelAssociation,
+                                Transformers.Factory.create(transformationTarget),
+                                PathAddress.pathAddress(PathElement.pathElement(HOST, hostControllerName), serverPath),
+                                ProxyOperationAddressTranslator.SERVER);
+        // TODO better handling for server :reload operation
+        if(current == InternalState.SERVER_STARTED && proxyController == null) {
+            this.proxyController = proxy;
+        } else {
+            internalSetState(new TransitionTask() {
+                @Override
+                public void execute(final ManagedServer server) throws Exception {
+                    server.proxyController = proxy;
+                }
+            // TODO we just check that we are in the correct state, perhaps introduce a new state
+            }, InternalState.SERVER_STARTING, InternalState.SERVER_STARTING);
+        }
+        return proxyController;
     }
 
     protected synchronized void serverStarted(final TransitionTask task) {
@@ -290,8 +321,10 @@ class ManagedServer {
     /**
      * Unregister the mgmt channel.
      */
-    protected synchronized void callbackUnregistered() {
-        this.proxyController = null;
+    protected synchronized void callbackUnregistered(final ProxyController old) {
+        if(proxyController == old) {
+            this.proxyController = null;
+        }
     }
 
     /**
@@ -373,7 +406,7 @@ class ManagedServer {
         transition();
     }
 
-    private void internalSetState(final TransitionTask task, final InternalState current, final InternalState next) {
+    private boolean internalSetState(final TransitionTask task, final InternalState current, final InternalState next) {
         assert Thread.holdsLock(this); // Call under lock
         final InternalState internalState = this.internalState;
         if(internalState == current) {
@@ -382,6 +415,7 @@ class ManagedServer {
                     task.execute(this);
                 }
                 this.internalState = next;
+                return true;
             } catch (final Exception e) {
                 ROOT_LOGGER.debugf(e, "transition (%s > %s) failed for server \"%s\"", current, next, serverName);
                 transitionFailed(current);
@@ -389,6 +423,7 @@ class ManagedServer {
                 notifyAll();
             }
         }
+        return false;
     }
 
     private TransitionTask getTransitionTask(final InternalState next) {
@@ -481,14 +516,7 @@ class ManagedServer {
     /**
      * The managed server boot configuration.
      */
-    public static interface ManagedServerBootConfiguration {
-        /**
-         * Get a list of boot updates.
-         *
-         * @return the boot updates
-         */
-        List<ModelNode> getBootUpdates();
-
+    public interface ManagedServerBootConfiguration {
         /**
          * Get the server launch environment.
          *
@@ -514,6 +542,14 @@ class ManagedServer {
          * Get whether the native management remoting connector should use the endpoint set up by
          */
         boolean isManagementSubsystemEndpoint();
+
+        /**
+         * Get the subsystem endpoint configuration, in case we use the subsystem.
+         *
+         * @return the subsystem endpoint config
+         */
+        ModelNode getSubsystemEndpointConfiguration();
+
     }
 
     static enum InternalState {
@@ -548,7 +584,7 @@ class ManagedServer {
         }
     }
 
-    static interface TransitionTask {
+    interface TransitionTask {
 
         void execute(ManagedServer server) throws Exception;
 
@@ -596,10 +632,12 @@ class ManagedServer {
         public void execute(ManagedServer server) throws Exception {
             assert Thread.holdsLock(ManagedServer.this); // Call under lock
             // Get the standalone boot updates
-            final List<ModelNode> bootUpdates = bootConfiguration.getBootUpdates();
+            final List<ModelNode> bootUpdates = Collections.emptyList(); // bootConfiguration.getBootUpdates();
             final Map<String, String> launchProperties = parseLaunchProperties(bootConfiguration.getServerLaunchCommand());
+            final boolean useSubsystemEndpoint = bootConfiguration.isManagementSubsystemEndpoint();
+            final ModelNode endpointConfig = bootConfiguration.getSubsystemEndpointConfiguration();
             // Send std.in
-            final ServiceActivator hostControllerCommActivator = HostCommunicationServices.createServerCommunicationActivator(managementSocket, serverName, serverProcessName, authKey, bootConfiguration.isManagementSubsystemEndpoint());
+            final ServiceActivator hostControllerCommActivator = DomainServerCommunicationServices.create(endpointConfig, managementSocket, serverName, serverProcessName, authKey, useSubsystemEndpoint);
             final ServerStartTask startTask = new ServerStartTask(hostControllerName, serverName, 0, Collections.<ServiceActivator>singletonList(hostControllerCommActivator), bootUpdates, launchProperties);
             final Marshaller marshaller = MARSHALLER_FACTORY.createMarshaller(CONFIG);
             final OutputStream os = processControllerClient.sendStdin(serverProcessName);

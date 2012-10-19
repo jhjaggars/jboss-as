@@ -53,6 +53,7 @@ import org.jboss.as.cli.operation.OperationRequestAddress;
 import org.jboss.as.cli.operation.ParsedCommandLine;
 import org.jboss.as.cli.operation.impl.DefaultOperationRequestAddress;
 import org.jboss.as.cli.operation.impl.DefaultOperationRequestBuilder;
+import org.jboss.as.cli.util.SimpleTable;
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
@@ -320,8 +321,6 @@ public class GenericTypeOperationHandler extends BatchModeCommandHandler {
                                     } else {
                                         valueConverter = ArgumentValueConverter.LIST;
                                     }
-                                } else if(ModelType.OBJECT == type) {
-                                    valueConverter = ArgumentValueConverter.OBJECT;
                                 }
                             }
                         }
@@ -389,8 +388,6 @@ public class GenericTypeOperationHandler extends BatchModeCommandHandler {
                                 } else {
                                     valueConverter = ArgumentValueConverter.LIST;
                                 }
-                            } else if(ModelType.OBJECT == type) {
-                                valueConverter = ArgumentValueConverter.OBJECT;
                             }
                         }
                     }
@@ -412,9 +409,11 @@ public class GenericTypeOperationHandler extends BatchModeCommandHandler {
         return true;
     }
 
+    @Override
     public void addArgument(CommandArgument arg) {
     }
 
+    @Override
     protected void recognizeArguments(CommandContext ctx) throws CommandFormatException {
         // argument validation is performed during request construction
     }
@@ -442,27 +441,40 @@ public class GenericTypeOperationHandler extends BatchModeCommandHandler {
     }
 
     protected StringBuilder formatResponse(CommandContext ctx, ModelNode opResponse, boolean composite, StringBuilder buf) throws CommandFormatException {
-        if(!opResponse.hasDefined(Util.RESULT)) {
-            return null;
+        if(opResponse.hasDefined(Util.RESULT)) {
+            final ModelNode result = opResponse.get(Util.RESULT);
+            if(composite) {
+                final Set<String> keys;
+                try {
+                    keys = result.keys();
+                } catch(Exception e) {
+                    throw new CommandFormatException("Failed to get step results from a composite operation response " + opResponse);
+                }
+                for(String key : keys) {
+                    final ModelNode stepResponse = result.get(key);
+                    buf = formatResponse(ctx, stepResponse, false, buf); // TODO nested composite ops aren't expected for now
+                }
+            } else {
+                final ModelNodeFormatter formatter = ModelNodeFormatter.Factory.forType(result.getType());
+                if(buf == null) {
+                    buf = new StringBuilder();
+                }
+                formatter.format(buf, 0, result);
+            }
         }
-        final ModelNode result = opResponse.get(Util.RESULT);
-        if(composite) {
-            final Set<String> keys;
-            try {
-                keys = result.keys();
-            } catch(Exception e) {
-                throw new CommandFormatException("Failed to get step results from a composite operation response " + opResponse);
-            }
+        if(opResponse.hasDefined(Util.RESPONSE_HEADERS)) {
+            final ModelNode headers = opResponse.get(Util.RESPONSE_HEADERS);
+            final Set<String> keys = headers.keys();
+            final SimpleTable table = new SimpleTable(2);
             for(String key : keys) {
-                final ModelNode stepResponse = result.get(key);
-                buf = formatResponse(ctx, stepResponse, false, buf); // TODO nested composite ops aren't expected for now
+                table.addLine(new String[]{key, headers.get(key).asString()});
             }
-        } else {
-            final ModelNodeFormatter formatter = ModelNodeFormatter.Factory.forType(result.getType());
             if(buf == null) {
                 buf = new StringBuilder();
+            } else {
+                buf.append(Util.LINE_SEPARATOR);
             }
-            formatter.format(buf, 0, result);
+            table.append(buf, false);
         }
         return buf;
     }
@@ -897,7 +909,7 @@ public class GenericTypeOperationHandler extends BatchModeCommandHandler {
                 builder.addProperty(Util.NAME, propName);
 
                 final String valueString = args.getPropertyValue(argName);
-                ModelNode nodeValue = arg.getValueConverter().fromString(valueString);
+                ModelNode nodeValue = arg.getValueConverter().fromString(ctx, valueString);
                 builder.getModelNode().get(Util.VALUE).set(nodeValue);
 
                 steps.add(builder.buildRequest());
@@ -958,7 +970,7 @@ public class GenericTypeOperationHandler extends BatchModeCommandHandler {
                     if(argName.equals(GenericTypeOperationHandler.this.name.getFullName())) {
                         continue;
                     }
-                    throw new CommandFormatException("Unrecognized argument " + argName + " for command '" + operation + "'.");
+                    throw new CommandFormatException("Unrecognized argument " + argName + " for command '" + opName + "'.");
                 }
 
                 final String propName;
@@ -969,7 +981,7 @@ public class GenericTypeOperationHandler extends BatchModeCommandHandler {
                 }
 
                 final String valueString = parsedArgs.getPropertyValue(argName);
-                ModelNode nodeValue = arg.getValueConverter().fromString(valueString);
+                ModelNode nodeValue = arg.getValueConverter().fromString(ctx, valueString);
                 request.get(propName).set(nodeValue);
             }
             return request;

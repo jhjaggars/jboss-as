@@ -36,7 +36,7 @@
     <dependencies>
         <module name="javax.api"/>
         <module name="org.jboss.staxmapper"/>
-        <module name="org.jboss.common-beans"/>
+	<module name="org.jboss.common-beans" services="export"/>
         <module name="org.jboss.dmr"/>
         <module name="org.jboss.invocation"/>
         <module name="org.jboss.jandex"/>
@@ -64,6 +64,7 @@
         <module name="org.jboss.as.protocol"/>
         <module name="org.jboss.as.remoting"/>
         <module name="org.jboss.as.security" optional="true" services="import"/>
+        <module name="org.jboss.as.version"/>
         <module name="org.picketbox" optional="true"/>
     </dependencies>
 </module>

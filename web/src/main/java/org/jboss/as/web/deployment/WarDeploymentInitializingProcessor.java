@@ -23,6 +23,8 @@
 package org.jboss.as.web.deployment;
 
 import java.util.Locale;
+import java.util.jar.Attributes;
+import java.util.jar.Manifest;
 
 import org.jboss.as.ee.structure.DeploymentType;
 import org.jboss.as.ee.structure.DeploymentTypeMarker;
@@ -36,18 +38,24 @@ import org.jboss.as.server.deployment.DeploymentUnitProcessor;
  * Processor that marks a war deployment.
  *
  * @author John Bailey
+ * @author Thomas.Diesler@jboss.com
  */
 public class WarDeploymentInitializingProcessor implements DeploymentUnitProcessor {
 
-    static final String WAR_EXTENSION = ".war";
-
     public void deploy(final DeploymentPhaseContext phaseContext) throws DeploymentUnitProcessingException {
         DeploymentUnit deploymentUnit = phaseContext.getDeploymentUnit();
-        if(deploymentUnit.hasAttachment(Attachments.OSGI_MANIFEST)) {
-            return;
-        }
-        if(deploymentUnit.getName().toLowerCase(Locale.ENGLISH).endsWith(WAR_EXTENSION)) {
+        String deploymentName = deploymentUnit.getName().toLowerCase(Locale.ENGLISH);
+        Manifest manifest = deploymentUnit.getAttachment(Attachments.OSGI_MANIFEST);
+        if (deploymentName.endsWith(".war") || deploymentName.endsWith(".wab")) {
             DeploymentTypeMarker.setType(DeploymentType.WAR, deploymentUnit);
+        }
+        // JAR deployments may contain OSGi metadata with a "Web-ContextPath" header
+        // This qualifies them as OSGi Web Application Bundle (WAB)
+        else if (manifest != null && deploymentName.endsWith(".jar")) {
+            Attributes mainAttributes = manifest.getMainAttributes();
+            if (mainAttributes.getValue("Web-ContextPath") != null) {
+                DeploymentTypeMarker.setType(DeploymentType.WAR, deploymentUnit);
+            }
         }
     }
 

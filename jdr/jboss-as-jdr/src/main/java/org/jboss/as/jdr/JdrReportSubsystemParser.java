@@ -22,6 +22,12 @@
 
 package org.jboss.as.jdr;
 
+import java.util.List;
+import javax.xml.stream.XMLStreamConstants;
+import javax.xml.stream.XMLStreamException;
+
+import org.jboss.as.controller.PathAddress;
+import org.jboss.as.controller.operations.common.Util;
 import org.jboss.as.controller.parsing.ParseUtils;
 import org.jboss.as.controller.persistence.SubsystemMarshallingContext;
 import org.jboss.dmr.ModelNode;
@@ -29,12 +35,6 @@ import org.jboss.staxmapper.XMLElementReader;
 import org.jboss.staxmapper.XMLElementWriter;
 import org.jboss.staxmapper.XMLExtendedStreamReader;
 import org.jboss.staxmapper.XMLExtendedStreamWriter;
-
-import javax.xml.stream.XMLStreamConstants;
-import javax.xml.stream.XMLStreamException;
-import java.util.List;
-
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.*;
 
 public final class JdrReportSubsystemParser implements XMLStreamConstants, XMLElementReader<List<ModelNode>>,
         XMLElementWriter<SubsystemMarshallingContext> {
@@ -49,9 +49,7 @@ public final class JdrReportSubsystemParser implements XMLStreamConstants, XMLEl
         ParseUtils.requireNoAttributes(reader);
         ParseUtils.requireNoContent(reader);
 
-        final ModelNode subsystem = new ModelNode();
-        subsystem.get(OP).set(ADD);
-        subsystem.get(OP_ADDR).set(SUBSYSTEM, JdrReportExtension.SUBSYSTEM_NAME);
+        final ModelNode subsystem = Util.createAddOperation(PathAddress.pathAddress(JdrReportExtension.SUBSYSTEM_PATH));
         list.add(subsystem);
 
         while (reader.hasNext() && reader.nextTag() != END_ELEMENT) {
@@ -88,7 +86,9 @@ public final class JdrReportSubsystemParser implements XMLStreamConstants, XMLEl
         list.add(addTypeOperation);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     */
     public void writeContent(final XMLExtendedStreamWriter writer, final SubsystemMarshallingContext context)
             throws XMLStreamException {
         context.startSubsystemElement(org.jboss.as.jdr.Namespace.CURRENT.getUriString(), false);
@@ -103,7 +103,4 @@ public final class JdrReportSubsystemParser implements XMLStreamConstants, XMLEl
         writer.writeEndElement();
     }
 
-    private void writeJdrElements(final XMLExtendedStreamWriter writer, ModelNode node) throws XMLStreamException {
-        writer.writeAttribute(Attribute.ENABLED.getLocalName(), node.require(CommonAttributes.ENABLED).toString());
-    }
 }

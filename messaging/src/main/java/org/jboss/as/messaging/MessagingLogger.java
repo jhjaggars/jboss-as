@@ -22,17 +22,17 @@
 
 package org.jboss.as.messaging;
 
-import org.jboss.as.controller.PathAddress;
-import org.jboss.logging.BasicLogger;
-import org.jboss.logging.Cause;
-import org.jboss.logging.LogMessage;
-import org.jboss.logging.Logger;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageLogger;
-
 import static org.jboss.logging.Logger.Level.ERROR;
 import static org.jboss.logging.Logger.Level.INFO;
 import static org.jboss.logging.Logger.Level.WARN;
+
+import org.jboss.as.controller.PathAddress;
+import org.jboss.logging.BasicLogger;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.LogMessage;
+import org.jboss.logging.Logger;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageLogger;
 
 /**
  * Date: 10.06.2011
@@ -158,5 +158,35 @@ public interface MessagingLogger extends BasicLogger {
     @LogMessage(level = WARN)
     @Message(id = 11609, value = "Attribute %s is deprecated and will not be taken into account")
     void deprecatedXMLAttribute(String name);
+
+    /**
+     * Logs an info message when a service for the given {@code type} and {@code name} is <em>started</em>.
+     *
+     * @param type the type of the service
+     * @param name the name of the service
+     */
+    @LogMessage(level = INFO)
+    @Message(id = 11610, value = "Started %s %s")
+    void startedService(String type, String name);
+
+    /**
+     * Logs an info message when a service for the given {@code type} and {@code name} is <em>stopped</em>.
+     *
+     * @param type the type of the service
+     * @param name the name of the service
+     */
+    @LogMessage(level = INFO)
+    @Message(id = 11611, value = "Stopped %s %s")
+    void stoppedService(String type, String name);
+
+    /**
+     * Logs a warning message indicating the management attribute with the given {@code name}
+     * is deprecated and will not be used anymore.
+     *
+     * @param name the name of the deprecated XML attribute
+     */
+    @LogMessage(level = WARN)
+    @Message(id = 11612, value = "Attribute %s of the resource at %s is deprecated and setting its value will not be taken into account")
+    void deprecatedAttribute(String name, PathAddress address);
 
 }

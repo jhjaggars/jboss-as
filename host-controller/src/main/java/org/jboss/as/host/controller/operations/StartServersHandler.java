@@ -25,15 +25,15 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SER
 import static org.jboss.as.host.controller.HostControllerLogger.ROOT_LOGGER;
 import static org.jboss.as.host.controller.HostControllerMessages.MESSAGES;
 
-import java.util.Locale;
 import java.util.Map;
 
 import org.jboss.as.controller.OperationContext;
+import org.jboss.as.controller.OperationDefinition;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.RunningMode;
-import org.jboss.as.controller.descriptions.DescriptionProvider;
+import org.jboss.as.controller.SimpleOperationDefinitionBuilder;
 import org.jboss.as.controller.registry.Resource;
 import org.jboss.as.host.controller.HostControllerEnvironment;
 import org.jboss.as.host.controller.HostRunningModeControl;
@@ -47,9 +47,14 @@ import org.jboss.dmr.ModelNode;
  *
  * @author Brian Stansberry (c) 2011 Red Hat Inc.
  */
-public class StartServersHandler implements OperationStepHandler, DescriptionProvider {
+public class StartServersHandler implements OperationStepHandler {
 
     public static final String OPERATION_NAME = "start-servers";
+
+  //Private method does not need resources for description
+    public static final OperationDefinition DEFINITION = new SimpleOperationDefinitionBuilder(OPERATION_NAME, null)
+        .setPrivateEntry()
+        .build();
 
     private final ServerInventory serverInventory;
     private final HostControllerEnvironment hostControllerEnvironment;
@@ -94,17 +99,11 @@ public class StartServersHandler implements OperationStepHandler, DescriptionPro
                         cleanStartServers(servers, domainModel);
                     }
                 }
-                context.completeStep();
+                context.completeStep(OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER);
             }
         }, OperationContext.Stage.RUNTIME);
 
-        context.completeStep(OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER);
-    }
-
-    @Override
-    public ModelNode getModelDescription(final Locale locale) {
-        // private operation does not need description
-        return new ModelNode();
+        context.stepCompleted();
     }
 
     private void cleanStartServers(final ModelNode servers, final ModelNode domainModel){
@@ -132,7 +131,7 @@ public class StartServersHandler implements OperationStepHandler, DescriptionPro
                 }
             } else if (info != null){
                 //Reconnect the server
-                serverInventory.reconnectServer(serverName, domainModel, info.isRunning());
+                serverInventory.reconnectServer(serverName, domainModel, info.isRunning(), info.isStopping());
             }
         }
     }

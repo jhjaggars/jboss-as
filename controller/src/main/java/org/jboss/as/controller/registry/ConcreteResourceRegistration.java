@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 import org.jboss.as.controller.AttributeDefinition;
+import org.jboss.as.controller.OperationDefinition;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.PathElement;
@@ -114,6 +115,11 @@ final class ConcreteResourceRegistration extends AbstractResourceRegistration {
         resourceDefinition.registerOperations(resourceRegistration);
         resourceDefinition.registerChildren(resourceRegistration);
         return resourceRegistration;
+    }
+
+    @Override
+    public void registerOperationHandler(OperationDefinition definition, OperationStepHandler handler, boolean inherited) {
+        registerOperationHandler(definition.getName(), handler, definition.getDescriptionProvider(), inherited, definition.getEntryType(), definition.getFlags());
     }
 
     public void unregisterSubModel(final PathElement address) throws IllegalArgumentException {
@@ -303,6 +309,20 @@ final class ConcreteResourceRegistration extends AbstractResourceRegistration {
         }
     }
 
+    @Override
+    public void registerAlias(PathElement address, AliasEntry alias, AbstractResourceRegistration target) {
+        getOrCreateSubregistry(address.getKey()).registerAlias(address.getValue(), alias, target);
+    }
+
+    @Override
+    public void unregisterAlias(PathElement address) {
+        final Map<String, NodeSubregistry> snapshot = childrenUpdater.get(this);
+        final NodeSubregistry subregistry = snapshot.get(address.getKey());
+        if (subregistry != null) {
+            subregistry.unregisterAlias(address.getValue());
+        }
+    }
+
     NodeSubregistry getOrCreateSubregistry(final String key) {
         for (;;) {
             final Map<String, NodeSubregistry> snapshot = childrenUpdater.get(this);
@@ -486,5 +506,9 @@ final class ConcreteResourceRegistration extends AbstractResourceRegistration {
         return MESSAGES.operationNotRegisteredException(op, PathAddress.pathAddress(address));
     }
 
+    @Override
+    public AliasEntry getAliasEntry() {
+        return null;
+    }
 }
 

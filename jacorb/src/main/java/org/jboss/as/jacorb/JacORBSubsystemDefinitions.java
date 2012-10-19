@@ -35,6 +35,7 @@ import javax.xml.stream.XMLStreamWriter;
 
 import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.MapAttributeDefinition;
+import org.jboss.as.controller.PropertiesAttributeDefinition;
 import org.jboss.as.controller.SimpleAttributeDefinition;
 import org.jboss.as.controller.SimpleAttributeDefinitionBuilder;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
@@ -112,7 +113,7 @@ class JacORBSubsystemDefinitions {
     public static final SimpleAttributeDefinition ORB_GIOP_MINOR_VERSION = new SimpleAttributeDefinitionBuilder(
             JacORBSubsystemConstants.ORB_GIOP_MINOR_VERSION, ModelType.INT, true)
             .setDefaultValue(new ModelNode().set(2))
-            .setValidator(new IntRangeValidator(1, 2, true, false))
+            .setValidator(new IntRangeValidator(0, 2, true, false))
             .setFlags(AttributeAccess.Flag.RESTART_ALL_SERVICES)
             .build();
 
@@ -436,44 +437,4 @@ class JacORBSubsystemDefinitions {
         return ATTRIBUTES_BY_NAME.get(attributeNAme);
     }
 
-
-    /**
-     *
-     */
-    //todo has to be moved to some better place same as org.jboss.as.remoting.AbstractOutboundConnectionResourceDefinition.PropertiesAttributeDefinition
-    private static class PropertiesAttributeDefinition extends MapAttributeDefinition {
-
-        public PropertiesAttributeDefinition(final String name, final String xmlName, boolean allowNull) {
-            super(name, xmlName, allowNull, 0, Integer.MAX_VALUE, new ModelTypeValidator(ModelType.STRING));
-        }
-
-        @Override
-        protected void addValueTypeDescription(ModelNode node, ResourceBundle bundle) {
-            node.get(ModelDescriptionConstants.VALUE_TYPE).set(ModelType.STRING);
-        }
-
-        @Override
-        protected void addAttributeValueTypeDescription(ModelNode node, ResourceDescriptionResolver resolver, Locale locale, ResourceBundle bundle) {
-            node.get(ModelDescriptionConstants.VALUE_TYPE).set(ModelType.STRING);
-        }
-
-        @Override
-        protected void addOperationParameterValueTypeDescription(ModelNode node, String operationName, ResourceDescriptionResolver resolver, Locale locale, ResourceBundle bundle) {
-            node.get(ModelDescriptionConstants.VALUE_TYPE).set(ModelType.STRING);
-        }
-
-        @Override
-        public void marshallAsElement(ModelNode resourceModel, XMLStreamWriter writer) throws XMLStreamException {
-            if (!isMarshallable(resourceModel)) { return; }
-
-            resourceModel = resourceModel.get(getName());
-            writer.writeStartElement(getName());
-            for (ModelNode property : resourceModel.asList()) {
-                writer.writeEmptyElement(getXmlName());
-                writer.writeAttribute(Attribute.NAME.getLocalName(), property.asProperty().getName());
-                writer.writeAttribute(Attribute.VALUE.getLocalName(), property.asProperty().getValue().asString());
-            }
-            writer.writeEndElement();
-        }
-    }
 }

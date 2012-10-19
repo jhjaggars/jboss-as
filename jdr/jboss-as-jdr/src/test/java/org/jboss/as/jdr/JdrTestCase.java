@@ -21,22 +21,26 @@
  */
 package org.jboss.as.jdr;
 
+import org.jboss.as.jdr.util.BlackListFilter;
+import org.jboss.as.jdr.util.PatternSanitizer;
+import org.jboss.as.jdr.util.XMLSanitizer;
+import org.junit.Test;
+
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.InputStream;
-import java.io.ByteArrayInputStream;
 
-import org.junit.Test;
-
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
 public class JdrTestCase {
 
     @Test
     public void testBlackListFilter() {
         FileFilter blf = new BlackListFilter();
-        assertFalse(blf.accept(new File("/foo/bar/baz/mgmt-users.properties"))); 
-        assertFalse(blf.accept(new File("/foo/bar/baz/application-users.properties"))); 
+        assertFalse(blf.accept(new File("/foo/bar/baz/mgmt-users.properties")));
+        assertFalse(blf.accept(new File("/foo/bar/baz/application-users.properties")));
     }
 
     @Test

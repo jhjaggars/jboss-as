@@ -47,14 +47,19 @@
         	   	 <include name="docs/**"/>
         	   </fileset>
         </copy>
+        <!-- Convert .bat files to DOS line endings -->
+        <fixcrlf srcdir="${output.dir}/bin" includes="**/*.bat" eol="crlf" />
+        <!-- Convert .sh files to Unix line endings -->
+        <fixcrlf srcdir="${output.dir}/bin" includes="**/*.sh" eol="lf" />
+        <fixcrlf srcdir="${output.dir}/bin" includes="**/*.conf" eol="lf" />
+        <!-- These files contain digested passwords, which should not be visible to external users -->
+        <chmod perm="600" file="${output.dir}/domain/configuration/mgmt-users.properties"/>
+        <chmod perm="600" file="${output.dir}/standalone/configuration/mgmt-users.properties"/>
         <chmod perm="755">
             <fileset dir="${output.dir}/bin">
                 <include name="**/*.sh"/>
             </fileset>
         </chmod>
-        <!-- These files contain digested passwords, which should not be visible to external users -->
-        <chmod perm="600" file="${output.dir}/domain/configuration/mgmt-users.properties"/>
-        <chmod perm="600" file="${output.dir}/standalone/configuration/mgmt-users.properties"/>
     </target>
 
     <target name="copy-standalone" description="Copy all standard configurations">
@@ -91,12 +96,51 @@
         <!-- Copy the EJB specific schemas to the JBOSS_HOME/docs/schema folder -->
         <unzip src="${org.jboss.metadata:jboss-metadata-ejb:jar}" dest="${output.dir}/docs/schema/">
             <patternset>
-                <include name="schema/ejb-jar*.xsd"/>
-                <include name="schema/jboss-ejb3*.xsd"/>
+                <include name="schema/*.xsd"/>
                 <include name="dtd/ejb-jar*.dtd"/>
             </patternset>
             <mapper type="flatten"/>
         </unzip>
+
+        <!-- Copy the jboss-metadata-appclient specific schemas to the JBOSS_HOME/docs/schema folder -->
+        <unzip src="${org.jboss.metadata:jboss-metadata-appclient:jar}" dest="${output.dir}/docs/schema/">
+            <patternset>
+                <include name="schema/*.xsd"/>
+            </patternset>
+            <mapper type="flatten"/>
+        </unzip>
+
+        <!-- Copy the jboss-metadata-ear specific schemas to the JBOSS_HOME/docs/schema folder -->
+        <unzip src="${org.jboss.metadata:jboss-metadata-ear:jar}" dest="${output.dir}/docs/schema/">
+            <patternset>
+                <include name="dtd/*.dtd"/>
+                <include name="schema/*.xsd"/>
+                <exclude name="schema/jboss-app_6_0.xsd"/>
+            </patternset>
+            <mapper type="flatten"/>
+        </unzip>
+
+        <!-- Copy the jboss-metadata-common specific schemas to the JBOSS_HOME/docs/schema folder -->
+        <unzip src="${org.jboss.metadata:jboss-metadata-common:jar}" dest="${output.dir}/docs/schema/">
+            <patternset>
+                <include name="dtd/*.dtd"/>
+                <include name="schema/*.xsd"/>
+                <exclude name="dtd/XMLSchema.dtd"/>
+                <exclude name="dtd/datatypes.dtd"/>
+                <exclude name="schema/xml.xsd"/>
+            </patternset>
+            <mapper type="flatten"/>
+        </unzip>
+
+        <!-- Copy the jboss-metadata-web specific schemas to the JBOSS_HOME/docs/schema folder -->
+        <unzip src="${org.jboss.metadata:jboss-metadata-web:jar}" dest="${output.dir}/docs/schema/">
+            <patternset>
+                <include name="dtd/*.dtd"/>
+                <include name="schema/*.xsd"/>
+            </patternset>
+            <mapper type="flatten"/>
+        </unzip>
+
         <!-- Copy the JBoss AS7 EJB specific schemas to the JBOSS_HOME/docs/schema folder -->
         <unzip src="${org.jboss.as:jboss-as-ejb3:jar}" dest="${output.dir}/docs/schema/">
             <patternset>
@@ -116,6 +160,7 @@
 
     <target name="copy-client">
         <copy file="${org.jboss.as:jboss-as-client-all:jar}" tofile="${output.dir}/bin/client/jboss-client.jar"/>
+        <copy file="${org.jboss.as:jboss-as-cli:jar:client}" tofile="${output.dir}/bin/client/jboss-cli-client.jar"/>
     </target>
 
     <target name="minimalistic" depends="base, copy-standalone-minimalistic"/>
@@ -209,7 +254,7 @@
         <module-def name="org.jboss.common-beans">
             <maven-resource group="org.jboss.common" artifact="jboss-common-beans"/>
         </module-def>
-    	
+
         <module-def name="org.jboss.common-core">
             <maven-resource group="org.jboss" artifact="jboss-common-core"/>
         </module-def>
@@ -261,9 +306,7 @@
             <maven-resource group="org.jboss.remoting3" artifact="jboss-remoting"/>
         </module-def>
 
-        <module-def name="org.jboss.remoting3.remoting-jmx">
-            <maven-resource group="org.jboss.remotingjmx" artifact="remoting-jmx"/>
-        </module-def>
+        <module-def name="org.jboss.remoting3.remoting-jmx" />
 
         <module-def name="org.jboss.sasl">
             <maven-resource group="org.jboss.sasl" artifact="jboss-sasl" />
@@ -316,12 +359,25 @@
             <maven-resource group="ch.qos.cal10n" artifact="cal10n-api"/>
         </module-def>
 
+        <module-def name="com.github.relaxng">
+            <maven-resource group="com.github.relaxng" artifact="relaxngDatatype" />
+        </module-def>
+
         <module-def name="com.google.guava">
             <maven-resource group="com.google.guava" artifact="guava" />
         </module-def>
 
         <module-def name="com.h2database.h2">
             <maven-resource group="com.h2database" artifact="h2"/>
+        </module-def>
+
+        <module-def name="com.sun.codemodel">
+            <maven-resource group="com.sun.codemodel" artifact="codemodel"/>
+        </module-def>
+
+        <module-def name="com.sun.istack">
+            <maven-resource group="com.sun.istack" artifact="istack-commons-runtime"/>
+            <maven-resource group="com.sun.istack" artifact="istack-commons-tools"/>
         </module-def>
 
         <module-def name="com.sun.jsf-impl">
@@ -339,6 +395,14 @@
 
         <module-def name="com.sun.xml.messaging.saaj">
             <maven-resource group="com.sun.xml.messaging.saaj" artifact="saaj-impl"/>
+        </module-def>
+
+        <module-def name="com.sun.xml.txw2">
+            <maven-resource group="com.sun.xml.txw2" artifact="txw2"/>
+        </module-def>
+
+        <module-def name="com.sun.xsom">
+            <maven-resource group="com.sun.xsom" artifact="xsom"/>
         </module-def>
 
         <module-def name="org.dom4j">
@@ -473,8 +537,12 @@
             <maven-resource group="org.jboss.spec.javax.xml.ws" artifact="jboss-jaxws-api_2.2_spec"/>
         </module-def>
 
-        <module-def name="jline">
-            <maven-resource group="jline" artifact="jline"/>
+        <module-def name="org.jboss.jreadline">
+            <maven-resource group="org.jboss.jreadline" artifact="jreadline"/>
+        </module-def>
+
+        <module-def name="org.fusesource.jansi">
+            <maven-resource group="org.fusesource.jansi" artifact="jansi"/>
         </module-def>
 
         <module-def name="net.jcip">
@@ -517,9 +585,10 @@
 
         <module-def name="org.apache.cxf">
             <maven-resource group="org.apache.cxf" artifact="cxf-api"/>
-            <maven-resource group="org.apache.cxf" artifact="cxf-common-utilities"/>
+        </module-def>
+
+        <module-def name="org.apache.cxf.impl">
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-bindings-coloc"/>
-            <maven-resource group="org.apache.cxf" artifact="cxf-rt-bindings-http"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-bindings-object"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-bindings-soap"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-bindings-xml"/>
@@ -529,20 +598,21 @@
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-frontend-jaxws"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-frontend-simple"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-management"/>
-            <maven-resource group="org.apache.cxf" artifact="cxf-rt-transports-common"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-transports-http"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-transports-jms"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-transports-local"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-ws-addr"/>
+            <maven-resource group="org.apache.cxf" artifact="cxf-rt-ws-mex"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-ws-policy"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-rt-ws-rm"/>
-            <maven-resource group="org.apache.cxf" artifact="cxf-rt-ws-security"/>
+            <maven-resource group="org.apache.cxf" artifact="cxf-rt-ws-security" jandex="true"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-tools-common"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-tools-java2ws"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-tools-validator"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-tools-wsdlto-core"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-tools-wsdlto-databinding-jaxb"/>
             <maven-resource group="org.apache.cxf" artifact="cxf-tools-wsdlto-frontend-jaxws"/>
+            <maven-resource group="org.apache.cxf.services.sts" artifact="cxf-services-sts-core"/>
             <maven-resource group="org.apache.cxf.xjcplugins" artifact="cxf-xjc-boolean"/>
             <maven-resource group="org.apache.cxf.xjcplugins" artifact="cxf-xjc-dv"/>
             <maven-resource group="org.apache.cxf.xjcplugins" artifact="cxf-xjc-ts"/>
@@ -648,6 +718,8 @@
 
         <module-def name="org.hornetq">
             <maven-resource group="org.hornetq" artifact="hornetq-core"/>
+            <maven-resource group="org.hornetq" artifact="hornetq-commons"/>
+            <maven-resource group="org.hornetq" artifact="hornetq-journal"/>
             <maven-resource group="org.hornetq" artifact="hornetq-jms"/>
         </module-def>
 
@@ -797,7 +869,6 @@
 
         <module-def name="org.jboss.as.jdr">
             <maven-resource group="org.jboss.as" artifact="jboss-as-jdr"/>
-            <maven-resource group="org.jboss.as" artifact="jboss-as-sos"/>
         </module-def>
 
         <module-def name="org.jboss.as.jpa">
@@ -822,6 +893,18 @@
 
         <module-def name="org.jboss.as.jpa.util">
             <maven-resource group="org.jboss.as" artifact="jboss-as-jpa-util"/>
+        </module-def>
+
+        <module-def name="org.jboss.as.jsf">
+            <maven-resource group="org.jboss.as" artifact="jboss-as-jsf" />
+        </module-def>
+
+        <module-def name="org.jboss.as.jsf-injection">
+            <maven-resource group="org.jboss.as" artifact="jboss-as-jsf-injection" />
+        </module-def>
+
+        <module-def name="org.jboss.as.jsf-injection" slot="1.2">
+            <maven-resource group="org.jboss.as" artifact="jboss-as-jsf-injection" />
         </module-def>
 
         <module-def name="org.jboss.as.logging">
@@ -860,6 +943,10 @@
             <maven-resource group="org.jboss.as" artifact="jboss-as-osgi-service"/>
         </module-def>
 
+     	<module-def name="org.jboss.as.osgi.integration">
+            <maven-resource group="org.jboss.as" artifact="jboss-as-osgi-integration"/>
+        </module-def>
+
         <module-def name="org.jboss.as.sar">
             <maven-resource group="org.jboss.as" artifact="jboss-as-sar"/>
         </module-def>
@@ -868,8 +955,16 @@
             <maven-resource group="org.jboss.as" artifact="jboss-as-security"/>
         </module-def>
 
+    	<module-def name="org.jboss.as.system-jmx">
+            <maven-resource group="org.jboss.as" artifact="jboss-as-system-jmx"/>
+        </module-def>
+
         <module-def name="org.jboss.as.transactions">
             <maven-resource group="org.jboss.as" artifact="jboss-as-transactions"/>
+        </module-def>
+
+        <module-def name="org.jboss.as.version">
+            <maven-resource group="org.jboss.as" artifact="jboss-as-version"/>
         </module-def>
 
         <module-def name="org.jboss.as.web">
@@ -962,12 +1057,18 @@
             <maven-resource group="org.jboss.metadata" artifact="jboss-metadata-ear"/>
         </module-def>
 
+        <!--
+          starting with 3.4.x Netty has changed its groupId to io.netty.
+        -->
         <module-def name="org.jboss.netty">
-            <maven-resource group="org.jboss.netty" artifact="netty"/>
+            <maven-resource group="io.netty" artifact="netty"/>
+        </module-def>
+
+        <module-def name="org.jboss.osgi.deployment">
+            <maven-resource group="org.jboss.osgi.deployment" artifact="jbosgi-deployment"/>
         </module-def>
 
         <module-def name="org.jboss.osgi.framework">
-            <maven-resource group="org.jboss.osgi.deployment" artifact="jbosgi-deployment"/>
             <maven-resource group="org.jboss.osgi.framework" artifact="jbosgi-framework-core"/>
         </module-def>
 
@@ -996,6 +1097,10 @@
 
         <module-def name="org.jboss.remote-naming">
             <maven-resource group="org.jboss" artifact="jboss-remote-naming"/>
+        </module-def>
+
+        <module-def name="org.jboss.remoting-jmx">
+            <maven-resource group="org.jboss.remotingjmx" artifact="remoting-jmx"/>
         </module-def>
 
         <module-def name="org.jboss.resteasy.resteasy-atom-provider">
@@ -1095,10 +1200,6 @@
             <maven-resource group="org.jboss.ws.native" artifact="jbossws-native-core"/>
         </module-def>
 
-        <module-def name="org.jboss.ws.native.jbossws-native-factories">
-            <maven-resource group="org.jboss.ws.native" artifact="jbossws-native-factories"/>
-        </module-def>
-
         <module-def name="org.jboss.ws.native.jbossws-native-services">
             <maven-resource group="org.jboss.ws.native" artifact="jbossws-native-services"/>
         </module-def>
@@ -1113,6 +1214,12 @@
 
         <module-def name="org.jboss.ws.tools.common">
             <maven-resource group="org.jboss.ws" artifact="jbossws-common-tools"/>
+        </module-def>
+
+        <module-def name="org.opensaml">
+            <maven-resource group="org.opensaml" artifact="opensaml"/>
+            <maven-resource group="org.opensaml" artifact="openws"/>
+            <maven-resource group="org.opensaml" artifact="xmltooling"/>
         </module-def>
 
         <module-def name="org.jboss.ws.saaj-impl">
@@ -1142,10 +1249,18 @@
             <maven-resource group="joda-time" artifact="joda-time"/>
         </module-def>
 
+        <module-def name="org.kohsuke.rngom">
+            <maven-resource group="org.kohsuke.rngom" artifact="rngom"/>
+        </module-def>
+
         <module-def name="org.omg.api" />
 
         <module-def name="org.osgi.core">
             <maven-resource group="org.osgi" artifact="org.osgi.core"/>
+        </module-def>
+
+        <module-def name="org.osgi.enterprise">
+            <maven-resource group="org.osgi" artifact="org.osgi.enterprise"/>
         </module-def>
 
         <module-def name="org.picketlink">
@@ -1197,6 +1312,8 @@
 
         <module-def name="sun.jdk"/>
 
+        <module-def name="ibm.jdk"/>
+
     </target>
 
     <target name="bundles">
@@ -1219,10 +1336,6 @@
 
         <bundle-def name="org.jboss.osgi.logging">
             <maven-bundle group="org.jboss.osgi.logging" artifact="jboss-osgi-logging"/>
-        </bundle-def>
-
-        <bundle-def name="org.osgi.enterprise">
-            <maven-bundle group="org.osgi" artifact="org.osgi.enterprise"/>
         </bundle-def>
 
         <bundle-def name="org.projectodd.stilts">

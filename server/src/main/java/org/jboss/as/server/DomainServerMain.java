@@ -27,20 +27,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.PrintStream;
-import java.io.Serializable;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 
-import org.jboss.as.controller.ModelController;
-import org.jboss.as.network.NetworkUtils;
 import org.jboss.as.process.protocol.StreamUtils;
-import org.jboss.as.remoting.EndpointService;
-import org.jboss.as.remoting.RemotingServices;
-import org.jboss.as.remoting.management.ManagementRemotingServices;
-import org.jboss.as.server.mgmt.domain.HostControllerServerClient;
-import org.jboss.as.server.mgmt.domain.RemoteFileRepository;
+import org.jboss.as.server.mgmt.domain.HostControllerClient;
+import org.jboss.as.server.mgmt.domain.HostControllerConnectionService;
 import org.jboss.logmanager.Level;
 import org.jboss.logmanager.handlers.ConsoleHandler;
 import org.jboss.marshalling.ByteInput;
@@ -56,8 +47,6 @@ import org.jboss.msc.service.ServiceActivatorContext;
 import org.jboss.msc.service.ServiceContainer;
 import org.jboss.msc.service.ServiceController;
 import org.jboss.msc.service.ServiceName;
-import org.jboss.msc.service.ServiceTarget;
-import org.jboss.remoting3.Endpoint;
 import org.jboss.stdio.LoggingOutputStream;
 import org.jboss.stdio.NullInputStream;
 import org.jboss.stdio.SimpleStdioContextSelector;
@@ -146,8 +135,7 @@ public final class DomainServerMain {
 
             // Get the host-controller server client
             final ServiceContainer container = containerFuture.get();
-            final ServiceController<?> controller = container.getRequiredService(HostControllerServerClient.SERVICE_NAME);
-            final HostControllerServerClient client = (HostControllerServerClient) controller.getValue();
+            final HostControllerClient client = getRequiredService(container, HostControllerConnectionService.SERVICE_NAME, HostControllerClient.class);
             // Reconnect to the host-controller
             client.reconnect(hostName, port, asAuthKey);
 
@@ -167,53 +155,9 @@ public final class DomainServerMain {
         throw new IllegalStateException(); // not reached
     }
 
-    private static void addCommunicationServices(final ServiceTarget serviceTarget, final String serverName, final String serverProcessName, final byte[] authKey,
-            final InetSocketAddress managementSocket, final boolean managementSubsystemEndpoint, final boolean isReconnect) {
-
-        final ServiceName endpointName;
-        if (!managementSubsystemEndpoint) {
-            endpointName = ManagementRemotingServices.MANAGEMENT_ENDPOINT;
-            if (!isReconnect) {
-                ManagementRemotingServices.installRemotingEndpoint(serviceTarget, ManagementRemotingServices.MANAGEMENT_ENDPOINT,
-                        SecurityActions.getSystemProperty(ServerEnvironment.NODE_NAME), EndpointService.EndpointType.MANAGEMENT, null, null);
-            }
-        } else {
-            endpointName = RemotingServices.SUBSYSTEM_ENDPOINT;
-        }
-
-        final int port = managementSocket.getPort();
-        final String host = NetworkUtils.formatPossibleIpv6Address(managementSocket.getAddress().getHostAddress());
-        final HostControllerServerClient client = new HostControllerServerClient(serverName, serverProcessName, host, port, authKey);
-                serviceTarget.addService(HostControllerServerClient.SERVICE_NAME, client)
-                    .addDependency(endpointName, Endpoint.class, client.getEndpointInjector())
-                    .addDependency(Services.JBOSS_SERVER_CONTROLLER, ModelController.class, client.getServerControllerInjector())
-                    .addDependency(RemoteFileRepository.SERVICE_NAME, RemoteFileRepository.class, client.getRemoteFileRepositoryInjector())
-                    .setInitialMode(ServiceController.Mode.ACTIVE)
-                    .install();
-    }
-
-    public static final class HostControllerCommunicationActivator implements ServiceActivator, Serializable {
-        private static final long serialVersionUID = -633960958861565102L;
-        private final InetSocketAddress managementSocket;
-        private final String serverName;
-        private final String serverProcessName;
-        private final byte[] authKey;
-        private final boolean managementSubsystemEndpoint;
-
-        public HostControllerCommunicationActivator(final InetSocketAddress managementSocket, final String serverName, final String serverProcessName, final byte[] authKey, final boolean managementSubsystemEndpoint) {
-            this.managementSocket = managementSocket;
-            this.serverName = serverName;
-            this.serverProcessName = serverProcessName;
-            this.authKey = authKey;
-            this.managementSubsystemEndpoint = managementSubsystemEndpoint;
-        }
-
-        @Override
-        public void activate(final ServiceActivatorContext serviceActivatorContext) {
-            final ServiceTarget serviceTarget = serviceActivatorContext.getServiceTarget();
-            // TODO - Correct the authKey propagation.
-            addCommunicationServices(serviceTarget, serverName, serverProcessName, authKey, managementSocket, managementSubsystemEndpoint, false);
-        }
+    static <T> T getRequiredService(final ServiceContainer container, final ServiceName serviceName, Class<T> type) {
+        final ServiceController<?> controller = container.getRequiredService(serviceName);
+        return type.cast(controller.getValue());
     }
 
 }

@@ -22,21 +22,23 @@
 
 package org.jboss.as.server.services.net;
 
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.VALUE;
+
+import java.net.UnknownHostException;
+
+import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.operations.global.WriteAttributeHandlers;
+import org.jboss.as.controller.operations.validation.ModelTypeValidator;
 import org.jboss.as.controller.operations.validation.ParameterValidator;
 import org.jboss.as.network.OutboundSocketBinding;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.ServiceController;
-
-import java.net.UnknownHostException;
-
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.VALUE;
 
 /**
  * A write attribute handler for handling updates to attributes of a client socket binding.
@@ -48,15 +50,19 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.VAL
  *
  * @author Jaikiran Pai
  */
-class OutboundSocketBindingWriteHandler extends WriteAttributeHandlers.WriteAttributeOperationHandler {
+class OutboundSocketBindingWriteHandler extends WriteAttributeHandlers.AttributeDefinitionValidatingHandler {
 
     private final ParameterValidator resolvedValueValidator;
     private final boolean remoteDestination;
 
-    OutboundSocketBindingWriteHandler(ParameterValidator valueValidator, ParameterValidator resolvedValueValidator,
+    OutboundSocketBindingWriteHandler(final AttributeDefinition attribute,
                                       final boolean remoteDestination) {
-        super(valueValidator);
-        this.resolvedValueValidator = resolvedValueValidator;
+        super(attribute);
+        if (attribute.getValidator() == null) {
+            resolvedValueValidator = new ModelTypeValidator(attribute.getType());
+        } else {
+            this.resolvedValueValidator = attribute.getValidator();
+        }
         this.remoteDestination = remoteDestination;
     }
 
@@ -103,21 +109,24 @@ class OutboundSocketBindingWriteHandler extends WriteAttributeHandlers.WriteAttr
                             // socket binding service would have use the (now stale) attributes.
                             context.reloadRequired();
                         }
-                        if (context.completeStep() != OperationContext.ResultAction.KEEP) {
-                            if (binding == null) {
-                                // Back to the old service
-                                revertBindingReinstall(context, bindingName, bindingModel, attributeName, currentValue);
-                            } else {
-                                context.revertReloadRequired();
+                        context.completeStep(new OperationContext.RollbackHandler() {
+                            @Override
+                            public void handleRollback(OperationContext context, ModelNode operation) {
+                                if (binding == null) {
+                                    // Back to the old service
+                                    revertBindingReinstall(context, bindingName, bindingModel, attributeName, currentValue);
+                                } else {
+                                    context.revertReloadRequired();
+                                }
                             }
-                        }
+                        });
                     }
                 }, OperationContext.Stage.RUNTIME);
             }
         }
-        if (context.completeStep() != OperationContext.ResultAction.KEEP && setReload) {
-            context.revertReloadRequired();
-        }
+        OperationContext.RollbackHandler rollbackHandler = setReload ? OperationContext.RollbackHandler.REVERT_RELOAD_REQUIRED_ROLLBACK_HANDLER
+                                                                     : OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER;
+        context.completeStep(rollbackHandler);
     }
 
     private void handleBindingReinstall(OperationContext context, String bindingName, ModelNode bindingModel) throws OperationFailedException {

@@ -30,11 +30,11 @@ import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 
 import org.jboss.as.controller.OperationFailedException;
-import org.jboss.logging.Cause;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageBundle;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageBundle;
 import org.jboss.logging.Messages;
-import org.jboss.logging.Param;
+import org.jboss.logging.annotations.Param;
 import org.jboss.msc.service.StartException;
 
 /**
@@ -197,7 +197,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Enter the details of the new user to add.")
+    @Message(id = Message.NONE, value = "Enter the details of the new user to add.")
     String enterNewUserDetails();
 
     /**
@@ -207,7 +207,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Realm (%s)")
+    @Message(id = Message.NONE, value = "Realm (%s)")
     String realmPrompt(String realm);
 
     /**
@@ -215,7 +215,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Username")
+    @Message(id = Message.NONE, value = "Username")
     String usernamePrompt();
 
     /**
@@ -225,7 +225,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Username (%s)")
+    @Message(id = Message.NONE, value = "Username (%s)")
     String usernamePrompt(String defaultUsername);
 
     /**
@@ -241,7 +241,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Password")
+    @Message(id = Message.NONE, value = "Password")
     String passwordPrompt();
 
     /**
@@ -257,7 +257,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Re-enter Password")
+    @Message(id = Message.NONE, value = "Re-enter Password")
     String passwordConfirmationPrompt();
 
     /**
@@ -292,15 +292,17 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "About to add user '%s' for realm '%s'")
+    @Message(id = Message.NONE, value = "About to add user '%s' for realm '%s'")
     String aboutToAddUser(String username, String realm);
 
     /**
-     * Prompt to ask user to confirm yes or no.
+     * Prompt to ask user to confirm the previous statement is correct.
+     *
+     * Do not include the translation specific yes/no
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Is this correct yes/no?")
+    @Message(id = Message.NONE, value = "Is this correct")
     String isCorrectPrompt();
 
     /**
@@ -310,7 +312,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "The username '%s' is easy to guess")
+    @Message(id = Message.NONE, value = "The username '%s' is easy to guess")
     String usernameEasyToGuess(String username);
 
     /**
@@ -320,18 +322,16 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Are you sure you want to add user '%s' yes/no?")
+    @Message(id = Message.NONE, value = "Are you sure you want to add user '%s' yes/no?")
     String sureToAddUser(String username);
 
     /**
      * The error message if the confirmation response is invalid.
      *
-     * TODO - On translation we will need support for checking the possible responses.
-     *
      * @return a {@link String} for the message.
      */
-    @Message(id = 15240, value = "Invalid response. (Valid responses are yes, y, no, and n)")
-    String invalidConfirmationResponse();
+    @Message(id = 15240, value = "Invalid response. (Valid responses are %s and %s)")
+    String invalidConfirmationResponse(String firstValues, String secondValues);
 
     /**
      * Message to inform user that the new user has been added to the file identified.
@@ -341,7 +341,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Added user '%s' to file '%s'")
+    @Message(id = Message.NONE, value = "Added user '%s' to file '%s'")
     String addedUser(String username, String fileName);
 
     /**
@@ -381,7 +381,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Error")
+    @Message(id = Message.NONE, value = "Error")
     String errorHeader();
 
     /**
@@ -389,7 +389,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Is this new user going to be used for one AS process to connect to another AS process e.g. slave domain controller?")
+    @Message(id = Message.NONE, value = "Is this new user going to be used for one AS process to connect to another AS process? %ne.g. for a slave host controller connecting to the master or for a Remoting connection for server to server EJB calls.")
     String serverUser();
 
     /**
@@ -397,7 +397,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "yes/no?")
+    @Message(id = Message.NONE, value = "yes/no?")
     String yesNo();
 
     /**
@@ -405,7 +405,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "To represent the user add the following to the server-identities definition <secret value=\"%s\" />")
+    @Message(id = Message.NONE, value = "To represent the user add the following to the server-identities definition <secret value=\"%s\" />")
     String secretElement(String base64);
 
     /**
@@ -469,14 +469,14 @@ public interface DomainManagementMessages {
     /**
      * Prompt for the file to update in add-users
      */
-    @Message(value = "What type of user do you wish to add? %n a) Management User (mgmt-users.properties) %n b) Application User (application-users.properties)")
+    @Message(id = Message.NONE, value = "What type of user do you wish to add? %n a) Management User (mgmt-users.properties) %n b) Application User (application-users.properties)")
     String filePrompt();
 
     /**
      * Prompt the user for the roles to add the user to
      * @return
      */
-    @Message(value = "What roles do you want this user to belong to? (Please enter a comma separated list, or leave blank for none)")
+    @Message(id = Message.NONE, value = "What roles do you want this user to belong to? (Please enter a comma separated list, or leave blank for none)")
     String rolesPrompt();
 
 
@@ -489,7 +489,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Added user '%s' with roles %s to file '%s'")
+    @Message(id = Message.NONE, value = "Added user '%s' with roles %s to file '%s'")
     String addedRoles(String username, String roles, String fileName);
 
     /**
@@ -509,27 +509,27 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "User '%s' already exits, would you like to update the existing user password and roles")
+    @Message(id = Message.NONE, value = "User '%s' already exits, would you like to update the existing user password and roles")
     String aboutToUpdateUser(String user);
 
     /**
      * Message to inform user that the user has been updated to the file identified.
      *
-     * @param username - The new username.
-     * @param fileName - The file the user has been added to.
+     * @param userName - The new username.
+     * @param canonicalPath - The file the user has been added to.
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Updated user '%s' to file '%s'")
+    @Message(id = Message.NONE, value = "Updated user '%s' to file '%s'")
     String updateUser(String userName, String canonicalPath);
 
 
 
     /**
-    * The error message if updating user to the file fails.
-    *
-    * @param file - The name of the file the add failed for.
-    * @param error - The failure message.
+     * The error message if updating user to the file fails.
+     *
+     * @param absolutePath - The name of the file the add failed for.
+     * @param message - The failure message.
      *
      * @return a {@link String} for the message.
      */
@@ -545,7 +545,7 @@ public interface DomainManagementMessages {
      *
      * @return a {@link String} for the message.
      */
-    @Message(value = "Updated user '%s' with roles %s to file '%s'")
+    @Message(id = Message.NONE, value = "Updated user '%s' with roles %s to file '%s'")
     String updatedRoles(String username, String roles, String fileName);
 
     /**
@@ -612,6 +612,183 @@ public interface DomainManagementMessages {
      */
     @Message(id = 15263, value = "Unable to initialise plug-in %s due to error %s")
     IllegalStateException unableToInitialisePlugIn(final String name, final String message);
+
+    /**
+     * The error message for password which does not met strength requirement.
+     *
+     * @param currentStrength - strength value which has been computed from password.
+     * @param desiredStrength - Minimum strength value which should be met.
+     *
+     * @return a {@link String} for the message.
+     */
+    @Message(id = 15264, value = "Password is not strong enough, it is '%s'. It should be atleast '%s'.")
+    String passwordNotStrongEnough(String currentStrength, String desiredStrength);
+
+    /**
+     * The error message for password which has forbidden value.
+     *
+     * @param password - password value.
+     *
+     * @return a {@link String} for the message.
+     */
+    @Message(id = 152565, value = "Password must not be equal to '%s', this value is restricted.")
+    String passwordMustNotBeEqual(String password);
+
+    /**
+     * The error message for password which has no digit.
+     *
+     * @return a {@link String} for the message.
+     */
+    @Message(id = 15266, value = "Password must not have atleast one digit.")
+    String passwordMustHaveDigit();
+
+    /**
+     * The error message for password which has no symbol.
+     *
+     * @return a {@link String} for the message.
+     */
+    @Message(id = 15267, value = "Password must have atleast one non-alphanumeric symbol.")
+    String passwordMustHaveSymbol();
+
+    /**
+     * The error message for password which has no alpha numerical values.
+     *
+     * @return a {@link String} for the message.
+     */
+    @Message(id = 15268, value = "Password must have atleast one alphanumeric character.")
+    String passwordMustHaveAlpha();
+
+    /**
+     * The error message for password which is not long enough.
+     * @param desiredLength - desired length of password.
+     * @return a {@link String} for the message.
+     */
+    @Message(id = 15269, value = "Password must have atleast '%s' characters!")
+    String passwordNotLontEnough(int desiredLength);
+
+    /**
+     * A prompt to double check the user is really sure they want to set password.
+     *
+     * @param password - The new password.
+     *
+     * @return a {@link String} for the message.
+     */
+    @Message(id = Message.NONE, value = "Are you sure you want to set password '%s' yes/no?")
+    String sureToSetPassword(String password);
+
+    /**
+     * Instructions for the {@link org.jboss.as.domain.management.security.AddPropertiesUser.CommandLineArgument#USAGE} command line argument.
+     * @return the message.
+     */
+    @Message(id = Message.NONE, value = "Usage: ./add-user.sh [args...]%nwhere args include:")
+    String argUsage();
+
+    /**
+     * Instructions for the {@link org.jboss.as.domain.management.security.AddPropertiesUser.CommandLineArgument#APPLICATION_USERS} command line argument.
+     * @return the message.
+     */
+    @Message(id = Message.NONE, value = "If set add an application user instead of a management user")
+    String argApplicationUsers();
+
+    /**
+     * Instructions for the {@link org.jboss.as.domain.management.security.AddPropertiesUser.CommandLineArgument#DOMAIN_CONFIG_DIR_USERS} command line argument.
+     * @return the message.
+     */
+    @Message(id = Message.NONE, value = "Define the system property to use for the domain config directory (default is \"jboss.domain.config.dir\")")
+    String argDomainConfigDirUsers();
+
+    /**
+     * Instructions for the {@link org.jboss.as.domain.management.security.AddPropertiesUser.CommandLineArgument#SERVER_CONFIG_DIR_USERS} command line argument.
+     * @return the message.
+     */
+    @Message(id = Message.NONE, value = "Define the system property to use for the server config directory (default is \"jboss.server.config.dir\")")
+    String argServerConfigDirUsers();
+
+    /**
+     * Instructions for the {@link org.jboss.as.domain.management.security.AddPropertiesUser.CommandLineArgument#PASSWORD} command line argument.
+     * @return the message.
+     */
+    @Message(id = Message.NONE, value = "Password of the user. Should not be same as the username")
+    String argPassword();
+
+    /**
+     * Instructions for the {@link org.jboss.as.domain.management.security.AddPropertiesUser.CommandLineArgument#USER} command line argument.
+     * @return the message.
+     */
+    @Message(id = Message.NONE, value = "Name of the user")
+    String argUser();
+
+    /**
+     * Instructions for the {@link org.jboss.as.domain.management.security.AddPropertiesUser.CommandLineArgument#REALM} command line argument.
+     * @return the message.
+     */
+    @Message(id = Message.NONE, value = "Name of the realm used to secure the management interfaces (default is \"ManagementRealm\")")
+    String argRealm();
+
+    /**
+     * Instructions for the {@link org.jboss.as.domain.management.security.AddPropertiesUser.CommandLineArgument#SILENT} command line argument.
+     * @return the message.
+     */
+    @Message(id = Message.NONE, value = "Activate the silent mode (no output to the console)")
+    String argSilent();
+
+    /**
+     * Instructions for the {@link org.jboss.as.domain.management.security.AddPropertiesUser.CommandLineArgument#ROLE} command line argument.
+     * @return the message.
+     */
+    @Message(id = Message.NONE, value = "Comma-separated list of roles for the user (only for application users, see -a)")
+    String argRole();
+
+    /**
+     * Instructions for the {@link org.jboss.as.domain.management.security.AddPropertiesUser.CommandLineArgument#HELP} command line argument.
+     * @return the message.
+     */
+    @Message(id = Message.NONE, value = "Display this message and exit")
+    String argHelp();
+
+    /**
+     * The long value a user would enter to indicate 'yes'
+     *
+     * This String should be the lower case representation in the respective locale.
+     *
+     * @return The value a user would enter to indicate 'yes'.
+     */
+    @Message(id = Message.NONE, value = "yes")
+    String yes();
+
+    /**
+     * The short value a user would enter to indicate 'yes'
+     *
+     * If no short value is available for a specific translation then only the long value will be accepted.
+     *
+     * This String should be the lower case representation in the respective locale.
+     *
+     * @return The short value a user would enter to indicate 'yes'.
+     */
+    @Message(id = Message.NONE, value = "y")
+    String shortYes();
+
+    /**
+     * The long value a user would enter to indicate 'no'
+     *
+     * This String should be the lower case representation in the respective locale.
+     *
+     * @return The value a user would enter to indicate 'no'.
+     */
+    @Message(id = Message.NONE, value = "no")
+    String no();
+
+    /**
+     * The short value a user would enter to indicate 'no'
+     *
+     * If no short value is available for a specific translation then only the long value will be accepted.
+     *
+     * This String should be the lower case representation in the respective locale.
+     *
+     * @return The short value a user would enter to indicate 'no'.
+     */
+    @Message(id = Message.NONE, value = "n")
+    String shortNo();
 
     /*
      * Logging IDs 15200 to 15299 are reserved for domain management, the file DomainManagementLogger also contains messages in

@@ -22,9 +22,9 @@
 
 package org.jboss.as.messaging.jms;
 
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
+
 import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.Executor;
 
 import org.hornetq.jms.server.JMSServerManager;
 import org.jboss.as.controller.AbstractAddStepHandler;
@@ -32,10 +32,8 @@ import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.ServiceVerificationHandler;
-import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
-import org.jboss.as.controller.operations.common.Util;
-import org.jboss.as.messaging.MessagingDescriptions;
+import org.jboss.as.messaging.CommonAttributes;
 import org.jboss.as.messaging.MessagingServices;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.ServiceBuilder;
@@ -44,10 +42,6 @@ import org.jboss.msc.service.ServiceController.Mode;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.ServiceTarget;
 
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ADD;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
-import static org.jboss.as.messaging.CommonAttributes.ENTRIES;
-
 /**
  * Update handler adding a topic to the JMS subsystem. The
  * runtime action, will create the {@link JMSTopicService}.
@@ -55,25 +49,12 @@ import static org.jboss.as.messaging.CommonAttributes.ENTRIES;
  * @author Emanuel Muckenhuber
  * @author <a href="mailto:andy.taylor@jboss.com">Andy Taylor</a>
  */
-public class JMSTopicAdd extends AbstractAddStepHandler implements DescriptionProvider {
-
-    public static final String OPERATION_NAME = ADD;
-
-    /**
-     * Create an "add" operation using the existing model
-     */
-    public static ModelNode getOperation(ModelNode address, ModelNode existing) {
-        ModelNode op = Util.getEmptyOperation(OPERATION_NAME, address);
-        if (existing.hasDefined(ENTRIES.getName())) {
-            op.get(ENTRIES.getName()).set(existing.get(ENTRIES.getName()));
-        }
-        return op;
-    }
+public class JMSTopicAdd extends AbstractAddStepHandler {
 
     public static final JMSTopicAdd INSTANCE = new JMSTopicAdd();
 
     protected void populateModel(ModelNode operation, ModelNode model) throws OperationFailedException {
-        ENTRIES.validateAndSet(operation, model);
+        CommonAttributes.DESTINATION_ENTRIES.validateAndSet(operation, model);
     }
 
     protected void performRuntime(OperationContext context, ModelNode operation, ModelNode model, ServiceVerificationHandler verificationHandler, List<ServiceController<?>> newControllers) throws OperationFailedException {
@@ -82,8 +63,8 @@ public class JMSTopicAdd extends AbstractAddStepHandler implements DescriptionPr
         final ServiceName hqServiceName = MessagingServices.getHornetQServiceName(PathAddress.pathAddress(operation.get(ModelDescriptionConstants.OP_ADDR)));
         final ServiceTarget serviceTarget = context.getServiceTarget();
 
-        final ModelNode entries = ENTRIES.resolveModelAttribute(context, model);
-        final String[] jndiBindings = JndiEntriesAttribute.getJndiBindings(entries);
+        final ModelNode entries = CommonAttributes.DESTINATION_ENTRIES.resolveModelAttribute(context, model);
+        final String[] jndiBindings = JMSServices.getJndiBindings(entries);
         installServices(verificationHandler, newControllers, name, hqServiceName, serviceTarget, jndiBindings);
     }
 
@@ -91,25 +72,17 @@ public class JMSTopicAdd extends AbstractAddStepHandler implements DescriptionPr
         final JMSTopicService service = new JMSTopicService(name, jndiBindings);
         final ServiceName serviceName = JMSServices.getJmsTopicBaseServiceName(hqServiceName).append(name);
 
-        final ServiceBuilder<Void> serviceBuilder = serviceTarget.addService(serviceName, service);
-
+        final ServiceBuilder<Void> serviceBuilder = serviceTarget.addService(serviceName, service)
+                .addDependency(JMSServices.getJmsManagerBaseServiceName(hqServiceName), JMSServerManager.class, service.getJmsServer())
+                .setInitialMode(Mode.ACTIVE);
+        org.jboss.as.server.Services.addServerExecutorDependency(serviceBuilder, service.getExecutorInjector(), false);
         if(verificationHandler != null) {
             serviceBuilder.addListener(verificationHandler);
         }
 
-        final ServiceController<Void> controller = serviceBuilder
-                .addDependency(JMSServices.getJmsManagerBaseServiceName(hqServiceName), JMSServerManager.class, service.getJmsServer())
-                .addDependency(MessagingServices.getHornetQStartupPoolServiceName(hqServiceName), Executor.class, service.getExecutorInjector())
-                .setInitialMode(Mode.ACTIVE)
-                .install();
+        final ServiceController<Void> controller = serviceBuilder.install();
         if(newControllers != null) {
             newControllers.add(controller);
         }
     }
-
-    @Override
-    public ModelNode getModelDescription(Locale locale) {
-        return MessagingDescriptions.getTopicAdd(locale);
-    }
-
 }

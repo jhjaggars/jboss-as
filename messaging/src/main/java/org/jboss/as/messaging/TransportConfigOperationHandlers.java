@@ -30,14 +30,11 @@ import static org.jboss.as.messaging.CommonAttributes.IN_VM_CONNECTOR;
 import static org.jboss.as.messaging.CommonAttributes.PARAM;
 import static org.jboss.as.messaging.CommonAttributes.REMOTE_ACCEPTOR;
 import static org.jboss.as.messaging.CommonAttributes.REMOTE_CONNECTOR;
-import static org.jboss.as.messaging.CommonAttributes.SERVER_ID;
-import static org.jboss.as.messaging.CommonAttributes.SOCKET_BINDING;
-import static org.jboss.as.messaging.CommonAttributes.VALUE;
 import static org.jboss.as.messaging.MessagingMessages.MESSAGES;
 
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -53,10 +50,9 @@ import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.PathElement;
-import org.jboss.as.controller.ReloadRequiredWriteAttributeHandler;
+import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
-import org.jboss.as.controller.registry.AttributeAccess;
-import org.jboss.as.controller.registry.ManagementResourceRegistration;
+import org.jboss.as.controller.parsing.ParseUtils;
 import org.jboss.as.controller.registry.Resource;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.Property;
@@ -70,83 +66,17 @@ import org.jboss.msc.service.ServiceName;
  */
 class TransportConfigOperationHandlers {
 
-    static AttributeDefinition[] GENERIC = new AttributeDefinition[] { CommonAttributes.FACTORY_CLASS, CommonAttributes.SOCKET_BINDING_OPTIONAL };
-    static AttributeDefinition[] REMOTE = new AttributeDefinition[] { CommonAttributes.SOCKET_BINDING };
-    static AttributeDefinition[] IN_VM = new AttributeDefinition[] { CommonAttributes.SERVER_ID };
-
-    /** The generic transport-config add operation handler. */
-    static final OperationStepHandler GENERIC_ADD = new BasicTransportConfigAdd(GENERIC);
-    static final SelfRegisteringAttributeHandler GENERIC_ATTR = new AttributeWriteHandler(GENERIC);
-
-    /** The remote transport-config add operation handler. */
-    static final OperationStepHandler REMOTE_ADD = new BasicTransportConfigAdd(REMOTE);
-    static final SelfRegisteringAttributeHandler REMOTE_ATTR = new AttributeWriteHandler(REMOTE);
-
-    /** The in-vm transport-config add operation handler. */
-    static final OperationStepHandler IN_VM_ADD = new BasicTransportConfigAdd(IN_VM);
-    static final SelfRegisteringAttributeHandler IN_VM_ATTR = new AttributeWriteHandler(IN_VM);
-
-    /** The transport-config remove operation handler. */
-    static final OperationStepHandler REMOVE = new OperationStepHandler() {
-
-        @Override
-        public void execute(final OperationContext context, final ModelNode operation) throws OperationFailedException {
-            final Resource resource = context.removeResource(PathAddress.EMPTY_ADDRESS);
-            reloadRequiredStep(context);
-            context.completeStep();
-        }
-    };
-
-    /** The transport-config param add operation handler. */
-    static final OperationStepHandler PARAM_ADD = new OperationStepHandler() {
-
-        @Override
-        public void execute(final OperationContext context, final ModelNode operation) throws OperationFailedException {
-            final Resource resource = context.createResource(PathAddress.EMPTY_ADDRESS);
-            VALUE.validateAndSet(operation, resource.getModel());
-            reloadRequiredStep(context);
-            context.completeStep();
-        }
-    };
-
-    static final OperationStepHandler PARAM_ATTR = new OperationStepHandler() {
-
-        @Override
-        public void execute(final OperationContext context, final ModelNode operation) throws OperationFailedException {
-            final Resource resource = context.readResourceForUpdate(PathAddress.EMPTY_ADDRESS);
-            VALUE.validateAndSet(operation, resource.getModel());
-            reloadRequiredStep(context);
-            context.completeStep();
-        }
-    };
-
     /**
-     * Create the connector/acceptor add operation.
-     *
-     * @param address the address
-     * @param node the subModel
-     * @return the add operation
+     * The transport-config remove operation handler.
      */
-    static ModelNode createAddOperation(final ModelNode address, final ModelNode node) {
-        final ModelNode operation = new ModelNode();
-        operation.get(ModelDescriptionConstants.OP).set(ModelDescriptionConstants.ADD);
-        operation.get(ModelDescriptionConstants.OP_ADDR).set(address);
-        if(node.hasDefined(CommonAttributes.SOCKET_BINDING.getName())) {
-            operation.get(CommonAttributes.SOCKET_BINDING.getName()).set(node.get(CommonAttributes.SOCKET_BINDING.getName()));
+    static final OperationStepHandler REMOVE = new OperationStepHandler() {
+        @Override
+        public void execute(final OperationContext context, final ModelNode operation) throws OperationFailedException {
+            context.removeResource(PathAddress.EMPTY_ADDRESS);
+            reloadRequiredStep(context);
+            context.stepCompleted();
         }
-        if(node.hasDefined(CommonAttributes.SERVER_ID.getName())) {
-            operation.get(CommonAttributes.SERVER_ID.getName()).set(node.get(CommonAttributes.SERVER_ID.getName()));
-        }
-        if(node.hasDefined(CommonAttributes.FACTORY_CLASS.getName())) {
-            operation.get(CommonAttributes.FACTORY_CLASS.getName()).set(node.get(CommonAttributes.FACTORY_CLASS.getName()));
-        }
-        if(node.hasDefined(CommonAttributes.PARAM)) {
-            for(final Property param : node.get(CommonAttributes.PARAM).asPropertyList()) {
-                operation.get(CommonAttributes.PARAM, param.getName()).set(param.getValue().get(ModelDescriptionConstants.VALUE));
-            }
-        }
-        return operation;
-    }
+    };
 
     /**
      * Add a step triggering the {@linkplain org.jboss.as.controller.OperationContext#reloadRequired()} in case the
@@ -156,16 +86,20 @@ class TransportConfigOperationHandlers {
      * @param context the operation context
      */
     static void reloadRequiredStep(final OperationContext context) {
-        if(context.isNormalServer()) {
+        if (context.isNormalServer()) {
             context.addStep(new OperationStepHandler() {
                 @Override
                 public void execute(final OperationContext context, final ModelNode operation) throws OperationFailedException {
                     final ServiceName hqServiceName = MessagingServices.getHornetQServiceName(PathAddress.pathAddress(operation.get(ModelDescriptionConstants.OP_ADDR)));
                     final ServiceController<?> controller = context.getServiceRegistry(false).getService(hqServiceName);
-                    if(controller != null) {
+                    OperationContext.RollbackHandler rh;
+                    if (controller != null) {
                         context.reloadRequired();
+                        rh = OperationContext.RollbackHandler.REVERT_RELOAD_REQUIRED_ROLLBACK_HANDLER;
+                    } else {
+                        rh = OperationContext.RollbackHandler.NOOP_ROLLBACK_HANDLER;
                     }
-                    context.completeStep();
+                    context.completeStep(rh);
                 }
             }, OperationContext.Stage.RUNTIME);
         }
@@ -174,38 +108,40 @@ class TransportConfigOperationHandlers {
     /**
      * Process the acceptor information.
      *
+     * @param context       the operation context
      * @param configuration the hornetQ configuration
      * @param params        the detyped operation parameters
      * @param bindings      the referenced socket bindings
+     * @throws OperationFailedException
      */
-    static void processAcceptors(final Configuration configuration, final ModelNode params, final Set<String> bindings) {
+    static void processAcceptors(final OperationContext context, final Configuration configuration, final ModelNode params, final Set<String> bindings) throws OperationFailedException {
         final Map<String, TransportConfiguration> acceptors = new HashMap<String, TransportConfiguration>();
-        if(params.hasDefined(ACCEPTOR)) {
+        if (params.hasDefined(ACCEPTOR)) {
             for (final Property property : params.get(ACCEPTOR).asPropertyList()) {
                 final String acceptorName = property.getName();
                 final ModelNode config = property.getValue();
-                final Map<String, Object> parameters = getParameters(config);
+                final Map<String, Object> parameters = getParameters(context, config);
                 final String clazz = config.get(FACTORY_CLASS.getName()).asString();
                 acceptors.put(acceptorName, new TransportConfiguration(clazz, parameters, acceptorName));
             }
         }
-        if(params.hasDefined(REMOTE_ACCEPTOR)) {
+        if (params.hasDefined(REMOTE_ACCEPTOR)) {
             for (final Property property : params.get(REMOTE_ACCEPTOR).asPropertyList()) {
                 final String acceptorName = property.getName();
                 final ModelNode config = property.getValue();
-                final Map<String, Object> parameters = getParameters(config);
-                final String binding = config.get(SOCKET_BINDING.getName()).asString();
-                parameters.put(SOCKET_BINDING.getName(), binding);
+                final Map<String, Object> parameters = getParameters(context, config);
+                final String binding = config.get(RemoteTransportDefinition.SOCKET_BINDING.getName()).asString();
+                parameters.put(RemoteTransportDefinition.SOCKET_BINDING.getName(), binding);
                 bindings.add(binding);
                 acceptors.put(acceptorName, new TransportConfiguration(NettyAcceptorFactory.class.getName(), parameters, acceptorName));
             }
         }
-        if(params.hasDefined(IN_VM_ACCEPTOR)) {
+        if (params.hasDefined(IN_VM_ACCEPTOR)) {
             for (final Property property : params.get(IN_VM_ACCEPTOR).asPropertyList()) {
                 final String acceptorName = property.getName();
                 final ModelNode config = property.getValue();
-                final Map<String, Object> parameters = getParameters(config);
-                parameters.put(SERVER_ID.getName(), config.get(SERVER_ID.getName()).asInt());
+                final Map<String, Object> parameters = getParameters(context, config);
+                parameters.put(InVMTransportDefinition.SERVER_ID.getName(), config.get(InVMTransportDefinition.SERVER_ID.getName()).asInt());
                 acceptors.put(acceptorName, new TransportConfiguration(InVMAcceptorFactory.class.getName(), parameters, acceptorName));
             }
         }
@@ -215,15 +151,22 @@ class TransportConfigOperationHandlers {
     /**
      * Get the parameters.
      *
+     * @param context the operation context
      * @param config the transport configuration
      * @return the extracted parameters
+     * @throws OperationFailedException if an expression can not be resolved
      */
-    static Map<String, Object> getParameters(final ModelNode config) {
+    static Map<String, Object> getParameters(final OperationContext context, final ModelNode config) throws OperationFailedException {
         final Map<String, Object> parameters = new HashMap<String, Object>();
-        if (config.get(PARAM).isDefined()) {
+        if (config.hasDefined(PARAM)) {
             for (final Property parameter : config.get(PARAM).asPropertyList()) {
-                parameters.put(parameter.getName(), parameter.getValue().get(ModelDescriptionConstants.VALUE).asString());
-            }
+                String name = parameter.getName();
+                // FIXME with https://issues.jboss.org/browse/AS7-5121, PARAM will be represented with an AttributeDefinition
+                // and expressions will be resolved automatically
+                ModelNode value =  parameter.getValue().get(ModelDescriptionConstants.VALUE);
+                ModelNode expression = ParseUtils.parsePossibleExpression(value.asString());
+                String resolvedValue = context.resolveExpressions(expression).asString();
+                parameters.put(name, resolvedValue);            }
         }
         return parameters;
     }
@@ -231,17 +174,19 @@ class TransportConfigOperationHandlers {
     /**
      * Process the connector information.
      *
+     * @param context       the operation context
      * @param configuration the hornetQ configuration
      * @param params        the detyped operation parameters
      * @param bindings      the referenced socket bindings
+     * @throws OperationFailedException
      */
-    static void processConnectors(final Configuration configuration, final ModelNode params, final Set<String> bindings) {
+    static void processConnectors(final OperationContext context, final Configuration configuration, final ModelNode params, final Set<String> bindings) throws OperationFailedException {
         final Map<String, TransportConfiguration> connectors = new HashMap<String, TransportConfiguration>();
         if (params.hasDefined(CONNECTOR)) {
             for (final Property property : params.get(CONNECTOR).asPropertyList()) {
                 final String connectorName = property.getName();
                 final ModelNode config = property.getValue();
-                final Map<String, Object> parameters = getParameters(config);
+                final Map<String, Object> parameters = getParameters(context, config);
                 final String clazz = config.get(FACTORY_CLASS.getName()).asString();
                 connectors.put(connectorName, new TransportConfiguration(clazz, parameters, connectorName));
             }
@@ -250,46 +195,45 @@ class TransportConfigOperationHandlers {
             for (final Property property : params.get(REMOTE_CONNECTOR).asPropertyList()) {
                 final String connectorName = property.getName();
                 final ModelNode config = property.getValue();
-                final Map<String, Object> parameters = getParameters(config);
-                final String binding = config.get(SOCKET_BINDING.getName()).asString();
-                parameters.put(SOCKET_BINDING.getName(), binding);
+                final Map<String, Object> parameters = getParameters(context, config);
+                final String binding = config.get(RemoteTransportDefinition.SOCKET_BINDING.getName()).asString();
+                parameters.put(RemoteTransportDefinition.SOCKET_BINDING.getName(), binding);
                 bindings.add(binding);
                 connectors.put(connectorName, new TransportConfiguration(NettyConnectorFactory.class.getName(), parameters, connectorName));
             }
         }
-        if(params.hasDefined(IN_VM_CONNECTOR)) {
+        if (params.hasDefined(IN_VM_CONNECTOR)) {
             for (final Property property : params.get(IN_VM_CONNECTOR).asPropertyList()) {
                 final String connectorName = property.getName();
                 final ModelNode config = property.getValue();
-                final Map<String, Object> parameters = getParameters(config);
-                parameters.put(SERVER_ID.getName(), config.get(SERVER_ID.getName()).asInt());
+                final Map<String, Object> parameters = getParameters(context, config);
+                parameters.put(InVMTransportDefinition.SERVER_ID.getName(), config.get(InVMTransportDefinition.SERVER_ID.getName()).asInt());
                 connectors.put(connectorName, new TransportConfiguration(InVMConnectorFactory.class.getName(), parameters, connectorName));
             }
         }
         configuration.setConnectorConfigurations(connectors);
     }
 
-    private static class BasicTransportConfigAdd implements OperationStepHandler {
+    static class BasicTransportConfigAdd implements OperationStepHandler, DescriptionProvider {
 
         private final AttributeDefinition[] attributes;
+        private final boolean isAcceptor;
 
-        BasicTransportConfigAdd(final AttributeDefinition[] attributes) {
+        BasicTransportConfigAdd(final boolean isAcceptor, final AttributeDefinition[] attributes) {
+            this.isAcceptor = isAcceptor;
             this.attributes = attributes;
         }
 
         @Override
-        public void execute(final OperationContext context, final ModelNode operation) throws OperationFailedException {
+        public void execute(OperationContext context, ModelNode operation) throws OperationFailedException {
             final Resource resource = context.createResource(PathAddress.EMPTY_ADDRESS);
             final ModelNode subModel = resource.getModel();
-            // Process attributes
-            for(final AttributeDefinition attribute : attributes) {
+            for (final AttributeDefinition attribute : attributes) {
                 attribute.validateAndSet(operation, subModel);
             }
-            // Process acceptor/connector type specific properties
-            process(subModel, operation);
-            // The transport-config parameters
-            if(operation.hasDefined(CommonAttributes.PARAMS)) {
-                for(Property property : operation.get(CommonAttributes.PARAMS).asPropertyList()) {
+
+            if(operation.hasDefined(CommonAttributes.PARAM)) {
+                for(Property property : operation.get(CommonAttributes.PARAM).asPropertyList()) {
                     final Resource param = context.createResource(PathAddress.pathAddress(PathElement.pathElement(CommonAttributes.PARAM, property.getName())));
                     final ModelNode value = property.getValue();
                     if(! value.isDefined()) {
@@ -300,34 +244,16 @@ class TransportConfigOperationHandlers {
             }
             // This needs a reload
             reloadRequiredStep(context);
-            context.completeStep();
+            context.stepCompleted();
         }
 
-        void process(ModelNode subModel, ModelNode operation) {
-            //
-        };
-    }
-
-    interface SelfRegisteringAttributeHandler extends OperationStepHandler {
-        void registerAttributes(final ManagementResourceRegistration registry, boolean registerRuntimeOnly);
-    }
-
-    static class AttributeWriteHandler extends ReloadRequiredWriteAttributeHandler implements SelfRegisteringAttributeHandler {
-        final AttributeDefinition[] attributes;
-
-        private AttributeWriteHandler(AttributeDefinition[] attributes) {
-            super(attributes);
-            this.attributes = attributes;
-        }
-
-        public void registerAttributes(final ManagementResourceRegistration registry, boolean registerRuntimeOnly) {
-            final EnumSet<AttributeAccess.Flag> flags = EnumSet.of(AttributeAccess.Flag.RESTART_ALL_SERVICES);
-            for (AttributeDefinition attr : attributes) {
-                if (registerRuntimeOnly || !attr.getFlags().contains(AttributeAccess.Flag.STORAGE_RUNTIME)) {
-                    registry.registerReadWriteAttribute(attr.getName(), null, this, flags);
-                }
+        @Override
+        public ModelNode getModelDescription(Locale locale) {
+            if (isAcceptor) {
+                return MessagingDescriptions.getAcceptorAdd(locale, attributes);
+            } else {
+                return MessagingDescriptions.getConnectorAdd(locale, attributes);
             }
         }
     }
-
 }

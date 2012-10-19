@@ -51,6 +51,7 @@ import java.util.Set;
 import org.jboss.as.controller.AttributeDefinition;
 import org.jboss.as.controller.ControlledProcessState;
 import org.jboss.as.controller.OperationContext;
+import org.jboss.as.controller.OperationDefinition;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.PathElement;
@@ -63,6 +64,7 @@ import org.jboss.as.controller.client.OperationAttachments;
 import org.jboss.as.controller.client.OperationMessageHandler;
 import org.jboss.as.controller.descriptions.DescriptionProvider;
 import org.jboss.as.controller.descriptions.OverrideDescriptionProvider;
+import org.jboss.as.controller.registry.AliasEntry;
 import org.jboss.as.controller.registry.AttributeAccess;
 import org.jboss.as.controller.registry.ImmutableManagementResourceRegistration;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
@@ -237,6 +239,14 @@ public abstract class AbstractOperationTestCase {
 
         public void completeStep(OperationContext.RollbackHandler rollbackHandler) {
 
+        }
+
+        public void completeStep(ResultHandler resultHandler) {
+
+        }
+
+        public void stepCompleted() {
+            completeStep(ResultHandler.NOOP_RESULT_HANDLER);
         }
 
         public ModelNode getFailureDescription() {
@@ -581,6 +591,16 @@ public abstract class AbstractOperationTestCase {
         }
 
         @Override
+        public void registerOperationHandler(OperationDefinition definition, OperationStepHandler handler) {
+
+        }
+
+        @Override
+        public void registerOperationHandler(OperationDefinition definition, OperationStepHandler handler, boolean inherited) {
+
+        }
+
+        @Override
         public void unregisterOperationHandler(String operationName) {
 
         }
@@ -682,6 +702,11 @@ public abstract class AbstractOperationTestCase {
             return null;
         }
 
+        @Override
+        public AliasEntry getAliasEntry() {
+            return null;
+        }
+
         public ProxyController getProxyController(PathAddress address) {
             if (address.getLastElement().getKey().equals(SERVER) && !address.getLastElement().getValue().equals("server-two")) {
                 return new ProxyController() {
@@ -698,6 +723,19 @@ public abstract class AbstractOperationTestCase {
 
         public Set<ProxyController> getProxyControllers(PathAddress address) {
             return null;
+        }
+
+        @Override
+        public void registerAlias(PathElement address, AliasEntry alias) {
+        }
+
+        @Override
+        public void unregisterAlias(PathElement address) {
+        }
+
+        @Override
+        public boolean isAlias() {
+            return false;
         }
     };
 }

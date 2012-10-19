@@ -22,11 +22,21 @@
 
 package org.jboss.as.connector.services.resourceadapters.deployment;
 
-import org.jboss.as.connector.util.ConnectorServices;
-import org.jboss.as.connector.services.mdr.AS7MetadataRepository;
+import static org.jboss.as.connector.logging.ConnectorLogger.DEPLOYMENT_CONNECTOR_LOGGER;
+import static org.jboss.as.connector.logging.ConnectorMessages.MESSAGES;
+
+import java.io.File;
+import java.net.URL;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.jboss.as.connector.metadata.deployment.ResourceAdapterDeployment;
 import org.jboss.as.connector.metadata.xmldescriptors.ConnectorXmlDescriptor;
+import org.jboss.as.connector.services.mdr.AS7MetadataRepository;
 import org.jboss.as.connector.services.resourceadapters.ResourceAdapterService;
+import org.jboss.as.connector.util.ConnectorServices;
+import org.jboss.as.naming.WritableServiceBasedNamingStore;
 import org.jboss.jca.common.api.metadata.ironjacamar.IronJacamar;
 import org.jboss.jca.common.api.metadata.ra.AdminObject;
 import org.jboss.jca.common.api.metadata.ra.ConnectionDefinition;
@@ -46,15 +56,6 @@ import org.jboss.msc.service.ServiceTarget;
 import org.jboss.msc.service.StartContext;
 import org.jboss.msc.service.StartException;
 import org.jboss.msc.service.StopContext;
-
-import java.io.File;
-import java.net.URL;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import static org.jboss.as.connector.logging.ConnectorLogger.DEPLOYMENT_CONNECTOR_LOGGER;
-import static org.jboss.as.connector.logging.ConnectorMessages.MESSAGES;
 
 /**
  * A ResourceAdapterDeploymentService.
@@ -93,11 +94,12 @@ public final class ResourceAdapterDeploymentService extends AbstractResourceAdap
         final File root = connectorXmlDescriptor == null ? null : connectorXmlDescriptor.getRoot();
         DEPLOYMENT_CONNECTOR_LOGGER.debugf("DEPLOYMENT name = %s",deploymentName);
         final AS7RaDeployer raDeployer =
-            new AS7RaDeployer(context.getChildTarget(), url, deploymentName, root, module.getClassLoader(), cmd, ijmd);
+            new AS7RaDeployer(context.getChildTarget(), url, deploymentName, root, module.getClassLoader(), cmd, ijmd, deploymentServiceName);
         raDeployer.setConfiguration(config.getValue());
 
         ClassLoader old = SecurityActions.getThreadContextClassLoader();
         try {
+            WritableServiceBasedNamingStore.pushOwner(container.subTarget());
             SecurityActions.setThreadContextClassLoader(module.getClassLoader());
             raDeployment = raDeployer.doDeploy();
         } catch (Throwable t) {
@@ -105,17 +107,19 @@ public final class ResourceAdapterDeploymentService extends AbstractResourceAdap
             throw MESSAGES.failedToStartRaDeployment(t, deploymentName);
         } finally {
             SecurityActions.setThreadContextClassLoader(old);
+            WritableServiceBasedNamingStore.popOwner();
         }
 
-        value = new ResourceAdapterDeployment(raDeployment);
+        raName = raDeployment.getDeploymentName();
+        ServiceName raServiceName = ConnectorServices.registerResourceAdapter(raName);
+
+        value = new ResourceAdapterDeployment(raDeployment, raName, raServiceName);
 
         managementRepository.getValue().getConnectors().add(value.getDeployment().getConnector());
-        raName = value.getDeployment().getDeploymentName();
 
         if (raDeployer.checkActivation(cmd, ijmd)) {
             registry.getValue().registerResourceAdapterDeployment(value);
 
-            ServiceName raServiceName = ConnectorServices.registerResourceAdapter(raName);
             context.getChildTarget()
                     .addService(raServiceName,
                                 new ResourceAdapterService(raName, raServiceName, value.getDeployment().getResourceAdapter())).setInitialMode(Mode.ACTIVE)
@@ -132,8 +136,8 @@ public final class ResourceAdapterDeploymentService extends AbstractResourceAdap
         String deploymentName = value.getDeployment() != null ? value.getDeployment().getDeploymentName() : "";
         DEPLOYMENT_CONNECTOR_LOGGER.debugf("Stopping sevice %s",
                         ConnectorServices.RESOURCE_ADAPTER_DEPLOYMENT_SERVICE_PREFIX.append(deploymentName));
-
         unregisterAll(deploymentName);
+
     }
 
     @Override
@@ -147,8 +151,15 @@ public final class ResourceAdapterDeploymentService extends AbstractResourceAdap
             ConnectorServices.unregisterResourceAdapterIdentifier(raName);
         }
 
-
         super.unregisterAll(deploymentName);
+
+        if (mdr != null && mdr.getValue() != null && deploymentName != null) {
+            try {
+                mdr.getValue().unregisterResourceAdapter(deploymentName);
+            } catch (Throwable t) {
+                DEPLOYMENT_CONNECTOR_LOGGER.debug("Exception during unregistering deployment", t);
+            }
+        }
     }
 
     public CommonDeployment getRaDeployment() {
@@ -164,8 +175,8 @@ public final class ResourceAdapterDeploymentService extends AbstractResourceAdap
         private final IronJacamar ijmd;
 
         public AS7RaDeployer(ServiceTarget serviceContainer, URL url, String deploymentName, File root, ClassLoader cl,
-                Connector cmd, IronJacamar ijmd) {
-            super(serviceContainer, url, deploymentName, root, cl, cmd);
+                Connector cmd, IronJacamar ijmd,  final ServiceName deploymentServiceName) {
+            super(serviceContainer, url, deploymentName, root, cl, cmd, deploymentServiceName);
             this.ijmd = ijmd;
         }
 

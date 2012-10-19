@@ -25,8 +25,8 @@ package org.jboss.as.clustering.jgroups;
 import java.net.URL;
 
 import org.jboss.as.controller.OperationFailedException;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageBundle;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageBundle;
 import org.jboss.logging.Messages;
 
 /**
@@ -70,4 +70,12 @@ public interface JGroupsMessages {
     @Message(id = 10274, value = "Protocol list for stack %s is not defined. Please specify both a transport and protocol list, either as optional parameters to add() or via batching.")
     OperationFailedException protocolListNotDefined(String stackName);
 
+    @Message(id = 10275, value = "Protocol with relative path %s is already defined.")
+    OperationFailedException protocolAlreadyDefined(String relativePath);
+
+    @Message(id = 10276, value = "Protocol with relative path %s is not defined.")
+    OperationFailedException protocolNotDefined(String relativePath);
+
+    @Message(id = 10277, value = "Property %s for protocol with relative path %s is not defined. ")
+    OperationFailedException propertyNotDefined(String propertyName, String protocolRelativePath);
 }

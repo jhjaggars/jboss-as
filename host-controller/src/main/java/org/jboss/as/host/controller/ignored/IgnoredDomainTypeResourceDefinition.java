@@ -22,28 +22,22 @@
 
 package org.jboss.as.host.controller.ignored;
 
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.*;
-
-import java.util.Locale;
-import java.util.ResourceBundle;
-
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamWriter;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.IGNORED_RESOURCE_TYPE;
 
 import org.jboss.as.controller.ListAttributeDefinition;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathElement;
+import org.jboss.as.controller.PrimitiveListAttributeDefinition;
 import org.jboss.as.controller.ResourceDefinition;
 import org.jboss.as.controller.SimpleAttributeDefinition;
 import org.jboss.as.controller.SimpleAttributeDefinitionBuilder;
 import org.jboss.as.controller.SimpleResourceDefinition;
 import org.jboss.as.controller.descriptions.ModelDescriptionConstants;
-import org.jboss.as.controller.descriptions.ResourceDescriptionResolver;
 import org.jboss.as.controller.operations.validation.StringLengthValidator;
 import org.jboss.as.controller.registry.AttributeAccess;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
 import org.jboss.as.controller.registry.OperationEntry;
-import org.jboss.as.host.controller.descriptions.HostRootDescription;
+import org.jboss.as.host.controller.descriptions.HostResolver;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
 
@@ -57,34 +51,14 @@ public class IgnoredDomainTypeResourceDefinition extends SimpleResourceDefinitio
     public static final SimpleAttributeDefinition WILDCARD = new SimpleAttributeDefinitionBuilder(ModelDescriptionConstants.WILDCARD, ModelType.BOOLEAN, true)
             .setDefaultValue(new ModelNode(false)).setFlags(AttributeAccess.Flag.RESTART_ALL_SERVICES).build();
 
-    public static final ListAttributeDefinition NAMES = new ListAttributeDefinition(ModelDescriptionConstants.NAMES, true, new StringLengthValidator(1), AttributeAccess.Flag.RESTART_ALL_SERVICES) {
-        @Override
-        protected void addValueTypeDescription(ModelNode node, ResourceBundle bundle) {
-            this.setValueType(node);
-        }
-
-        @Override
-        protected void addAttributeValueTypeDescription(ModelNode node, ResourceDescriptionResolver resolver, Locale locale, ResourceBundle bundle) {
-            this.setValueType(node);
-        }
-
-        @Override
-        protected void addOperationParameterValueTypeDescription(ModelNode node, String operationName, ResourceDescriptionResolver resolver, Locale locale, ResourceBundle bundle) {
-            this.setValueType(node);
-        }
-
-        @Override
-        public void marshallAsElement(ModelNode resourceModel, XMLStreamWriter writer) throws XMLStreamException {
-            throw new UnsupportedOperationException();
-        }
-
-        private void setValueType(ModelNode node) {
-            node.get(ModelDescriptionConstants.VALUE_TYPE).set(ModelType.STRING);
-        }
-    };
+    public static final ListAttributeDefinition NAMES = new PrimitiveListAttributeDefinition.Builder(ModelDescriptionConstants.NAMES, ModelType.STRING)
+            .setAllowNull(true)
+            .setValidator(new StringLengthValidator(1))
+            .setFlags(AttributeAccess.Flag.RESTART_ALL_SERVICES)
+            .build();
 
     IgnoredDomainTypeResourceDefinition() {
-        super(PathElement.pathElement(IGNORED_RESOURCE_TYPE), HostRootDescription.getResourceDescriptionResolver(IGNORED_RESOURCE_TYPE),
+        super(PathElement.pathElement(IGNORED_RESOURCE_TYPE), HostResolver.getResolver(IGNORED_RESOURCE_TYPE),
                 new IgnoredDomainTypeAddHandler(),
                 new IgnoredDomainTypeRemoveHandler(),
                 OperationEntry.Flag.RESTART_ALL_SERVICES, OperationEntry.Flag.RESTART_ALL_SERVICES);

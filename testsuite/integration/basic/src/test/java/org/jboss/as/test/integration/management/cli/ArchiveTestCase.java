@@ -36,7 +36,7 @@ import org.jboss.arquillian.test.api.ArquillianResource;
 import org.jboss.as.cli.CommandContext;
 import org.jboss.as.cli.CommandContextFactory;
 import org.jboss.as.test.integration.common.HttpRequest;
-import org.jboss.as.test.integration.management.base.AbstractCliTestBase;
+import org.jboss.as.test.integration.management.util.CLITestUtil;
 import org.jboss.as.test.integration.management.util.SimpleServlet;
 import org.jboss.shrinkwrap.api.Archive;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
@@ -67,7 +67,7 @@ public class ArchiveTestCase {
     @Deployment
     public static Archive<?> getDeployment() {
         JavaArchive ja = ShrinkWrap.create(JavaArchive.class, "dummy.jar");
-        ja.addClass(DeployTestCase.class);
+        ja.addClass(ArchiveTestCase.class);
         return ja;
     }
 
@@ -106,14 +106,12 @@ public class ArchiveTestCase {
         }
         cliArchiveFile = new File(tempDir + File.separator + "archive.cli");
         new ZipExporterImpl(cliArchive).exportTo(cliArchiveFile, true);
-
-        AbstractCliTestBase.initCLI();
     }
 
     @Test
     public void testDeployArchive() throws Exception {
 
-        final CommandContext ctx = CommandContextFactory.getInstance().newCommandContext();
+        final CommandContext ctx = CLITestUtil.getCommandContext();
         try {
             ctx.connectController();
             ctx.handle("deploy " + cliArchiveFile.getAbsolutePath() + " --script=install.scr");
@@ -135,10 +133,33 @@ public class ArchiveTestCase {
         }
     }
 
+    @Test
+    public void testUnDeployArchive() throws Exception {
+
+        final CommandContext ctx = CommandContextFactory.getInstance().newCommandContext();
+        try {
+            ctx.connectController();
+            ctx.handle("deploy " + cliArchiveFile.getAbsolutePath() + " --script=install.scr");
+
+            // check that now both wars are deployed
+            String response = HttpRequest.get(getBaseURL(url) + "deployment0/SimpleServlet", 10, TimeUnit.SECONDS);
+            assertTrue("Invalid response: " + response, response.indexOf("SimpleServlet") >=0);
+            response = HttpRequest.get(getBaseURL(url) + "deployment1/SimpleServlet", 10, TimeUnit.SECONDS);
+            assertTrue("Invalid response: " + response, response.indexOf("SimpleServlet") >=0);
+
+            ctx.handle("undeploy " + "--path=" + cliArchiveFile.getAbsolutePath() + " --script=uninstall.scr");
+
+            // check that both wars are undeployed
+            assertTrue(checkUndeployed(getBaseURL(url) + "deployment0/SimpleServlet"));
+            assertTrue(checkUndeployed(getBaseURL(url) + "deployment1/SimpleServlet"));
+        } finally {
+            ctx.terminateSession();
+        }
+    }
+
     @AfterClass
     public static void after() throws Exception {
         cliArchiveFile.delete();
-        AbstractCliTestBase.closeCLI();
     }
 
     protected final String getBaseURL(URL url) throws MalformedURLException {

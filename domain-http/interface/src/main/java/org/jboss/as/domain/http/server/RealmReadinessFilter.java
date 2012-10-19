@@ -22,15 +22,10 @@
 
 package org.jboss.as.domain.http.server;
 
-import static org.jboss.as.domain.http.server.Constants.LOCATION;
-import static org.jboss.as.domain.http.server.Constants.TEMPORARY_REDIRECT;
-import static org.jboss.as.domain.http.server.HttpServerMessages.MESSAGES;
-
 import java.io.IOException;
 
 import org.jboss.as.domain.management.SecurityRealm;
 import org.jboss.com.sun.net.httpserver.Filter;
-import org.jboss.com.sun.net.httpserver.Headers;
 import org.jboss.com.sun.net.httpserver.HttpExchange;
 
 /**
@@ -38,14 +33,12 @@ import org.jboss.com.sun.net.httpserver.HttpExchange;
  *
  * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>
  */
-class RealmReadinessFilter extends Filter {
+abstract class RealmReadinessFilter extends Filter {
 
     private final SecurityRealm securityRealm;
-    private final String redirectTo;
 
-    RealmReadinessFilter(final SecurityRealm securityRealm, final String redirectTo) {
+    RealmReadinessFilter(final SecurityRealm securityRealm) {
         this.securityRealm = securityRealm;
-        this.redirectTo = redirectTo;
     }
 
     @Override
@@ -53,16 +46,20 @@ class RealmReadinessFilter extends Filter {
         if (securityRealm.isReady()) {
             chain.doFilter(exchange);
         } else {
-            Headers responseHeaders = exchange.getResponseHeaders();
-            responseHeaders.add(LOCATION, redirectTo);
-            exchange.sendResponseHeaders(TEMPORARY_REDIRECT, 0);
-            exchange.close();
+            rejectRequest(exchange);
         }
     }
 
-    @Override
-    public String description() {
-        return MESSAGES.realmReadinessFilter();
-    }
+    /**
+     * Method to be implemented by sub classes to handle the rejection process due to the realm not being ready to authenticate
+     * clients.
+     *
+     * Possible examples are sending a redirect to a page to inform the user that it is not possible due to no users being
+     * defined or sending a DMR response indicating a failure.
+     *
+     * @param exchange
+     * @throws IOException
+     */
+    abstract void rejectRequest(HttpExchange exchange) throws IOException;
 
 }

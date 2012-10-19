@@ -23,16 +23,18 @@
 package org.jboss.as.messaging;
 
 import java.util.Collection;
+import java.util.List;
 
 import javax.xml.stream.XMLStreamException;
 
+import org.jboss.as.controller.ModelVersion;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.server.deployment.DeploymentUnitProcessingException;
 import org.jboss.dmr.ModelType;
-import org.jboss.logging.Cause;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageBundle;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageBundle;
 import org.jboss.logging.Messages;
 import org.jboss.msc.service.ServiceController.State;
 import org.jboss.msc.service.ServiceName;
@@ -473,5 +475,37 @@ public interface MessagingMessages {
      */
     @Message(id = 11670, value = "Only one of %s or %s is required")
     String onlyOneRequired(Object obj1, Object obj2);
+
+
+    /**
+     * Create an exception indicating that a messaging resource has failed
+     * to be recovered
+     *
+     * @param cause  the cause of the error.
+     * @param name the name that failed to be recovered.
+     *
+     * @return the message.
+     */
+    @Message(id = 11671, value = "Failed to recover %s")
+    OperationFailedException failedToRecover(@Cause Throwable cause, String name);
+
+    /**
+     * Create an failure description message indicating that an attribute is not supported by a given model version.
+     *
+     * @param attributes the name(s) of the unsupported attribute(s)
+     * @param version the model version that does not support the attribute
+     *
+     * @return the message.
+     */
+    @Message(id = 11672, value = "Attribute(s) %s are not supported by messaging management model %s")
+    String unsupportedAttributeInVersion(String attributes, ModelVersion version);
+
+    /**
+     * Create an failure description message indicating that the clustered attribute is deprecated.
+     *
+     * @return an {@link UnsupportedOperationException} for the error.
+     */
+    @Message(id = 11673, value = "The clustered attribute is deprecated. To create a clustered HornetQ server, define at least one cluster-connection")
+    UnsupportedOperationException canNotWriteClusteredAttribute();
 
 }

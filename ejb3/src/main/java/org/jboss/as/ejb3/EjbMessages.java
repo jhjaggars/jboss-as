@@ -45,9 +45,9 @@ import org.jboss.as.naming.context.NamespaceContextSelector;
 import org.jboss.as.server.deployment.DeploymentUnit;
 import org.jboss.as.server.deployment.DeploymentUnitProcessingException;
 import org.jboss.invocation.InterceptorContext;
-import org.jboss.logging.Cause;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageBundle;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageBundle;
 import org.jboss.logging.Messages;
 import org.jboss.metadata.ejb.spec.MethodParametersMetaData;
 import org.jboss.msc.service.ServiceController;
@@ -644,7 +644,7 @@ public interface EjbMessages {
      *
      * @return a {@link IllegalArgumentException} for the error.
      */
-    @Message(id = 14368, value = "Component %s with component class: %s\n isn't a %s component")
+    @Message(id = 14368, value = "Component %s with component class: %s%n isn't a %s component")
     IllegalArgumentException componentNotInstanceOfSessionComponent(Component component, Class<?> componentClass, String type);
 
     /**
@@ -800,7 +800,7 @@ public interface EjbMessages {
      *
      * @return a {@link DeploymentUnitProcessingException} for the error.
      */
-    @Message(id = 14393, value = "<role-name> cannot be null or empty in <security-role-ref>\nfor bean: %s")
+    @Message(id = 14393, value = "<role-name> cannot be null or empty in <security-role-ref>%nfor bean: %s")
     DeploymentUnitProcessingException roleNamesIsNull(String ejbName);
 
     /**
@@ -898,7 +898,7 @@ public interface EjbMessages {
      *
      * @return a {@link DeploymentUnitProcessingException} for the error.
      */
-    @Message(id = 14405, value = "Could not determine type of corresponding implied EJB 2.x local interface (see EJB 3.1 21.4.5)\n due to multiple create* methods with different return types on home %s")
+    @Message(id = 14405, value = "Could not determine type of corresponding implied EJB 2.x local interface (see EJB 3.1 21.4.5)%n due to multiple create* methods with different return types on home %s")
     DeploymentUnitProcessingException multipleCreateMethod(Class localHomeClass);
 
     /**
@@ -1164,7 +1164,7 @@ public interface EjbMessages {
      *
      * @return an {@link IllegalArgumentException} for the error.
      */
-    @Message(id = 14438, value = "Timer service with timedObjectId: %s\n is already registered")
+    @Message(id = 14438, value = "Timer service with timedObjectId: %s%n is already registered")
     IllegalStateException timerServiceAlreadyRegistered(String timedObjectId);
 
     /**
@@ -1725,7 +1725,7 @@ public interface EjbMessages {
      *
      * @return an {@link String} for the error.
      */
-    @Message(id = 14508, value = "EJB component for address %s is in \n state %s, must be in state %s")
+    @Message(id = 14508, value = "EJB component for address %s is in %n state %s, must be in state %s")
     String invalidComponentState(PathAddress operationAddress, ServiceController.State controllerState, ServiceController.State up);
 
 
@@ -2072,6 +2072,12 @@ public interface EjbMessages {
     @Message(id = 14579, value = "EJB business method %s must be public")
     DeploymentUnitProcessingException ejbBusinessMethodMustBePublic(final Method method);
 
+    @Message(id = 14580, value = "Unexpected Error")
+    EJBException unexpectedError();
+
+    @Message(id = 14581, value = "EJB 3.1 FR 13.3.3: BMT bean %s should complete transaction before returning.")
+    String transactionNotComplete(String componentName);
+
     // STOP!!! Don't add message ids greater that 14599!!! If you need more first check what EjbLogger is
     // using and take more (lower) numbers from the available range for this module. If the range for the module is
     // all used, go to https://community.jboss.org/docs/DOC-16810 and allocate another block for this subsystem
@@ -2081,9 +2087,21 @@ public interface EjbMessages {
     @Message(id = 14225, value = "Could not create an instance of deployment node selector %s")
     DeploymentUnitProcessingException failedToCreateDeploymentNodeSelector(@Cause Exception e, String deploymentNodeSelectorClassName);
 
-    // Don't add exception messages greater that 14299!!! If you need more go to
+    // Don't add exception messages greater that 14240!!! If you need more go to
     // https://community.jboss.org/docs/DOC-16810 and allocate another block for this subsystem
 
     @Message(id = 14226, value = "Could not lookup service %s")
     IllegalStateException serviceNotFound(ServiceName serviceName);
+
+    @Message(id = 14227, value = "EJB %s of type %s must have public default constructor")
+    DeploymentUnitProcessingException ejbMustHavePublicDefaultConstructor(String componentName, String componentClassName);
+
+    @Message(id = 14228, value = "EJB %s of type %s must not be inner class")
+    DeploymentUnitProcessingException ejbMustNotBeInnerClass(String componentName, String componentClassName);
+
+    @Message(id = 14229, value = "EJB %s of type %s must be declared public")
+    DeploymentUnitProcessingException ejbMustBePublicClass(String componentName, String componentClassName);
+
+    @Message(id = 14230, value = "EJB %s of type %s must not be declared final")
+    DeploymentUnitProcessingException ejbMustNotBeFinalClass(String componentName, String componentClassName);
 }

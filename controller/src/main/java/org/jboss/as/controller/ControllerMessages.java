@@ -29,7 +29,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
-
 import javax.xml.namespace.QName;
 import javax.xml.stream.Location;
 import javax.xml.stream.XMLStreamException;
@@ -43,11 +42,11 @@ import org.jboss.as.controller.registry.OperationEntry.Flag;
 import org.jboss.as.protocol.mgmt.RequestProcessingException;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
-import org.jboss.logging.Cause;
-import org.jboss.logging.Message;
-import org.jboss.logging.MessageBundle;
+import org.jboss.logging.annotations.Cause;
+import org.jboss.logging.annotations.Message;
+import org.jboss.logging.annotations.MessageBundle;
 import org.jboss.logging.Messages;
-import org.jboss.logging.Param;
+import org.jboss.logging.annotations.Param;
 import org.jboss.modules.ModuleIdentifier;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.StartException;
@@ -1391,7 +1390,7 @@ public interface ControllerMessages {
      *
      * @return the message.
      */
-    @Message("Operation %s")
+    @Message(id = Message.NONE, value = "Operation %s")
     String operation(String step);
 
     /**
@@ -1401,22 +1400,6 @@ public interface ControllerMessages {
      */
     @Message(id = 14748, value = "Operation already complete")
     IllegalStateException operationAlreadyComplete();
-
-    /**
-     * Creates a message indicating the operation is cancelled.
-     *
-     * @return the message.
-     */
-    @Message("Operation cancelled")
-    String operationCancelled();
-
-    /**
-     * Creates a message indicating the operation is cancelled asynchronously.
-     *
-     * @return a {@link CancellationException} for the error.
-     */
-    @Message("Operation cancelled asynchronously")
-    OperationCancellationException operationCancelledAsynchronously();
 
     /**
      * A message indicating the operation handler failed.
@@ -1562,7 +1545,7 @@ public interface ControllerMessages {
      *
      * @return the message.
      */
-    @Message("%nService %s was depended upon by ")
+    @Message(id = Message.NONE, value = "%nService %s was depended upon by ")
     String removingServiceUnsatisfiedDependencies(String name);
 
     /**
@@ -1652,7 +1635,7 @@ public interface ControllerMessages {
      *
      * @return the message.
      */
-    @Message("Missing[%s]")
+    @Message(id = Message.NONE, value = "is missing [%s]")
     String servicesMissing(StringBuilder sb);
 
     /**
@@ -1702,7 +1685,7 @@ public interface ControllerMessages {
      *
      * @return the message.
      */
-    @Message("      %s (missing) dependents: %s %n")
+    @Message(id = Message.NONE, value = "      %s (missing) dependents: %s %n")
     String serviceStatusReportMissing(ServiceName serviceName, String dependents);
 
     /**
@@ -1712,7 +1695,7 @@ public interface ControllerMessages {
      *
      * @return the message.
      */
-    @Message("      %s (unavailable) dependents: %s %n")
+    @Message(id = Message.NONE, value = "      %s (unavailable) dependents: %s %n")
     String serviceStatusReportUnavailable(ServiceName serviceName, String dependents);
 
     /**
@@ -1730,7 +1713,7 @@ public interface ControllerMessages {
      *
      * @return the message.
      */
-    @Message("      %s (no longer required)%n")
+    @Message(id = Message.NONE, value = "      %s (no longer required)%n")
     String serviceStatusReportNoLongerRequired(ServiceName serviceName);
 
     /**
@@ -1740,7 +1723,7 @@ public interface ControllerMessages {
      *
      * @return the message.
      */
-    @Message("      %s (new available)%n")
+    @Message(id = Message.NONE, value = "      %s (new available)%n")
     String serviceStatusReportAvailable(ServiceName serviceName);
 
     /**
@@ -1812,11 +1795,11 @@ public interface ControllerMessages {
     String subsystemBootOperationFailed(String name);
 
     /**
-     * A message indicating a failure executing subsystem boot operations, but no individual operation failed.
+     * A message indicating a failure executing subsystem boot operations.
      *
      * @return the message.
      */
-    @Message(id = 14784, value = "Failed executing subsystem %s boot operations but no individual operation failed")
+    @Message(id = 14784, value = "Failed executing subsystem %s boot operations")
     String subsystemBootOperationFailedExecuting(String name);
 
     /**
@@ -2476,9 +2459,82 @@ public interface ControllerMessages {
     @Message(id = 14859, value = "Failed to rename temp file %s to %s")
     ConfigurationPersistenceException failedToRenameTempFile(@Cause Throwable cause, File temp, File file);
 
+
     @Message(id = 14860, value = "Invalid locale format:  %s")
     String invalidLocaleString(String unparsed);
 
     @Message(id = 14861, value = "<one or more transitive dependencies>")
     String transitiveDependencies();
+
+    /**
+     * Creates a message indicating the operation is cancelled.
+     *
+     * @return the message.
+     */
+    @Message(id = 14862, value = "Operation cancelled")
+    String operationCancelled();
+
+    /**
+     * Creates a message indicating the operation is cancelled asynchronously.
+     *
+     * @return a {@link CancellationException} for the error.
+     */
+    @Message(id = 14863, value = "Operation cancelled asynchronously")
+    OperationCancellationException operationCancelledAsynchronously();
+
+    @Message(id = 14864, value = "Stream was killed")
+    IOException streamWasKilled();
+
+    @Message(id = 14865, value = "Stream was closed")
+    IOException streamWasClosed();
+
+    @Message(id = 14866, value = "Cannot define both '%s' and '%s'")
+    OperationFailedException cannotHaveBothParameters(String nameA, String name2);
+
+    @Message(id = 14867, value = "Failed to delete file %s")
+    IllegalStateException couldNotDeleteFile(File file);
+
+    @Message(id = 14868, value = "An alias is already registered at location '%s'")
+    IllegalArgumentException aliasAlreadyRegistered(String location);
+
+    @Message(id = 14869, value = "Expected an address under '%s', was '%s'")
+    IllegalArgumentException badAliasConvertAddress(PathAddress aliasAddress, PathAddress actual);
+
+    @Message(id = 14870, value = "Alias target address not found: %s")
+    IllegalArgumentException aliasTargetResourceRegistrationNotFound(PathAddress targetAddress);
+
+    @Message(id = 14871, value = "No operation called '%s' found for alias address '%s' which maps to '%s'")
+    IllegalArgumentException aliasStepHandlerOperationNotFound(String name, PathAddress aliasAddress, PathAddress targetAddress);
+
+
+    @Message(id = 14872, value = "Resource registration is not an alias")
+    IllegalStateException resourceRegistrationIsNotAnAlias();
+
+    @Message(id = 14873, value = "Model contains fields that are not known in definition, fields: %s, path: %s")
+    RuntimeException modelFieldsNotKnown(Set<String> fields, PathAddress address);
+
+
+    @Message(id = 14874, value = "Could not marshal attribute as element: %s")
+    UnsupportedOperationException couldNotMarshalAttributeAsElement(String attributeName);
+
+    @Message(id = 14875, value = "Could not marshal attribute as attribute: %s")
+    UnsupportedOperationException couldNotMarshalAttributeAsAttribute(String attributeName);
+
+    @Message(id = 14876, value = "Operation %s invoked against multiple target addresses failed at address %s with failure description %s")
+    String wildcardOperationFailedAtSingleAddress(String operation, PathAddress address, String failureMessage);
+
+    @Message(id = 14877, value = "Operation %s invoked against multiple target addresses failed at address %s. See the operation result for details.")
+    String wildcardOperationFailedAtSingleAddressWithComplexFailure(String operation, PathAddress address);
+
+    @Message(id = 14878, value = "Operation %s invoked against multiple target addresses failed at addresses %s. See the operation result for details.")
+    String wildcardOperationFailedAtMultipleAddresses(String operation, Set<PathAddress> addresses);
+
+    @Message(id = 14879, value = "One or more services were unable to start due to one or more indirect dependencies not being available.")
+    String missingTransitiveDependencyProblem();
+
+    @Message(id = Message.NONE, value = "Services that were unable to start:")
+    String missingTransitiveDependendents();
+
+    @Message(id = Message.NONE, value = "Services that may be the cause:")
+    String missingTransitiveDependencies();
 }
