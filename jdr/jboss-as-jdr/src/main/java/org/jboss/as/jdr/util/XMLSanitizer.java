@@ -44,16 +44,20 @@ public class XMLSanitizer implements Sanitizer {
     }
 
     public InputStream sanitize(InputStream in) throws Exception {
-        Document doc = builder.parse(in);
-        Object result = expression.evaluate(doc, XPathConstants.NODESET);
-        NodeList nodes = (NodeList) result;
-        for (int i = 0; i < nodes.getLength(); i++) {
-            nodes.item(i).setTextContent("");
+        try {
+            Document doc = builder.parse(in);
+            Object result = expression.evaluate(doc, XPathConstants.NODESET);
+            NodeList nodes = (NodeList) result;
+            for (int i = 0; i < nodes.getLength(); i++) {
+                nodes.item(i).setTextContent("");
+            }
+            DOMSource source = new DOMSource(doc);
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            StreamResult outStream = new StreamResult(output);
+            transformer.transform(source, outStream);
+            return new ByteArrayInputStream(output.toByteArray());
+        } catch (Exception e) {
+            return in;
         }
-        DOMSource source = new DOMSource(doc);
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        StreamResult outStream = new StreamResult(output);
-        transformer.transform(source, outStream);
-        return new ByteArrayInputStream(output.toByteArray());
     }
 }

@@ -88,29 +88,29 @@ public class JdrReportService implements JdrReportCollector, Service<JdrReportCo
             host = "localhost";
         }
         if (port == null) {
-            port = "9990";
+            port = "9999";
         }
 
         // Let's go ahead and see if we need to auth before prompting the user
         // for a username and password
-        boolean must_auth = false;
+//        boolean must_auth = false;
 
-        try {
-            URL managementApi = new URL("http://" + NetworkUtils.formatPossibleIpv6Address(host) + ":" + port + "/management");
-            HttpURLConnection conn = (HttpURLConnection) managementApi.openConnection();
-            int code = conn.getResponseCode();
-            if (code != 200) {
-                must_auth = true;
-            }
-        } catch (Exception e) {
-        }
+//        try {
+//            URL managementApi = new URL("http://" + NetworkUtils.formatPossibleIpv6Address(host) + ":" + port + "/management");
+//            HttpURLConnection conn = (HttpURLConnection) managementApi.openConnection();
+//            int code = conn.getResponseCode();
+//            if (code != 200) {
+//                must_auth = true;
+//            }
+//        } catch (Exception e) {
+//        }
 
-        if (must_auth) {
-            if (cons != null) {
-                username = cons.readLine("Management username: ");
-                password = String.valueOf(cons.readPassword("Management password: "));
-            }
-        }
+//        if (must_auth) {
+//            if (cons != null) {
+//                username = cons.readLine("Management username: ");
+//                password = String.valueOf(cons.readPassword("Management password: "));
+//            }
+//        }
         return new JdrRunner(username, password, host, port).collect();
     }
 

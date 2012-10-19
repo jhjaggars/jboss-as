@@ -28,6 +28,7 @@ import org.jboss.as.jdr.commands.JdrCommand;
 import org.jboss.as.jdr.commands.JdrEnvironment;
 import org.jboss.as.jdr.plugins.JdrPlugin;
 import org.jboss.as.jdr.util.JdrZipFile;
+import org.jboss.as.cli.impl.CommandContextImpl;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -40,6 +41,7 @@ import static org.jboss.as.jdr.JdrMessages.MESSAGES;
 public class JdrRunner implements JdrReportCollector {
 
     JdrEnvironment env = new JdrEnvironment();
+    CommandContextImpl ctx;
 
     public JdrRunner() {
     }
@@ -49,6 +51,15 @@ public class JdrRunner implements JdrReportCollector {
         this.env.setPassword(pass);
         this.env.setHost(host);
         this.env.setPort(port);
+        try {
+            ctx = new CommandContextImpl(host, Integer.valueOf(port), null, null, false);
+            ctx.connectController();
+            this.env.setClient(ctx.getModelControllerClient());
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            // the server isn't available, carry on
+        }
     }
 
     public JdrReport collect() throws OperationFailedException {
@@ -65,11 +76,7 @@ public class JdrRunner implements JdrReportCollector {
 
 
         try {
-            InputStream is = FileUtils.openInputStream(
-                    FileUtils.getFile(
-                            this.env.getJbossHome(), "modules", "org", "jboss", "as", "jdr", "main", "plugins.properties"
-                    )
-            );
+            InputStream is = this.getClass().getClassLoader().getResourceAsStream("plugins.properties");
             Properties plugins = new Properties();
             plugins.load(is);
             for (String pluginName : plugins.stringPropertyNames()) {
@@ -107,6 +114,13 @@ public class JdrRunner implements JdrReportCollector {
 
         report.setEndTime();
         report.setLocation(this.env.getZip().name());
+
+        try {
+            ctx.terminateSession();
+        } catch (Exception e) {
+            // idk
+        }
+
         return report;
     }
 

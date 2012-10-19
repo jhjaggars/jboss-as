@@ -4,12 +4,12 @@ import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.jdr.util.JdrZipFile;
 
 public class JdrEnvironment {
-    private String jbossHome;
+    private String jbossHome = System.getenv("JBOSS_HOME");
     private String username;
     private String password;
     private String host;
     private String port;
-    private String outputDirectory;
+    private String outputDirectory = System.getProperty("user.dir");
     private String hostControllerName;
     private String serverName;
     private ModelControllerClient client;
