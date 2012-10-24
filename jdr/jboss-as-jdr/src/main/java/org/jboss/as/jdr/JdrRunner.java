@@ -57,7 +57,6 @@ public class JdrRunner implements JdrReportCollector {
             this.env.setClient(ctx.getModelControllerClient());
         }
         catch (Exception e) {
-            e.printStackTrace();
             // the server isn't available, carry on
         }
     }

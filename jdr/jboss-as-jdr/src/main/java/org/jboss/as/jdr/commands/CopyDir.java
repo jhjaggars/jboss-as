@@ -69,7 +69,6 @@ public class CopyDir extends JdrCommand {
             )
         );
         for( File f : matches ) {
-            System.out.println(f.getPath());
             InputStream stream = new FileInputStream(f);
             for (Sanitizer s : this.sanitizers) {
                 stream = s.sanitize(stream);

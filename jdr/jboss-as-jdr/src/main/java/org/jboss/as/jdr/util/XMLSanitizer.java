@@ -52,8 +52,9 @@ public class XMLSanitizer implements Sanitizer {
         DocumentBuilderFactory DBfactory = DocumentBuilderFactory.newInstance();
         DBfactory.setNamespaceAware(true);
         builder = DBfactory.newDocumentBuilder();
+        builder.setErrorHandler(null);
 
-        TransformerFactory transformerFactory = TransformerFactory.newInstance();
+        TransformerFactory transformerFactory = TransformerFactory.newInstance("org.apache.xalan.processor.TransformerFactoryImpl", null);
         transformer = transformerFactory.newTransformer();
     }
 
