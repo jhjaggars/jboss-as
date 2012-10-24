@@ -31,6 +31,8 @@ import org.jboss.as.jdr.plugins.JdrPlugin;
 import org.jboss.as.jdr.util.JdrZipFile;
 
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -73,7 +75,6 @@ public class JdrRunner implements JdrReportCollector {
 
         List<JdrCommand> commands = new ArrayList<JdrCommand>();
 
-
         try {
             InputStream is = this.getClass().getClassLoader().getResourceAsStream("plugins.properties");
             Properties plugins = new Properties();
@@ -94,6 +95,7 @@ public class JdrRunner implements JdrReportCollector {
         }
 
         JdrReport report = new JdrReport();
+        StringBuilder skips = new StringBuilder();
         report.setStartTime();
 
         for( JdrCommand command : commands ) {
@@ -101,14 +103,25 @@ public class JdrRunner implements JdrReportCollector {
             try {
                 command.execute();
             } catch (Exception e) {
-                ROOT_LOGGER.debugf("Skipping command %s", command.toString());
+                String message = "Skipping command " + command.toString();
+                ROOT_LOGGER.debugf(message);
+                skips.append(message);
+                PrintWriter pw = new PrintWriter(new StringWriter());
+                e.printStackTrace(pw);
+                skips.append(pw.toString());
             }
+        }
+
+        try {
+            this.env.getZip().addLog(skips.toString(), "skips.log");
+        } catch (Exception e) {
+            ROOT_LOGGER.debugf(e, "Could not add skipped commands log to jdr zip file.");
         }
 
         try {
             this.env.getZip().close();
         } catch (Exception e) {
-            ROOT_LOGGER.debugf(e, "Could not close zipfile");
+            ROOT_LOGGER.debugf(e, "Could not close zip file.");
         }
 
         report.setEndTime();
