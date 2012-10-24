@@ -21,14 +21,14 @@
  */
 package org.jboss.as.jdr;
 
-import org.apache.commons.io.FileUtils;
+import org.jboss.as.cli.CommandContext;
+import org.jboss.as.cli.CommandContextFactory;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.jdr.commands.JdrCommand;
 import org.jboss.as.jdr.commands.JdrEnvironment;
 import org.jboss.as.jdr.plugins.JdrPlugin;
 import org.jboss.as.jdr.util.JdrZipFile;
-import org.jboss.as.cli.impl.CommandContextImpl;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -41,7 +41,7 @@ import static org.jboss.as.jdr.JdrMessages.MESSAGES;
 public class JdrRunner implements JdrReportCollector {
 
     JdrEnvironment env = new JdrEnvironment();
-    CommandContextImpl ctx;
+    CommandContext ctx;
 
     public JdrRunner() {
     }
@@ -52,7 +52,7 @@ public class JdrRunner implements JdrReportCollector {
         this.env.setHost(host);
         this.env.setPort(port);
         try {
-            ctx = new CommandContextImpl(host, Integer.valueOf(port), null, null, false);
+            ctx = CommandContextFactory.getInstance().newCommandContext(host, Integer.valueOf(port), null, null, false);
             ctx.connectController();
             this.env.setClient(ctx.getModelControllerClient());
         }
