@@ -21,35 +21,34 @@
  */
 package org.jboss.as.jdr.commands;
 
-import org.apache.commons.io.filefilter.AndFileFilter;
-import org.apache.commons.io.filefilter.DelegateFileFilter;
-import org.jboss.as.jdr.util.BlackListFilter;
+import org.jboss.as.jdr.resource.Factory;
+import org.jboss.as.jdr.resource.Resource;
+import org.jboss.as.jdr.resource.Utils;
+import org.jboss.as.jdr.resource.filter.AndFilter;
+import org.jboss.as.jdr.resource.filter.RegexBlacklistFilter;
+import org.jboss.as.jdr.resource.filter.RegexpPathFilter;
+import org.jboss.as.jdr.resource.filter.ResourceFilter;
 import org.jboss.as.jdr.util.Sanitizer;
 import org.jboss.as.jdr.util.Find;
-import org.jboss.as.jdr.util.WildcardPathFilter;
-
-import java.io.File;
-import java.io.FileFilter;
-import java.io.FileInputStream;
 import java.io.InputStream;
-import java.util.Collection;
 import java.util.LinkedList;
+import java.util.List;
 
 public class CopyDir extends JdrCommand {
 
-    FileFilter filter;
-    FileFilter blacklistFilter = new BlackListFilter();
+    ResourceFilter filter;
+    ResourceFilter blacklistFilter = new RegexBlacklistFilter();
     LinkedList<Sanitizer> sanitizers = new LinkedList<Sanitizer>();
 
-    public CopyDir(FileFilter filter) {
+    public CopyDir(ResourceFilter filter) {
         this.filter = filter;
     }
 
     public CopyDir(String pattern) {
-        this.filter = new WildcardPathFilter(pattern);
+        this.filter = new RegexpPathFilter(pattern);
     }
 
-    public CopyDir blacklist(FileFilter blacklistFilter) {
+    public CopyDir blacklist(ResourceFilter blacklistFilter) {
         this.blacklistFilter = blacklistFilter;
         return this;
     }
@@ -61,20 +60,18 @@ public class CopyDir extends JdrCommand {
 
     @Override
     public void execute() throws Exception {
-        Collection<File> matches = Find.walk(
-            new File(this.env.getJbossHome()),
-            new AndFileFilter(
-                new DelegateFileFilter(this.filter),
-                new DelegateFileFilter(this.blacklistFilter)
-            )
+        List<Resource> matches = Find.walk(
+                Factory.getResource(this.env.getJbossHome()),
+            new AndFilter(this.filter, this.blacklistFilter)
         );
-        for( File f : matches ) {
+        for( Resource f : matches ) {
             System.out.println(f.getPath());
-            InputStream stream = new FileInputStream(f);
+            InputStream stream = f.openStream();
             for (Sanitizer s : this.sanitizers) {
                 stream = s.sanitize(stream);
             }
             this.env.getZip().add(f, stream);
+            Utils.safelyClose(stream);
         }
     }
 }

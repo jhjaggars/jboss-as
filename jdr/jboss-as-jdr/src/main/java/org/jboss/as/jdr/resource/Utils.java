@@ -38,7 +38,7 @@ public final class Utils {
         }
     }
 
-    public static void safeClose(InputStream is){
+    public static void safelyClose(InputStream is){
         try{
             if(is != null) {
                 is.close();
@@ -48,7 +48,7 @@ public final class Utils {
         }
     }
 
-    public List<String> readLines(InputStream input) throws IOException {
+    public static List<String> readLines(InputStream input) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(input));
         List<String> result = new ArrayList<String>();
         String line = reader.readLine();
@@ -60,11 +60,19 @@ public final class Utils {
         return result;
     }
 
-    public static char WINDOWS_SEPARATOR = '\\';
-    public static char SYSTEM_SEPARATOR = File.separatorChar;
+    public static char WIN_SEP = '\\';
+    public static char SYS_SEP = File.separatorChar;
 
     public static boolean isWindows() {
-        return SYSTEM_SEPARATOR == WINDOWS_SEPARATOR;
+        return SYS_SEP == WIN_SEP;
     }
+
+    public final static long ONE_KB = 1024;
+
+    public final static long ONE_MB = ONE_KB * ONE_KB;
+
+    public final static long ONE_GB = ONE_KB * ONE_MB;
+
+    public final static long ONE_TB = ONE_KB * ONE_GB;
 
 }

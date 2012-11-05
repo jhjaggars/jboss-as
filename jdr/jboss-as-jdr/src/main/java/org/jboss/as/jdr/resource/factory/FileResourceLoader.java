@@ -12,7 +12,7 @@ import java.io.File;
  * Time: 5:02 PM
  * To change this template use File | Settings | File Templates.
  */
-public class FileResourceFactory implements ResourceFactory {
+public class FileResourceLoader implements ResourceLoader {
     @Override
     public Resource getResource(String path) {
         return new FileResource(new File(path));

@@ -22,6 +22,7 @@
 package org.jboss.as.jdr.util;
 
 import org.jboss.as.jdr.commands.JdrEnvironment;
+import org.jboss.as.jdr.resource.Resource;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -95,7 +96,7 @@ public class JdrZipFile {
         }
     }
 
-    public void add(File file, InputStream is) throws Exception {
+    public void add(Resource file, InputStream is) throws Exception {
         String name = "JBOSS_HOME" + file.getPath().substring(this.jbossHome.length());
         this.add(is, name);
     }

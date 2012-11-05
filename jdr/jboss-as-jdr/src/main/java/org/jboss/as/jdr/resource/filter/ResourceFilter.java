@@ -10,5 +10,15 @@ import org.jboss.as.jdr.resource.Resource;
  * To change this template use File | Settings | File Templates.
  */
 public interface ResourceFilter {
+
+    public static ResourceFilter TRUE = new ResourceFilter() {
+        @Override
+        public boolean accepts(Resource resource) {
+            return true;
+        }
+    };
+
+    public static ResourceFilter FALSE = new NotFilter(TRUE);
+
     public boolean accepts(Resource resource);
 }

@@ -9,7 +9,7 @@ import org.jboss.as.jdr.resource.Resource;
  * Time: 4:59 PM
  * To change this template use File | Settings | File Templates.
  */
-public interface ResourceFactory {
+public interface ResourceLoader {
 
     public Resource getResource(String path);
 

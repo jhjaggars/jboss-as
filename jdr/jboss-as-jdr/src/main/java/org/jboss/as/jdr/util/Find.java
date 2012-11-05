@@ -21,31 +21,33 @@
  */
 package org.jboss.as.jdr.util;
 
-import org.apache.commons.io.filefilter.TrueFileFilter;
+import org.jboss.as.jdr.resource.Resource;
 
-import java.io.File;
-import java.io.FileFilter;
+//TODO: Change this to WildcardPathFilter to handle globbing instead of full regex
+import org.jboss.as.jdr.resource.filter.RegexpPathFilter;
+import org.jboss.as.jdr.resource.filter.ResourceFilter;
+
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.List;
 
 public class Find {
 
-    public static Collection walk(File root) throws Exception {
-        return walk(root, TrueFileFilter.TRUE);
+    public static List<Resource> walk(Resource root) throws Exception {
+        return walk(root, ResourceFilter.TRUE);
     }
 
-    public static Collection walk(File root, String pattern) throws Exception {
-        return walk(root, new WildcardPathFilter(pattern));
+    public static List<Resource> walk(Resource root, String pattern) throws Exception {
+        return walk(root, new RegexpPathFilter(pattern));
     }
 
-    public static Collection walk(File root, FileFilter filter) throws Exception {
-        ArrayList<File> results = new ArrayList<File>();
-        for( File f : root.listFiles() ) {
+    public static List<Resource> walk(Resource root, ResourceFilter filter) throws Exception {
+        ArrayList<Resource> results = new ArrayList<Resource>();
+        for( Resource f : root.getChildren() ) {
             if(f.isDirectory()) {
                 results.addAll(walk(f, filter));
             }
             else {
-                if( filter.accept(f) ) {
+                if( filter.accepts(f) ) {
                     results.add(f);
                 }
             }

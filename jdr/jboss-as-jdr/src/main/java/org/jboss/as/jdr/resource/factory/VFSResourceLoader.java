@@ -11,7 +11,7 @@ import org.jboss.vfs.VFS;
  * Time: 5:00 PM
  * To change this template use File | Settings | File Templates.
  */
-public class VFSResourceFactory implements ResourceFactory {
+public class VFSResourceLoader implements ResourceLoader {
     @Override
     public Resource getResource(String path) {
         return new VFSResource(VFS.getChild(path));

@@ -41,7 +41,7 @@ public class VFSResource extends AbstractResource implements Resource {
             is = manifestFile.openStream();
             return extractManfiest(is);
         } finally {
-            Utils.safeClose(is);
+            Utils.safelyClose(is);
         }
     }
 
@@ -51,7 +51,7 @@ public class VFSResource extends AbstractResource implements Resource {
     }
 
     @Override
-    public List<Resource> getChildren(ResourceFilter filter) throws IOException {
+    public List<Resource> getChildren(ResourceFilter filter) {
         return Utils.applyFilter(toResourceList(virtualFile.getChildren()), filter);
     }
 

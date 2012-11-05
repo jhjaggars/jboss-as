@@ -21,30 +21,34 @@
  */
 package org.jboss.as.jdr.util;
 
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
+import org.jboss.as.jdr.resource.Utils;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class PatternSanitizer implements Sanitizer {
-    String pattern;
-    String replacement;
+    private final Pattern pattern;
+    private final String replacement;
 
-    public PatternSanitizer (String pattern) throws Exception {
-        this.pattern = pattern;
+    public PatternSanitizer(String pattern, String replacement) throws Exception {
+        this.pattern = Pattern.compile(pattern);
+        this.replacement = replacement;
     }
 
     public InputStream sanitize(InputStream in) throws Exception {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        for(String line : IOUtils.readLines(in)) {
-           if(FilenameUtils.wildcardMatch(line, pattern)) {
-               output.write(pattern.getBytes());
-           }
-           else {
-               output.write(line.getBytes());
-           }
+        for(String line : Utils.readLines(in)) {
+
+            Matcher matcher = pattern.matcher(line);
+            if(matcher.matches()) {
+                output.write(replacement.getBytes());
+            }
+            else {
+                output.write(line.getBytes());
+            }
         }
         return new ByteArrayInputStream(output.toByteArray());
     }

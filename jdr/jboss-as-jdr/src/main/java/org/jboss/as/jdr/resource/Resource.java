@@ -1,7 +1,5 @@
 package org.jboss.as.jdr.resource;
 
-import org.jboss.as.jdr.resource.factory.ResourceFactory;
-import org.jboss.as.jdr.resource.factory.VFSResourceFactory;
 import org.jboss.as.jdr.resource.filter.ResourceFilter;
 
 import java.io.IOException;
@@ -20,8 +18,8 @@ public interface Resource {
     public String getPath();
     public String getName();
     public String getManifest() throws IOException;
-    public List<Resource> getChildren() throws IOException;
-    public List<Resource> getChildren(ResourceFilter filter) throws IOException;
+    public List<Resource> getChildren();
+    public List<Resource> getChildren(ResourceFilter filter);
     public long getSize();
     public boolean isDirectory();
     public boolean isFile();

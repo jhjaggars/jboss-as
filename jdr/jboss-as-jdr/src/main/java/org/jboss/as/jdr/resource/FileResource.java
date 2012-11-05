@@ -50,18 +50,18 @@ public class FileResource extends AbstractResource {
             is = jf.getInputStream(manifest);
             return extractManfiest(is);
         } finally {
-            Utils.safeClose(is);
+            Utils.safelyClose(is);
             Utils.safeClose(jf);
         }
     }
 
     @Override
-    public List<Resource> getChildren() throws IOException {
+    public List<Resource> getChildren() {
         return toResourceList(file.listFiles());
     }
 
     @Override
-    public List<Resource> getChildren(ResourceFilter filter) throws IOException {
+    public List<Resource> getChildren(ResourceFilter filter) {
         return Utils.applyFilter(toResourceList(file.listFiles()), filter);
     }
 
