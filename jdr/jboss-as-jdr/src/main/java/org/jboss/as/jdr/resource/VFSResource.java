@@ -63,6 +63,11 @@ public class VFSResource extends AbstractResource implements Resource {
     }
 
     @Override
+    public Resource getChild(String path) {
+        return new VFSResource(virtualFile.getChild(path));
+    }
+
+    @Override
     public List<Resource> getChildren() {
         return toResourceList(virtualFile.getChildren());
     }

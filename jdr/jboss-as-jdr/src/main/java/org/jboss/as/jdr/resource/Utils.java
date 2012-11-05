@@ -3,6 +3,7 @@ package org.jboss.as.jdr.resource;
 import org.jboss.as.jdr.resource.filter.ResourceFilter;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -60,6 +61,20 @@ public final class Utils {
             line = reader.readLine();
         }
         return result;
+    }
+
+    public static String resourceToString(Resource r) throws IOException {
+        byte [] buffer = new byte[1024];
+        InputStream is = r.openStream();
+
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        int bytesRead = is.read(buffer);
+        while( bytesRead > -1 ) {
+            os.write(buffer, 0, bytesRead);
+            bytesRead = is.read(buffer);
+        }
+
+        return new String(os.toByteArray());
     }
 
     public static char WIN_SEP = '\\';

@@ -22,7 +22,7 @@
 package org.jboss.as.jdr.commands;
 
 
-import org.jboss.as.jdr.resource.Factory;
+import org.jboss.as.jdr.resource.ResourceFactory;
 import org.jboss.as.jdr.resource.Resource;
 import org.jboss.as.jdr.resource.Utils;
 
@@ -40,7 +40,7 @@ public class JarCheck extends JdrCommand {
     @Override
     public void execute() throws Exception {
         this.buffer = new StringBuilder();
-        walk(Factory.getResource(this.env.getJbossHome()));
+        walk(ResourceFactory.getResource(this.env.getJbossHome()));
         this.env.getZip().add(this.buffer.toString(), "jarcheck.txt");
     }
 

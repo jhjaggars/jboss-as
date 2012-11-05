@@ -21,7 +21,7 @@
  */
 package org.jboss.as.jdr.commands;
 
-import org.jboss.as.jdr.resource.Factory;
+import org.jboss.as.jdr.resource.ResourceFactory;
 import org.jboss.as.jdr.resource.Resource;
 import org.jboss.as.jdr.resource.Utils;
 import org.jboss.as.jdr.resource.filter.AndFilter;
@@ -59,7 +59,7 @@ public class CopyDir extends JdrCommand {
 
     @Override
     public void execute() throws Exception {
-        Resource root = Factory.getResource(this.env.getJbossHome());
+        Resource root = ResourceFactory.getResource(this.env.getJbossHome());
         List<Resource> matches = root.getChildrenRecursively(new AndFilter(this.filter, this.blacklistFilter));
         for( Resource f : matches ) {
             InputStream stream = f.openStream();

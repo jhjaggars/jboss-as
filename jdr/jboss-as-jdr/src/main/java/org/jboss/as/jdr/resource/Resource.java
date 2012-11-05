@@ -16,6 +16,7 @@ public interface Resource {
     String getPath();
     String getName();
     String getManifest() throws IOException;
+    Resource getChild(String path);
     List<Resource> getChildren();
     List<Resource> getChildren(ResourceFilter filter);
     List<Resource> getChildrenRecursively() throws IOException;

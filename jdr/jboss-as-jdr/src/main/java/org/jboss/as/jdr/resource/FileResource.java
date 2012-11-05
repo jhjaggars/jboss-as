@@ -65,6 +65,11 @@ public class FileResource extends AbstractResource {
     }
 
     @Override
+    public Resource getChild(String path) {
+        return new FileResource(new File(file, path));
+    }
+
+    @Override
     public List<Resource> getChildren() {
         return toResourceList(file.listFiles());
     }

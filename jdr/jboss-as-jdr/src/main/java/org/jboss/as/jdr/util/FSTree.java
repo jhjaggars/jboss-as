@@ -21,7 +21,7 @@
  */
 package org.jboss.as.jdr.util;
 
-import org.jboss.as.jdr.resource.Factory;
+import org.jboss.as.jdr.resource.ResourceFactory;
 import org.jboss.as.jdr.resource.Resource;
 import org.jboss.as.jdr.resource.Utils;
 
@@ -70,7 +70,7 @@ public class FSTree {
 
     private void traverse(String dir, String padding, boolean first)
         throws java.io.IOException {
-        Resource path = Factory.getResource(dir);
+        Resource path = ResourceFactory.getResource(dir);
 
         if (!first) {
             String _p = padding.substring(0, padding.length() -1);

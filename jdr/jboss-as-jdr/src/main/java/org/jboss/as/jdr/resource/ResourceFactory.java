@@ -9,7 +9,7 @@ import org.jboss.as.jdr.resource.factory.VFSResourceLoader;
  * Date: 11/4/12
  * Time: 6:06 PM
  */
-public final class Factory {
+public final class ResourceFactory {
 
     private static final ResourceLoader LOADER = new VFSResourceLoader();
 
