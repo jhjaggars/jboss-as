@@ -40,20 +40,14 @@ public class VFSResource extends AbstractResource implements Resource {
 
     @Override
     public String getManifest() throws IOException {
-        if(virtualFile.getName().endsWith(".jar")){
-            Automounter.mount(virtualFile);
-        }
-        else {
-            return null;
-        }
-
-        VirtualFile manifestFile = virtualFile.getChild(Utils.MANIFEST_NAME);
-        if(!manifestFile.exists()){
-            return null;
-        }
+        Automounter.mount(virtualFile);
 
         InputStream is = null;
         try {
+            VirtualFile manifestFile = virtualFile.getChild(Utils.MANIFEST_NAME);
+            if(!manifestFile.exists()){
+                return null;
+            }
             is = manifestFile.openStream();
             return extractManfiest(is);
         } finally {
