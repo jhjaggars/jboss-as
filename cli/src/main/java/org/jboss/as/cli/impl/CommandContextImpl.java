@@ -150,7 +150,7 @@ import org.jboss.sasl.util.HexConverter;
  *
  * @author Alexey Loubyansky
  */
-private class CommandContextImpl implements CommandContext {
+class CommandContextImpl implements CommandContext {
 
     private static final Logger log = Logger.getLogger(CommandContext.class);
 
