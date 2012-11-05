@@ -21,7 +21,7 @@
  */
 package org.jboss.as.jdr.util;
 
-import org.apache.commons.io.FileUtils;
+//import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 
@@ -60,9 +60,9 @@ public class FSTree {
     }
 
     private void append(File f, String padding) {
-        String basename = f.getName();
+        String baseName = f.getName();
         String size = formatBytes(f.length());
-        buf.append(String.format(fmt, padding, "+-- ", size, basename));
+        buf.append(String.format(fmt, padding, "+-- ", size, baseName));
         buf.append("\n");
     }
 
