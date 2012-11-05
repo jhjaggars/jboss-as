@@ -52,7 +52,7 @@ public class JdrTestCase {
         InputStream res = s.sanitize(is);
         byte [] buf = new byte [res.available()];
         res.read(buf);
-        assertEquals("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><test><password/></test>", new String(buf));
+        assertEquals("<?xml version=\"1.0\" encoding=\"UTF-8\"?><test><password/></test>", new String(buf));
     }
 
     @Test

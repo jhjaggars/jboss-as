@@ -81,7 +81,7 @@ public class JdrZipFile {
             }
         }
         catch (ZipException ze) {
-            ROOT_LOGGER.tracef(ze, "%s is already in the zip", path);
+            ROOT_LOGGER.debugf(ze, "%s is already in the zip", path);
         }
         catch (Exception e) {
             ROOT_LOGGER.debugf(e, "Error when adding %s", path);
@@ -103,6 +103,11 @@ public class JdrZipFile {
 
     public void add(String content, String path) throws Exception {
         String name = "sos_strings/as7/" + path;
+        this.add(new ByteArrayInputStream(content.getBytes()), name);
+    }
+
+    public void addLog(String content, String logName) throws Exception {
+        String name = "sos_logs/" + logName;
         this.add(new ByteArrayInputStream(content.getBytes()), name);
     }
 

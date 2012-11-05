@@ -49,11 +49,12 @@ public class XMLSanitizer implements Sanitizer {
         XPath xpath = factory.newXPath();
         expression = xpath.compile(pattern);
 
-        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-        dbFactory.setNamespaceAware(true);
-        builder = dbFactory.newDocumentBuilder();
+        DocumentBuilderFactory DBfactory = DocumentBuilderFactory.newInstance();
+        DBfactory.setNamespaceAware(true);
+        builder = DBfactory.newDocumentBuilder();
+        builder.setErrorHandler(null);
 
-        TransformerFactory transformerFactory = TransformerFactory.newInstance();
+        TransformerFactory transformerFactory = TransformerFactory.newInstance("org.apache.xalan.processor.TransformerFactoryImpl", null);
         transformer = transformerFactory.newTransformer();
     }
 

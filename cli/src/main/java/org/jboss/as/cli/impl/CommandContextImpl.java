@@ -150,7 +150,7 @@ import org.jboss.sasl.util.HexConverter;
  *
  * @author Alexey Loubyansky
  */
-public class CommandContextImpl implements CommandContext {
+private class CommandContextImpl implements CommandContext {
 
     private static final Logger log = Logger.getLogger(CommandContext.class);
 
@@ -243,7 +243,7 @@ public class CommandContextImpl implements CommandContext {
      * Default constructor used for both interactive and non-interactive mode.
      *
      */
-    public CommandContextImpl(String defaultControllerHost, int defaultControllerPort, String username, char[] password, boolean initConsole)
+    CommandContextImpl(String defaultControllerHost, int defaultControllerPort, String username, char[] password, boolean initConsole)
             throws CliInitializationException {
 
         config = CliConfigImpl.load(this);

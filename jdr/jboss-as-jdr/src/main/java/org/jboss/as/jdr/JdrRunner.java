@@ -21,16 +21,18 @@
  */
 package org.jboss.as.jdr;
 
-import org.apache.commons.io.FileUtils;
+import org.jboss.as.cli.CommandContext;
+import org.jboss.as.cli.CommandContextFactory;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.client.ModelControllerClient;
 import org.jboss.as.jdr.commands.JdrCommand;
 import org.jboss.as.jdr.commands.JdrEnvironment;
 import org.jboss.as.jdr.plugins.JdrPlugin;
 import org.jboss.as.jdr.util.JdrZipFile;
-import org.jboss.as.cli.impl.CommandContextImpl;
 
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -41,7 +43,7 @@ import static org.jboss.as.jdr.JdrMessages.MESSAGES;
 public class JdrRunner implements JdrReportCollector {
 
     JdrEnvironment env = new JdrEnvironment();
-    CommandContextImpl ctx;
+    CommandContext ctx;
 
     public JdrRunner() {
     }
@@ -52,12 +54,11 @@ public class JdrRunner implements JdrReportCollector {
         this.env.setHost(host);
         this.env.setPort(port);
         try {
-            ctx = new CommandContextImpl(host, Integer.valueOf(port), null, null, false);
+            ctx = CommandContextFactory.getInstance().newCommandContext(host, Integer.valueOf(port), null, null, false);
             ctx.connectController();
             this.env.setClient(ctx.getModelControllerClient());
         }
         catch (Exception e) {
-            e.printStackTrace();
             // the server isn't available, carry on
         }
     }
@@ -73,7 +74,6 @@ public class JdrRunner implements JdrReportCollector {
         }
 
         List<JdrCommand> commands = new ArrayList<JdrCommand>();
-
 
         try {
             InputStream is = this.getClass().getClassLoader().getResourceAsStream("plugins.properties");
@@ -95,21 +95,33 @@ public class JdrRunner implements JdrReportCollector {
         }
 
         JdrReport report = new JdrReport();
+        StringBuilder skips = new StringBuilder();
         report.setStartTime();
 
         for( JdrCommand command : commands ) {
             command.setEnvironment(new JdrEnvironment(this.env));
             try {
                 command.execute();
-            } catch (Exception e) {
-                ROOT_LOGGER.debugf("Skipping command %s", command.toString());
+            } catch (Throwable t) {
+                String message = "Skipping command " + command.toString();
+                ROOT_LOGGER.debugf(message);
+                skips.append(message);
+                PrintWriter pw = new PrintWriter(new StringWriter());
+                t.printStackTrace(pw);
+                skips.append(pw.toString());
             }
+        }
+
+        try {
+            this.env.getZip().addLog(skips.toString(), "skips.log");
+        } catch (Exception e) {
+            ROOT_LOGGER.debugf(e, "Could not add skipped commands log to jdr zip file.");
         }
 
         try {
             this.env.getZip().close();
         } catch (Exception e) {
-            ROOT_LOGGER.debugf(e, "Could not close zipfile");
+            ROOT_LOGGER.debugf(e, "Could not close zip file.");
         }
 
         report.setEndTime();

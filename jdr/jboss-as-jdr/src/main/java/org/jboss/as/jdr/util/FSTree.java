@@ -57,7 +57,7 @@ public class FSTree {
         }
     }
 
-    public void traverse(String dir, String padding) throws java.io.IOException {
+    private void traverse(String dir, String padding) throws java.io.IOException {
         traverse(dir, padding, false);
     }
 
@@ -68,7 +68,7 @@ public class FSTree {
         buf.append("\n");
     }
 
-    public void traverse(String dir, String padding, boolean first)
+    private void traverse(String dir, String padding, boolean first)
         throws java.io.IOException {
         Resource path = Factory.getResource(dir);
 
