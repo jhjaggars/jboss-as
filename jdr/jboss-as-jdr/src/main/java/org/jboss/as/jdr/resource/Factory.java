@@ -11,11 +11,7 @@ import org.jboss.as.jdr.resource.factory.VFSResourceLoader;
  */
 public final class Factory {
 
-    private static final ResourceLoader LOADER;
-
-    static {
-        LOADER = new VFSResourceLoader();
-    }
+    private static final ResourceLoader LOADER = new VFSResourceLoader();
 
     public static Resource getResource(String path) {
         return LOADER.getResource(path);
