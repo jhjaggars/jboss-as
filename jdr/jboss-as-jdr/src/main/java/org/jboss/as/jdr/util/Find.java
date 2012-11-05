@@ -30,15 +30,15 @@ import java.util.Collection;
 
 public class Find {
 
-    public static Collection walk(File root) throws Exception {
+    public static Collection<File> walk(File root) throws Exception {
         return walk(root, TrueFileFilter.TRUE);
     }
 
-    public static Collection walk(File root, String pattern) throws Exception {
+    public static Collection<File> walk(File root, String pattern) throws Exception {
         return walk(root, new WildcardPathFilter(pattern));
     }
 
-    public static Collection walk(File root, FileFilter filter) throws Exception {
+    public static Collection<File> walk(File root, FileFilter filter) throws Exception {
         ArrayList<File> results = new ArrayList<File>();
         for( File f : root.listFiles() ) {
             if(f.isDirectory()) {
