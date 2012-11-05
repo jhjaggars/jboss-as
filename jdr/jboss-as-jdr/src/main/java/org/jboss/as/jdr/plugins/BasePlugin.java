@@ -27,8 +27,9 @@ import org.jboss.as.jdr.commands.CopyDir;
 import org.jboss.as.jdr.commands.JarCheck;
 import org.jboss.as.jdr.commands.JdrCommand;
 import org.jboss.as.jdr.commands.TreeCommand;
+import org.jboss.as.jdr.resource.filter.PathEndsWithFilter;
+import org.jboss.as.jdr.util.FilteredSanitizer;
 import org.jboss.as.jdr.util.PatternSanitizer;
-import org.jboss.as.jdr.util.Sanitizer;
 import org.jboss.as.jdr.util.XMLSanitizer;
 
 import java.util.Arrays;
@@ -38,8 +39,10 @@ public class BasePlugin implements JdrPlugin {
 
     @Override
     public List<JdrCommand> getCommands() throws Exception {
-        Sanitizer xmlSanitizer = new XMLSanitizer("//password");
-        Sanitizer passwordSanitizer = new PatternSanitizer("password=.*", "password=*");
+        FilteredSanitizer xmlSanitizer = new FilteredSanitizer(
+                new XMLSanitizer("//password"), new PathEndsWithFilter(".xml"));
+        FilteredSanitizer passwordSanitizer = new FilteredSanitizer(
+                new PatternSanitizer("password=.*", "password=*"), new PathEndsWithFilter(".properties"));
 
         return Arrays.asList(
             new TreeCommand(),
@@ -49,9 +52,9 @@ public class BasePlugin implements JdrPlugin {
             new CallAS7("cluster-proxies-configuration").resource("subsystem", "modcluster"),
             new CopyDir(".*/standalone/configuration/.*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
             new CopyDir(".*/domain/configuration/.*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
-            new CopyDir(".*\\.log"),
-            new CopyDir(".*\\.properties").sanitizer(passwordSanitizer),
-            new CopyDir(".*\\.xml").sanitizer(xmlSanitizer)
+            new CopyDir(".*\\.log$"),
+            new CopyDir(".*\\.properties$").sanitizer(passwordSanitizer),
+            new CopyDir(".*\\.xml$").sanitizer(xmlSanitizer)
         );
     }
 }

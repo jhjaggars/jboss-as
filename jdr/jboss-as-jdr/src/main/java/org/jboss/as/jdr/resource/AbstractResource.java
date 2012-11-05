@@ -1,15 +1,16 @@
 package org.jboss.as.jdr.resource;
 
-import java.io.*;
-
+import java.io.InputStream;
+import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.File;
 import static org.jboss.as.jdr.JdrLogger.ROOT_LOGGER;
 
 /**
- * Created with IntelliJ IDEA.
  * User: csams
  * Date: 11/4/12
  * Time: 4:21 PM
- * To change this template use File | Settings | File Templates.
  */
 public abstract class AbstractResource implements  Resource{
 

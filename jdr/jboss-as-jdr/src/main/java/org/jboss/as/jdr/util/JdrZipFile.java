@@ -76,7 +76,7 @@ public class JdrZipFile {
             zos.putNextEntry(ze);
             int bytesRead = is.read(buffer);
             while( bytesRead > -1 ) {
-                zos.write(buffer);
+                zos.write(buffer, 0, bytesRead);
                 bytesRead = is.read(buffer);
             }
         }

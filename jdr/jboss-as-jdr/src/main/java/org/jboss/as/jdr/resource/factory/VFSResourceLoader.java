@@ -5,11 +5,9 @@ import org.jboss.as.jdr.resource.VFSResource;
 import org.jboss.vfs.VFS;
 
 /**
- * Created with IntelliJ IDEA.
- * User: csams
+= * User: csams
  * Date: 11/4/12
  * Time: 5:00 PM
- * To change this template use File | Settings | File Templates.
  */
 public class VFSResourceLoader implements ResourceLoader {
     @Override

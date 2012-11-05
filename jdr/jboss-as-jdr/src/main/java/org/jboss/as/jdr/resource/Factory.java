@@ -1,18 +1,17 @@
 package org.jboss.as.jdr.resource;
 
+import org.jboss.as.jdr.resource.factory.FileResourceLoader;
 import org.jboss.as.jdr.resource.factory.ResourceLoader;
 import org.jboss.as.jdr.resource.factory.VFSResourceLoader;
 
 /**
- * Created with IntelliJ IDEA.
  * User: csams
  * Date: 11/4/12
  * Time: 6:06 PM
- * To change this template use File | Settings | File Templates.
  */
 public final class Factory {
 
-    private final static ResourceLoader LOADER;
+    private static final ResourceLoader LOADER;
 
     static {
         LOADER = new VFSResourceLoader();

@@ -23,7 +23,7 @@ package org.jboss.as.jdr.util;
 
 import org.jboss.as.jdr.resource.Resource;
 
-//TODO: Change this to WildcardPathFilter to handle globbing instead of full regex
+//TODO: csams - Change this to WildcardPathFilter to handle globbing instead of full regex
 import org.jboss.as.jdr.resource.filter.RegexpPathFilter;
 import org.jboss.as.jdr.resource.filter.ResourceFilter;
 

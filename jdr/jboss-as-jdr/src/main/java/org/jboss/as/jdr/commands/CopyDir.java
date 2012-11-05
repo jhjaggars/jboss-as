@@ -28,17 +28,16 @@ import org.jboss.as.jdr.resource.filter.AndFilter;
 import org.jboss.as.jdr.resource.filter.RegexBlacklistFilter;
 import org.jboss.as.jdr.resource.filter.RegexpPathFilter;
 import org.jboss.as.jdr.resource.filter.ResourceFilter;
-import org.jboss.as.jdr.util.Sanitizer;
-import org.jboss.as.jdr.util.Find;
+import org.jboss.as.jdr.util.FilteredSanitizer;
 import java.io.InputStream;
 import java.util.LinkedList;
 import java.util.List;
 
 public class CopyDir extends JdrCommand {
 
-    ResourceFilter filter;
+    ResourceFilter filter = ResourceFilter.TRUE;
     ResourceFilter blacklistFilter = new RegexBlacklistFilter();
-    LinkedList<Sanitizer> sanitizers = new LinkedList<Sanitizer>();
+    LinkedList<FilteredSanitizer> sanitizers = new LinkedList<FilteredSanitizer>();
 
     public CopyDir(ResourceFilter filter) {
         this.filter = filter;
@@ -53,22 +52,21 @@ public class CopyDir extends JdrCommand {
         return this;
     }
 
-    public CopyDir sanitizer(Sanitizer sanitizer) {
+    public CopyDir sanitizer(FilteredSanitizer sanitizer) {
         this.sanitizers.add(sanitizer);
         return this;
     }
 
     @Override
     public void execute() throws Exception {
-        List<Resource> matches = Find.walk(
-                Factory.getResource(this.env.getJbossHome()),
-            new AndFilter(this.filter, this.blacklistFilter)
-        );
+        Resource root = Factory.getResource(this.env.getJbossHome());
+        List<Resource> matches = root.getChildrenRecursively(new AndFilter(this.filter, this.blacklistFilter));
         for( Resource f : matches ) {
-            System.out.println(f.getPath());
             InputStream stream = f.openStream();
-            for (Sanitizer s : this.sanitizers) {
-                stream = s.sanitize(stream);
+            for (FilteredSanitizer sanitizer : this.sanitizers) {
+                if(sanitizer.accepts(f)){
+                    stream = sanitizer.sanitize(stream);
+                }
             }
             this.env.getZip().add(f, stream);
             Utils.safelyClose(stream);

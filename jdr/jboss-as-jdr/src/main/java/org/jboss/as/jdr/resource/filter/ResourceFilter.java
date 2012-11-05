@@ -11,14 +11,14 @@ import org.jboss.as.jdr.resource.Resource;
  */
 public interface ResourceFilter {
 
-    public static ResourceFilter TRUE = new ResourceFilter() {
+    ResourceFilter TRUE = new ResourceFilter() {
         @Override
         public boolean accepts(Resource resource) {
             return true;
         }
     };
 
-    public static ResourceFilter FALSE = new NotFilter(TRUE);
+    ResourceFilter FALSE = new NotFilter(TRUE);
 
-    public boolean accepts(Resource resource);
+    boolean accepts(Resource resource);
 }

@@ -7,23 +7,23 @@ import java.io.InputStream;
 import java.util.List;
 
 /**
- * Created with IntelliJ IDEA.
  * User: csams
  * Date: 11/4/12
  * Time: 2:15 PM
- * To change this template use File | Settings | File Templates.
  */
 public interface Resource {
 
-    public String getPath();
-    public String getName();
-    public String getManifest() throws IOException;
-    public List<Resource> getChildren();
-    public List<Resource> getChildren(ResourceFilter filter);
-    public long getSize();
-    public boolean isDirectory();
-    public boolean isFile();
-    public boolean isSymlink() throws IOException;
-    public InputStream openStream() throws IOException;
+    String getPath();
+    String getName();
+    String getManifest() throws IOException;
+    List<Resource> getChildren();
+    List<Resource> getChildren(ResourceFilter filter);
+    List<Resource> getChildrenRecursively() throws IOException;
+    List<Resource> getChildrenRecursively(ResourceFilter filter) throws IOException;
+    long getSize();
+    boolean isDirectory();
+    boolean isFile();
+    boolean isSymlink() throws IOException;
+    InputStream openStream() throws IOException;
 
 }

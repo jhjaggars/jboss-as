@@ -40,18 +40,18 @@ import java.io.InputStream;
 
 public class XMLSanitizer implements Sanitizer {
 
-    XPathExpression expression;
-    DocumentBuilder builder;
-    Transformer transformer;
+    private XPathExpression expression;
+    private DocumentBuilder builder;
+    private Transformer transformer;
 
-    public XMLSanitizer (String pattern) throws Exception {
+    public XMLSanitizer(String pattern) throws Exception {
         XPathFactory factory = XPathFactory.newInstance();
         XPath xpath = factory.newXPath();
         expression = xpath.compile(pattern);
 
-        DocumentBuilderFactory DBfactory = DocumentBuilderFactory.newInstance();
-        DBfactory.setNamespaceAware(true);
-        builder = DBfactory.newDocumentBuilder();
+        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+        dbFactory.setNamespaceAware(true);
+        builder = dbFactory.newDocumentBuilder();
 
         TransformerFactory transformerFactory = TransformerFactory.newInstance();
         transformer = transformerFactory.newTransformer();

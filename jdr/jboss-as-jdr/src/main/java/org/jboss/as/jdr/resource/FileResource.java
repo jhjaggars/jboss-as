@@ -1,5 +1,6 @@
 package org.jboss.as.jdr.resource;
 
+import org.jboss.as.jdr.resource.filter.RegexpPathFilter;
 import org.jboss.as.jdr.resource.filter.ResourceFilter;
 
 import java.io.File;
@@ -12,11 +13,9 @@ import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
 
 /**
- * Created with IntelliJ IDEA.
  * User: csams
  * Date: 11/4/12
  * Time: 2:26 PM
- * To change this template use File | Settings | File Templates.
  */
 public class FileResource extends AbstractResource {
 
@@ -42,13 +41,23 @@ public class FileResource extends AbstractResource {
 
     @Override
     public String getManifest() throws IOException {
+        if(!file.getName().endsWith(".jar")){
+            return null;
+        }
+
         JarFile jf = null;
         InputStream is = null;
         try {
             jf = new JarFile(file);
             ZipEntry manifest = jf.getEntry(Utils.MANIFEST_NAME);
-            is = jf.getInputStream(manifest);
-            return extractManfiest(is);
+
+            if(manifest != null){
+                is = jf.getInputStream(manifest);
+                return extractManfiest(is);
+            }
+            else {
+                return null;
+            }
         } finally {
             Utils.safelyClose(is);
             Utils.safeClose(jf);
@@ -63,6 +72,16 @@ public class FileResource extends AbstractResource {
     @Override
     public List<Resource> getChildren(ResourceFilter filter) {
         return Utils.applyFilter(toResourceList(file.listFiles()), filter);
+    }
+
+    @Override
+    public List<Resource> getChildrenRecursively() throws IOException {
+        return toResourceList(getLeaves(this.file).toArray(new File[0]));
+    }
+
+    @Override
+    public List<Resource> getChildrenRecursively(ResourceFilter filter) throws IOException {
+        return Utils.applyFilter(getChildrenRecursively(), filter);
     }
 
     @Override
@@ -96,6 +115,19 @@ public class FileResource extends AbstractResource {
             resources.add(new FileResource(f));
         }
         return resources;
+    }
+
+    private List<File> getLeaves(File root) throws IOException {
+        ArrayList<File> results = new ArrayList<File>();
+        for(File f : root.listFiles() ) {
+            if(f.isDirectory()) {
+                results.addAll(getLeaves(f));
+            }
+            else {
+                results.add(f);
+            }
+        }
+        return results;
     }
 
 }

@@ -85,7 +85,8 @@ public class JarCheck extends JdrCommand {
 
     private String getManifestString(Resource resource) throws java.io.IOException {
         try {
-            return resource.getManifest();
+            String result = resource.getManifest();
+            return result != null? result: "";
         } catch (Exception npe) {
             ROOT_LOGGER.tracef("no MANIFEST present");
             return "";

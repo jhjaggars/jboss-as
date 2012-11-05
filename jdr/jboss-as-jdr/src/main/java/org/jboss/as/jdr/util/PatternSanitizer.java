@@ -23,13 +23,15 @@ package org.jboss.as.jdr.util;
 
 import org.jboss.as.jdr.resource.Utils;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class PatternSanitizer implements Sanitizer {
+
     private final Pattern pattern;
     private final String replacement;
 
@@ -40,16 +42,19 @@ public class PatternSanitizer implements Sanitizer {
 
     public InputStream sanitize(InputStream in) throws Exception {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
+        PrintWriter writer = new PrintWriter(output);
         for(String line : Utils.readLines(in)) {
 
             Matcher matcher = pattern.matcher(line);
             if(matcher.matches()) {
-                output.write(replacement.getBytes());
+                writer.write(replacement);
             }
             else {
-                output.write(line.getBytes());
+                writer.write(line);
             }
+            writer.write('\n');
         }
+        writer.close();
         return new ByteArrayInputStream(output.toByteArray());
     }
 }

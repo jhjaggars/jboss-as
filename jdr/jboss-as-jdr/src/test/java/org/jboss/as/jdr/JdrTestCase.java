@@ -21,6 +21,7 @@
  */
 package org.jboss.as.jdr;
 
+import org.jboss.as.jdr.resource.filter.ResourceFilter;
 import org.jboss.as.jdr.util.BlackListFilter;
 import org.jboss.as.jdr.util.PatternSanitizer;
 import org.jboss.as.jdr.util.XMLSanitizer;
