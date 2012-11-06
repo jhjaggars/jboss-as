@@ -39,8 +39,10 @@ public class FileResource extends AbstractResource {
         return file.getName();
     }
 
+    //todo csams change this so it doesn't test for .jar
     @Override
     public String getManifest() throws IOException {
+
         if(!file.getName().endsWith(".jar")){
             return null;
         }
@@ -76,7 +78,7 @@ public class FileResource extends AbstractResource {
 
     @Override
     public List<Resource> getChildren(ResourceFilter filter) {
-        return Utils.applyFilter(toResourceList(file.listFiles()), filter);
+        return Utils.applyFilter(getChildren(), filter);
     }
 
     @Override

@@ -1,8 +1,6 @@
 package org.jboss.as.jdr.resource;
 
 import org.jboss.as.jdr.resource.filter.ResourceFilter;
-import org.jboss.util.file.JarUtils;
-import org.jboss.vfs.VFSUtils;
 import org.jboss.vfs.VirtualFile;
 import org.jboss.vfs.VirtualFileFilter;
 import org.jboss.vfs.VisitorAttributes;
@@ -68,7 +66,7 @@ public class VFSResource extends AbstractResource implements Resource {
 
     @Override
     public List<Resource> getChildren(ResourceFilter filter) {
-        return Utils.applyFilter(toResourceList(virtualFile.getChildren()), filter);
+        return Utils.applyFilter(getChildren(), filter);
     }
 
     @Override
@@ -125,6 +123,5 @@ public class VFSResource extends AbstractResource implements Resource {
         virtualFile.visit(visitor);
         return visitor.getMatched();
     }
-
 
 }

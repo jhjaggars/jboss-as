@@ -74,6 +74,8 @@ public final class Utils {
             bytesRead = is.read(buffer);
         }
 
+        Utils.safelyClose(is);
+
         return new String(os.toByteArray());
     }
 

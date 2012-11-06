@@ -7,11 +7,11 @@ import org.jboss.as.jdr.resource.Resource;
  * Date: 11/4/12
  * Time: 11:47 PM
  */
-public class PathEndsWithFilter implements ResourceFilter {
+public class PathSuffixFilter implements ResourceFilter {
 
     private final String suffix;
 
-    public PathEndsWithFilter(String suffix){
+    public PathSuffixFilter(String suffix){
         this.suffix = suffix;
     }
     @Override
