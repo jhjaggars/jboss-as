@@ -96,7 +96,7 @@ public class CollectFiles extends JdrCommand {
         while(iter.hasNext() && !limiter.isDone()) {
 
             Resource f = iter.next();
-            InputStream stream = limiter.limit(f.openStream(), f.getSize());
+            InputStream stream = limiter.limit(f);
 
             for (FilteredSanitizer sanitizer : this.sanitizers) {
                 if(sanitizer.accepts(f)){
@@ -124,71 +124,28 @@ public class CollectFiles extends JdrCommand {
         }
 
         /**
-         * Implemented to return an InputStream to cut down on memory usage from slurping the entire file
-         * into memory.
-         *
-         * @param is
-         * @param totalSize
          * @return
          * @throws IOException
          */
-        public InputStream limit(final InputStream is, final long totalSize) throws IOException {
+        public InputStream limit(Resource resource) throws IOException {
+
+            InputStream is = resource.openStream();
+            long totalSize = resource.getSize();
 
             // if we're limiting and know we're not going to consume the whole file, we skip
-            // ahead so that we get the tail of the file instead of the beginning of it.
+            // ahead so that we get the tail of the file instead of the beginning of it, and we
+            // throw the done switch.
             if(limit != -1){
                 long leftToRead = limit - amountRead;
                 if(leftToRead < totalSize){
                     is.skip(totalSize - leftToRead);
+                    done = true;
+                } else {
+                    amountRead += totalSize;
                 }
             }
+            return is;
 
-            return new InputStream() {
-
-                @Override
-                public int read() throws IOException {
-
-                    //we've read as much as we should
-                    if(amountRead == limit){
-                        done = true;
-                        return -1;
-                    }
-                    amountRead++;
-                    return is.read();
-                }
-
-                public int available() throws IOException {
-                    return is.available();
-                }
-
-                public void close() throws IOException {
-                    is.close();
-                }
-
-                public void mark(int readlimit) {
-                    is.mark(readlimit);
-                }
-
-                public void reset() throws IOException {
-                    is.reset();
-                }
-
-                public boolean markSupported() {
-                    return is.markSupported();
-                }
-
-                public int read(byte[] b) throws IOException {
-                    return is.read(b);
-                }
-
-                public int read(byte[] b, int off, int len) throws IOException {
-                    return is.read(b, off, len);
-                }
-
-                public long skip(long n) throws IOException {
-                    return is.skip(n);
-                }
-            };
         }
 
     }
