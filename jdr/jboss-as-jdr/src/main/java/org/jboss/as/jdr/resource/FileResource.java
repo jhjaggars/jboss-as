@@ -1,6 +1,5 @@
 package org.jboss.as.jdr.resource;
 
-import org.jboss.as.jdr.resource.filter.RegexpPathFilter;
 import org.jboss.as.jdr.resource.filter.ResourceFilter;
 
 import java.io.File;

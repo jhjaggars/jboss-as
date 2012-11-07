@@ -23,7 +23,7 @@
 package org.jboss.as.jdr.plugins;
 
 import org.jboss.as.jdr.commands.CallAS7;
-import org.jboss.as.jdr.commands.CopyDir;
+import org.jboss.as.jdr.commands.CollectFiles;
 import org.jboss.as.jdr.commands.JarCheck;
 import org.jboss.as.jdr.commands.JdrCommand;
 import org.jboss.as.jdr.commands.TreeCommand;
@@ -50,11 +50,11 @@ public class BasePlugin implements JdrPlugin {
             new CallAS7("configuration").param("recursive", "true"),
             new CallAS7("dump-services").resource("core-service", "service-container"),
             new CallAS7("cluster-proxies-configuration").resource("subsystem", "modcluster"),
-            new CopyDir("*/standalone/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
-            new CopyDir("*/domain/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
-            new CopyDir("*.log"),
-            new CopyDir("*.properties").sanitizer(passwordSanitizer),
-            new CopyDir("*.xml").sanitizer(xmlSanitizer)
+            new CollectFiles("*/standalone/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
+            new CollectFiles("*/domain/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
+            new CollectFiles("*.log"),
+            new CollectFiles("*.properties").sanitizer(passwordSanitizer),
+            new CollectFiles("*.xml").sanitizer(xmlSanitizer)
         );
     }
 }

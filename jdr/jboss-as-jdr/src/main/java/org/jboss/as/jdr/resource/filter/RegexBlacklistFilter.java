@@ -21,8 +21,8 @@ public class RegexBlacklistFilter implements ResourceFilter{
         this.patterns = Arrays.asList(Pattern.compile(".*-users.properties"));
     }
 
-    public RegexBlacklistFilter(List<String> patterns){
-        this.patterns = new ArrayList<Pattern>(patterns.size());
+    public RegexBlacklistFilter(String... patterns){
+        this.patterns = new ArrayList<Pattern>(patterns.length);
         for(String p: patterns){
             this.patterns.add(Pattern.compile(p));
         }

@@ -14,6 +14,7 @@ public class NotFilter implements ResourceFilter {
     public NotFilter(ResourceFilter filter){
         this.filter = filter;
     }
+
     @Override
     public boolean accepts(Resource resource) {
         return !this.filter.accepts(resource);
