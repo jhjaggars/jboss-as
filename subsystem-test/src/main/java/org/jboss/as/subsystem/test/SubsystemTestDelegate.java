@@ -529,9 +529,11 @@ final class SubsystemTestDelegate {
         op.get("include-aliases").set(true);
         ModelNode result = kernelServices.executeOperation(op);
         if (result.hasDefined(FAILURE_DESCRIPTION)) {
-            throw new RuntimeException(result.get(FAILURE_DESCRIPTION).asString());
+            throw new RuntimeException(result.get(FAILURE_DESCRIPTION).toString());
         }
         ModelNode model = result.get(RESULT);
+
+        //System.out.println(model);
 
         ModelDescriptionValidator validator = new ModelDescriptionValidator(address, model, arbitraryDescriptors);
         List<ModelDescriptionValidator.ValidationFailure> validationMessages = validator.validateResource();
