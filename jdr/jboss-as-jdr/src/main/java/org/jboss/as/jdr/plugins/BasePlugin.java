@@ -50,11 +50,11 @@ public class BasePlugin implements JdrPlugin {
             new CallAS7("configuration").param("recursive", "true"),
             new CallAS7("dump-services").resource("core-service", "service-container"),
             new CallAS7("cluster-proxies-configuration").resource("subsystem", "modcluster"),
-            new CopyDir(".*/standalone/configuration/.*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
-            new CopyDir(".*/domain/configuration/.*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
-            new CopyDir(".*\\.log$"),
-            new CopyDir(".*\\.properties$").sanitizer(passwordSanitizer),
-            new CopyDir(".*\\.xml$").sanitizer(xmlSanitizer)
+            new CopyDir("*/standalone/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
+            new CopyDir("*/domain/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
+            new CopyDir("*.log"),
+            new CopyDir("*.properties").sanitizer(passwordSanitizer),
+            new CopyDir("*.xml").sanitizer(xmlSanitizer)
         );
     }
 }

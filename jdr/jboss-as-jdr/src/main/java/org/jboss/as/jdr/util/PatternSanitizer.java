@@ -43,16 +43,14 @@ public class PatternSanitizer implements Sanitizer {
     public InputStream sanitize(InputStream in) throws Exception {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         PrintWriter writer = new PrintWriter(output);
-        for(String line : Utils.readLines(in)) {
-
-            Matcher matcher = pattern.matcher(line);
-            if(matcher.matches()) {
-                writer.write(replacement);
+        String[] lines = Utils.readLines(in).toArray(new String[0]);
+        int lineCount = lines.length;
+        for(int i = 0; i < lineCount; i++) {
+            Matcher matcher = pattern.matcher(lines[i]);
+            writer.write(matcher.replaceAll(replacement));
+            if(i < (lineCount-1)){
+                writer.write(Utils.LINE_SEP);
             }
-            else {
-                writer.write(line);
-            }
-            writer.write('\n');
         }
         writer.close();
         return new ByteArrayInputStream(output.toByteArray());

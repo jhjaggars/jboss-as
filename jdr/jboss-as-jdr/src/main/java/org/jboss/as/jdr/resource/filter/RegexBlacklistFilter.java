@@ -31,8 +31,7 @@ public class RegexBlacklistFilter implements ResourceFilter{
     @Override
     public boolean accepts(Resource resource) {
         for(Pattern p: this.patterns){
-            Matcher m = p.matcher(resource.getName());
-            if(m.matches()){
+            if(p.matcher(resource.getName()).matches()){
                 return false;
             }
         }

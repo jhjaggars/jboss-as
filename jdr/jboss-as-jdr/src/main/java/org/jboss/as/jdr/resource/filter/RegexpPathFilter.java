@@ -22,7 +22,6 @@ public class RegexpPathFilter implements ResourceFilter {
 
     @Override
     public boolean accepts(Resource resource) {
-        Matcher matcher = pattern.matcher(resource.getPath());
-        return matcher.matches();
+        return pattern.matcher(resource.getPath()).matches();
     }
 }

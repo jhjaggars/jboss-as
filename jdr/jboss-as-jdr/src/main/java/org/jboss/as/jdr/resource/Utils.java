@@ -79,8 +79,9 @@ public final class Utils {
         return new String(os.toByteArray());
     }
 
-    public static char WIN_SEP = '\\';
-    public static char SYS_SEP = File.separatorChar;
+    public static final String LINE_SEP = String.format("%n");
+    public static final char WIN_SEP = '\\';
+    public static final char SYS_SEP = File.separatorChar;
 
     public static boolean isWindows() {
         return SYS_SEP == WIN_SEP;

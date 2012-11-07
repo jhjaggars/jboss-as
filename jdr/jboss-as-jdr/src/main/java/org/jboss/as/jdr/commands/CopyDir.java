@@ -28,6 +28,7 @@ import org.jboss.as.jdr.resource.filter.AndFilter;
 import org.jboss.as.jdr.resource.filter.RegexBlacklistFilter;
 import org.jboss.as.jdr.resource.filter.RegexpPathFilter;
 import org.jboss.as.jdr.resource.filter.ResourceFilter;
+import org.jboss.as.jdr.resource.filter.WildcardPathFilter;
 import org.jboss.as.jdr.util.FilteredSanitizer;
 import java.io.InputStream;
 import java.util.LinkedList;
@@ -44,7 +45,7 @@ public class CopyDir extends JdrCommand {
     }
 
     public CopyDir(String pattern) {
-        this.filter = new RegexpPathFilter(pattern);
+        this.filter = new WildcardPathFilter(pattern);
     }
 
     public CopyDir blacklist(ResourceFilter blacklistFilter) {
