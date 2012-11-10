@@ -25,8 +25,8 @@ import org.jboss.as.jdr.resource.ResourceFactory;
 import org.jboss.as.jdr.resource.Resource;
 import org.jboss.as.jdr.resource.Utils;
 import org.jboss.as.jdr.resource.filter.AndFilter;
-import org.jboss.as.jdr.resource.filter.RegexBlacklistFilter;
 import org.jboss.as.jdr.resource.filter.ResourceFilter;
+import org.jboss.as.jdr.resource.filter.WildcardBlacklistFilter;
 import org.jboss.as.jdr.resource.filter.WildcardPathFilter;
 import org.jboss.as.jdr.util.Sanitizer;
 
@@ -41,7 +41,7 @@ import java.util.List;
 public class CollectFiles extends JdrCommand {
 
     private ResourceFilter filter = ResourceFilter.TRUE;
-    private ResourceFilter blacklistFilter = new RegexBlacklistFilter();
+    private WildcardBlacklistFilter blacklistFilter = new WildcardBlacklistFilter();
     private LinkedList<Sanitizer> sanitizers = new LinkedList<Sanitizer>();
     private Comparator<Resource> sorter = null;
 
@@ -56,7 +56,7 @@ public class CollectFiles extends JdrCommand {
         this.filter = new WildcardPathFilter(pattern);
     }
 
-    public CollectFiles blacklist(ResourceFilter blacklistFilter) {
+    public CollectFiles blacklist(WildcardBlacklistFilter blacklistFilter) {
         this.blacklistFilter = blacklistFilter;
         return this;
     }
@@ -75,6 +75,11 @@ public class CollectFiles extends JdrCommand {
 
     public CollectFiles limit(final long limit){
         this.limit = limit;
+        return this;
+    }
+
+    public CollectFiles omit(String pattern) {
+        this.blacklistFilter.add(pattern);
         return this;
     }
 

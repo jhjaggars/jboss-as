@@ -23,7 +23,11 @@ public class RegexBlacklistFilter implements ResourceFilter{
 
     public RegexBlacklistFilter(String... patterns){
         this.patterns = new ArrayList<Pattern>(patterns.length);
-        for(String p: patterns){
+        this.add(patterns);
+    }
+
+    public void add(String ... patterns) {
+        for (String p : patterns) {
             this.patterns.add(Pattern.compile(p));
         }
     }
