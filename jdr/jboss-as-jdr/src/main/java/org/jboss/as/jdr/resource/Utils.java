@@ -79,6 +79,21 @@ public final class Utils {
         return new String(os.toByteArray());
     }
 
+    /**
+     * Ensure InputStream actually skips ahead the required number of bytes
+     * @param is
+     * @param amount
+     * @throws IOException
+     */
+    public static void skip(InputStream is, long amount) throws IOException {
+        long leftToSkip = amount;
+        long amountSkipped = 0;
+        while(leftToSkip > 0 && amountSkipped >= 0){
+            amountSkipped = is.skip(leftToSkip);
+            leftToSkip -= amountSkipped;
+        }
+    }
+
     public static final String LINE_SEP = String.format("%n");
     public static final char WIN_SEP = '\\';
     public static final char SYS_SEP = File.separatorChar;

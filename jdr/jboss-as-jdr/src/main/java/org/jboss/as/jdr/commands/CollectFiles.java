@@ -1,6 +1,6 @@
 /*
  * JBoss, Home of Professional Open Source.
- * Copyright 2011, Red Hat, Inc., and individual contributors
+ * Copyright 2012, Red Hat, Inc., and individual contributors
  * as indicated by the @author tags. See the copyright.txt file in the
  * distribution for a full listing of individual contributors.
  *
@@ -85,8 +85,8 @@ public class CollectFiles extends JdrCommand {
 
         // order the files in some arbitrary way.. basically prep for the limiter so things like log files can
         // be gotten in chronological order.  Keep in mind everything that might be collected per the filter for
-        // this collector (if the filter is too broad, you may collect unrelated logs, sort them, and then
-        // get some limit on that set, which probably would be wrong).
+        // this collector. If the filter is too broad, you may collect unrelated logs, sort them, and then
+        // get some limit on that set, which probably would be wrong.
         if(sorter != null){
             Collections.sort(matches, sorter);
         }
@@ -111,6 +111,16 @@ public class CollectFiles extends JdrCommand {
         }
     }
 
+    /**
+     * A Limiter is constructed with a number, and it can be repeatedly given Resources for which it will return an
+     * InputStream that possibly is adjusted so that the number of bytes the stream can provide, when added to what the
+     * Limiter already has seen, won't be more than the limit.
+     *
+     * If the Resource's size minus the amount already seen by the Limiter is smaller than the limit, the Resource's
+     * InputStream is simply returned and its size added to the number of bytes the Limiter has seen.  Otherwise, the
+     * Resource's InputStream is skipped ahead so that the total number of bytes it will provide before exhaustion will
+     * make the total amount seen by the Limiter equal to its limit.
+     */
     private static class Limiter {
 
         private long amountRead = 0;
@@ -132,18 +142,18 @@ public class CollectFiles extends JdrCommand {
         public InputStream limit(Resource resource) throws IOException {
 
             InputStream is = resource.openStream();
-            long totalSize = resource.getSize();
+            long resourceSize = resource.getSize();
 
             // if we're limiting and know we're not going to consume the whole file, we skip
             // ahead so that we get the tail of the file instead of the beginning of it, and we
             // throw the done switch.
             if(limit != -1){
                 long leftToRead = limit - amountRead;
-                if(leftToRead < totalSize){
-                    is.skip(totalSize - leftToRead);
+                if(leftToRead < resourceSize){
+                    Utils.skip(is, resourceSize - leftToRead);
                     done = true;
                 } else {
-                    amountRead += totalSize;
+                    amountRead += resourceSize;
                 }
             }
             return is;
