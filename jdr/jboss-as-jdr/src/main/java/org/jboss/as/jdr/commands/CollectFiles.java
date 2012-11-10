@@ -43,7 +43,12 @@ public class CollectFiles extends JdrCommand {
     private ResourceFilter filter = ResourceFilter.TRUE;
     private WildcardBlacklistFilter blacklistFilter = new WildcardBlacklistFilter();
     private LinkedList<Sanitizer> sanitizers = new LinkedList<Sanitizer>();
-    private Comparator<Resource> sorter = null;
+    private Comparator<Resource> sorter = new Comparator<Resource>() {
+        @Override
+        public int compare(Resource resource, Resource resource1) {
+            return Long.signum(resource.lastModified() - resource1.lastModified());
+        }
+    };
 
     // -1 means no limit
     private long limit = -1;

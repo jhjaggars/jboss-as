@@ -22,6 +22,7 @@ public interface Resource {
     List<Resource> getChildrenRecursively() throws IOException;
     List<Resource> getChildrenRecursively(ResourceFilter filter) throws IOException;
     long getSize();
+    long lastModified();
     boolean isDirectory();
     boolean isFile();
     boolean isSymlink() throws IOException;

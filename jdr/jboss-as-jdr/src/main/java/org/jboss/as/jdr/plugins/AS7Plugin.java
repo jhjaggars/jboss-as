@@ -27,6 +27,7 @@ import org.jboss.as.jdr.commands.CollectFiles;
 import org.jboss.as.jdr.commands.JarCheck;
 import org.jboss.as.jdr.commands.JdrCommand;
 import org.jboss.as.jdr.commands.TreeCommand;
+import org.jboss.as.jdr.resource.Utils;
 import org.jboss.as.jdr.resource.filter.PathSuffixFilter;
 import org.jboss.as.jdr.util.*;
 
@@ -48,7 +49,8 @@ public class AS7Plugin implements JdrPlugin {
             new CallAS7("cluster-proxies-configuration").resource("subsystem", "modcluster"),
             new CollectFiles("*/standalone/configuration/*").sanitizer(xmlSanitizer, passwordSanitizer),
             new CollectFiles("*/domain/configuration/*").sanitizer(xmlSanitizer, passwordSanitizer),
-            new CollectFiles("*.log"),
+            new CollectFiles("*server.log").limit(50 * Utils.ONE_MB),
+            new CollectFiles("*.log").omit("*server.log"),
             new CollectFiles("*.properties").sanitizer(passwordSanitizer),
             new CollectFiles("*.xml").sanitizer(xmlSanitizer)
         );

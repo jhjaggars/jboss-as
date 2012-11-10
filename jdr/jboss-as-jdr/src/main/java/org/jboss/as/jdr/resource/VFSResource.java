@@ -85,6 +85,11 @@ public class VFSResource extends AbstractResource implements Resource {
     }
 
     @Override
+    public long lastModified() {
+        return virtualFile.getLastModified();
+    }
+
+    @Override
     public boolean isDirectory() {
         return virtualFile.isDirectory();
     }

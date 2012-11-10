@@ -96,6 +96,11 @@ public class FileResource extends AbstractResource {
     }
 
     @Override
+    public long lastModified() {
+        return file.lastModified();
+    }
+
+    @Override
     public boolean isDirectory() {
         return file.isDirectory();
     }
