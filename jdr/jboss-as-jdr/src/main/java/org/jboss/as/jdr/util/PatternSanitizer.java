@@ -22,6 +22,7 @@
 package org.jboss.as.jdr.util;
 
 import org.jboss.as.jdr.resource.Utils;
+import org.jboss.as.jdr.resource.filter.ResourceFilter;
 
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
@@ -30,14 +31,15 @@ import java.io.PrintWriter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class PatternSanitizer implements Sanitizer {
+public class PatternSanitizer extends AbstractSanitizer {
 
     private final Pattern pattern;
     private final String replacement;
 
-    public PatternSanitizer(String pattern, String replacement) throws Exception {
+    public PatternSanitizer(String pattern, String replacement, ResourceFilter filter) throws Exception {
         this.pattern = Pattern.compile(pattern);
         this.replacement = replacement;
+        this.filter = filter;
     }
 
     public InputStream sanitize(InputStream in) throws Exception {

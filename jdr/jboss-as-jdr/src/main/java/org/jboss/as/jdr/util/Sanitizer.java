@@ -21,8 +21,11 @@
  */
 package org.jboss.as.jdr.util;
 
+import org.jboss.as.jdr.resource.Resource;
+
 import java.io.InputStream;
 
 public interface Sanitizer {
     InputStream sanitize(InputStream in) throws Exception;
+    public boolean accepts(Resource resource);
 }

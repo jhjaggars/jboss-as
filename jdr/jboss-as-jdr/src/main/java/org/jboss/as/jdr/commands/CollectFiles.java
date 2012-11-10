@@ -28,7 +28,7 @@ import org.jboss.as.jdr.resource.filter.AndFilter;
 import org.jboss.as.jdr.resource.filter.RegexBlacklistFilter;
 import org.jboss.as.jdr.resource.filter.ResourceFilter;
 import org.jboss.as.jdr.resource.filter.WildcardPathFilter;
-import org.jboss.as.jdr.util.FilteredSanitizer;
+import org.jboss.as.jdr.util.Sanitizer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,7 +42,7 @@ public class CollectFiles extends JdrCommand {
 
     private ResourceFilter filter = ResourceFilter.TRUE;
     private ResourceFilter blacklistFilter = new RegexBlacklistFilter();
-    private LinkedList<FilteredSanitizer> sanitizers = new LinkedList<FilteredSanitizer>();
+    private LinkedList<Sanitizer> sanitizers = new LinkedList<Sanitizer>();
     private Comparator<Resource> sorter = null;
 
     // -1 means no limit
@@ -61,8 +61,10 @@ public class CollectFiles extends JdrCommand {
         return this;
     }
 
-    public CollectFiles sanitizer(FilteredSanitizer sanitizer) {
-        this.sanitizers.add(sanitizer);
+    public CollectFiles sanitizer(Sanitizer ... sanitizers) {
+        for (Sanitizer s : sanitizers) {
+            this.sanitizers.add(s);
+        }
         return this;
     }
 
@@ -98,7 +100,7 @@ public class CollectFiles extends JdrCommand {
             Resource f = iter.next();
             InputStream stream = limiter.limit(f);
 
-            for (FilteredSanitizer sanitizer : this.sanitizers) {
+            for (Sanitizer sanitizer : this.sanitizers) {
                 if(sanitizer.accepts(f)){
                     stream = sanitizer.sanitize(stream);
                 }

@@ -22,6 +22,7 @@
 package org.jboss.as.jdr.util;
 
 import org.jboss.as.jdr.resource.Resource;
+import org.jboss.as.jdr.resource.ResourceFactory;
 
 //TODO: csams - Change this to WildcardPathFilter to handle globbing instead of full regex
 import org.jboss.as.jdr.resource.filter.RegexpPathFilter;
@@ -31,6 +32,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Find {
+
+    public static List<Resource> walk(String root) throws Exception {
+        return walk(ResourceFactory.getResource(root));
+    }
+
+    public static List<Resource> walk(String root, String pattern) throws Exception {
+        return walk(ResourceFactory.getResource(root), pattern);
+    }
 
     public static List<Resource> walk(Resource root) throws Exception {
         return walk(root, ResourceFilter.TRUE);

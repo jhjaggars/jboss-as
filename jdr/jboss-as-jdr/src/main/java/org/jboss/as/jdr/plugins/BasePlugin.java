@@ -28,9 +28,7 @@ import org.jboss.as.jdr.commands.JarCheck;
 import org.jboss.as.jdr.commands.JdrCommand;
 import org.jboss.as.jdr.commands.TreeCommand;
 import org.jboss.as.jdr.resource.filter.PathSuffixFilter;
-import org.jboss.as.jdr.util.FilteredSanitizer;
-import org.jboss.as.jdr.util.PatternSanitizer;
-import org.jboss.as.jdr.util.XMLSanitizer;
+import org.jboss.as.jdr.util.*;
 
 import java.util.Arrays;
 import java.util.List;
@@ -39,10 +37,8 @@ public class BasePlugin implements JdrPlugin {
 
     @Override
     public List<JdrCommand> getCommands() throws Exception {
-        FilteredSanitizer xmlSanitizer = new FilteredSanitizer(
-                new XMLSanitizer("//password"), new PathSuffixFilter(".xml"));
-        FilteredSanitizer passwordSanitizer = new FilteredSanitizer(
-                new PatternSanitizer("password=.*", "password=*"), new PathSuffixFilter(".properties"));
+        Sanitizer xmlSanitizer = Sanitizers.xml("//password");
+        Sanitizer passwordSanitizer = Sanitizers.pattern("password=.*", "password=*");
 
         return Arrays.asList(
             new TreeCommand(),
@@ -50,8 +46,8 @@ public class BasePlugin implements JdrPlugin {
             new CallAS7("configuration").param("recursive", "true"),
             new CallAS7("dump-services").resource("core-service", "service-container"),
             new CallAS7("cluster-proxies-configuration").resource("subsystem", "modcluster"),
-            new CollectFiles("*/standalone/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
-            new CollectFiles("*/domain/configuration/*").sanitizer(xmlSanitizer).sanitizer(passwordSanitizer),
+            new CollectFiles("*/standalone/configuration/*").sanitizer(xmlSanitizer, passwordSanitizer),
+            new CollectFiles("*/domain/configuration/*").sanitizer(xmlSanitizer, passwordSanitizer),
             new CollectFiles("*.log"),
             new CollectFiles("*.properties").sanitizer(passwordSanitizer),
             new CollectFiles("*.xml").sanitizer(xmlSanitizer)

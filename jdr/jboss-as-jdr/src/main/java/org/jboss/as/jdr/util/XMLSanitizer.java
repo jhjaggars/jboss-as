@@ -21,6 +21,7 @@
  */
 package org.jboss.as.jdr.util;
 
+import org.jboss.as.jdr.resource.filter.ResourceFilter;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
@@ -38,13 +39,14 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
-public class XMLSanitizer implements Sanitizer {
+public class XMLSanitizer extends AbstractSanitizer {
 
     private XPathExpression expression;
     private DocumentBuilder builder;
     private Transformer transformer;
 
-    public XMLSanitizer(String pattern) throws Exception {
+    public XMLSanitizer(String pattern, ResourceFilter filter) throws Exception {
+        this.filter = filter;
         XPathFactory factory = XPathFactory.newInstance();
         XPath xpath = factory.newXPath();
         expression = xpath.compile(pattern);
