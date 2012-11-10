@@ -33,7 +33,7 @@ import org.jboss.as.jdr.util.*;
 import java.util.Arrays;
 import java.util.List;
 
-public class BasePlugin implements JdrPlugin {
+public class AS7Plugin implements JdrPlugin {
 
     @Override
     public List<JdrCommand> getCommands() throws Exception {
