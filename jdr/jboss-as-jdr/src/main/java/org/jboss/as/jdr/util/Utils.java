@@ -52,6 +52,10 @@ public final class Utils {
     }
 
     public static String toString(VirtualFile r) throws IOException {
+        return new String(toBytes(r));
+    }
+
+    public static byte[] toBytes(VirtualFile r) throws IOException {
         byte [] buffer = new byte[1024];
         InputStream is = r.openStream();
 
@@ -63,8 +67,7 @@ public final class Utils {
         }
 
         Utils.safelyClose(is);
-
-        return new String(os.toByteArray());
+        return os.toByteArray();
     }
 
     /**
