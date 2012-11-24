@@ -1,7 +1,7 @@
 package org.jboss.as.jdr.util;
 
-import org.jboss.as.jdr.resource.Resource;
-import org.jboss.as.jdr.resource.filter.ResourceFilter;
+import org.jboss.vfs.VirtualFile;
+import org.jboss.vfs.VirtualFileFilter;
 
 import java.io.InputStream;
 
@@ -13,15 +13,15 @@ import java.io.InputStream;
 public class FilteredSanitizer implements Sanitizer {
 
     private final Sanitizer delegate;
-    private final ResourceFilter filter;
+    private final VirtualFileFilter filter;
 
-    public FilteredSanitizer(Sanitizer delegate, ResourceFilter filter){
+    public FilteredSanitizer(Sanitizer delegate, VirtualFileFilter filter){
         this.delegate = delegate;
         this.filter = filter;
     }
 
-    public boolean accepts(Resource resource){
-        return filter.accepts(resource);
+    public boolean accepts(VirtualFile file){
+        return filter.accepts(file);
     }
 
     @Override

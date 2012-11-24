@@ -21,9 +21,8 @@
  */
 package org.jboss.as.jdr.util;
 
-import org.jboss.as.jdr.resource.ResourceFactory;
-import org.jboss.as.jdr.resource.Resource;
-import org.jboss.as.jdr.resource.Utils;
+import org.jboss.vfs.VFS;
+import org.jboss.vfs.VirtualFile;
 
 import java.util.List;
 
@@ -61,7 +60,7 @@ public class FSTree {
         traverse(dir, padding, false);
     }
 
-    private void append(Resource f, String padding) {
+    private void append(VirtualFile f, String padding) {
         String baseName = f.getName();
         String size = formatBytes(f.getSize());
         buf.append(String.format(fmt, padding, "+-- ", size, baseName));
@@ -70,7 +69,7 @@ public class FSTree {
 
     private void traverse(String dir, String padding, boolean first)
         throws java.io.IOException {
-        Resource path = ResourceFactory.getResource(dir);
+        VirtualFile path = VFS.getChild(dir);
 
         if (!first) {
             String _p = padding.substring(0, padding.length() -1);
@@ -83,30 +82,30 @@ public class FSTree {
         }
 
         int count = 0;
-        List<Resource> files = path.getChildren();
-        for (Resource f : files ) {
+        List<VirtualFile> files = path.getChildren();
+        for (VirtualFile f : files ) {
             count += 1;
 
-            if (f.getPath().startsWith(".")) {
+            if (f.getPathName().startsWith(".")) {
                 continue;
             }
             else if (f.isFile()) {
                 append(f, padding);
             }
-            else if (f.isSymlink()) {
+            else if (Utils.isSymlink(f)) {
                 buf.append(padding);
                 buf.append("+-- ");
                 buf.append(f.getName());
                 buf.append(" -> ");
-                buf.append(f.getPath());
+                buf.append(f.getPathName());
                 buf.append("\n");
             }
             else if (f.isDirectory()) {
                 if (count == files.size()) {
-                    traverse(f.getPath(), padding + " ");
+                    traverse(f.getPathName(), padding + " ");
                 }
                 else {
-                    traverse(f.getPath(), padding + "|");
+                    traverse(f.getPathName(), padding + "|");
                 }
             }
         }

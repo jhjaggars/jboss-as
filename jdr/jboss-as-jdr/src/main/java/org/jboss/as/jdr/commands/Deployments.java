@@ -1,8 +1,8 @@
 package org.jboss.as.jdr.commands;
 
-import org.jboss.as.jdr.resource.ResourceFactory;
-import org.jboss.as.jdr.resource.Resource;
-import org.jboss.as.jdr.resource.Utils;
+import org.jboss.as.jdr.util.Utils;
+import org.jboss.vfs.VFS;
+import org.jboss.vfs.VirtualFile;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
@@ -26,24 +26,24 @@ import java.util.Map;
 public class Deployments extends JdrCommand {
 
     Map<String, String> hashToName;
-    Resource jbossHome;
+    VirtualFile jbossHome;
     final XPath xPath;
     final XPathExpression pattern;
 
     public Deployments () throws XPathExpressionException {
         hashToName = new HashMap<String, String>();
-        jbossHome = ResourceFactory.getResource(this.env.getJbossHome());
+        jbossHome = VFS.getChild(this.env.getJbossHome());
         xPath = XPathFactory.newInstance().newXPath();
         pattern = xPath.compile("./deployments/deployment");
     }
 
     private void buildMap() throws Exception {
-        Collection<Resource> candidates = new ArrayList<Resource>();
+        Collection<VirtualFile> candidates = new ArrayList<VirtualFile>();
         candidates.addAll(jbossHome.getChild("standalone").getChildrenRecursively());
         candidates.addAll(jbossHome.getChild("domain").getChildrenRecursively());
 
-        for (Resource f : candidates) {
-            String xml = Utils.resourceToString(f);
+        for (VirtualFile f : candidates) {
+            String xml = Utils.toString(f);
             NodeList deployments = (NodeList) pattern.evaluate(new InputSource(new StringReader(xml)), XPathConstants.NODESET);
             for (int i = 0; i < deployments.getLength(); ++i) {
                 Node node = deployments.item(i);

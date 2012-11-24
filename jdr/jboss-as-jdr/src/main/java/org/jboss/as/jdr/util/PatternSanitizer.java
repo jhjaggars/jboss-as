@@ -21,8 +21,6 @@
  */
 package org.jboss.as.jdr.util;
 
-import org.jboss.as.jdr.resource.Utils;
-
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;

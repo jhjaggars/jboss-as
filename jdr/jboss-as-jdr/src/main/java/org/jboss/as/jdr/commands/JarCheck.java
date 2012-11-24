@@ -22,9 +22,9 @@
 package org.jboss.as.jdr.commands;
 
 
-import org.jboss.as.jdr.resource.ResourceFactory;
-import org.jboss.as.jdr.resource.Resource;
-import org.jboss.as.jdr.resource.Utils;
+import org.jboss.as.jdr.util.Utils;
+import org.jboss.vfs.VFS;
+import org.jboss.vfs.VirtualFile;
 
 import java.io.InputStream;
 import java.math.BigInteger;
@@ -40,12 +40,12 @@ public class JarCheck extends JdrCommand {
     @Override
     public void execute() throws Exception {
         this.buffer = new StringBuilder();
-        walk(ResourceFactory.getResource(this.env.getJbossHome()));
+        walk(VFS.getChild(this.env.getJbossHome()));
         this.env.getZip().add(this.buffer.toString(), "jarcheck.txt");
     }
 
-    private void walk(Resource root) throws NoSuchAlgorithmException {
-        for(Resource f : root.getChildren()) {
+    private void walk(VirtualFile root) throws NoSuchAlgorithmException {
+        for(VirtualFile f : root.getChildren()) {
             if(f.isDirectory()) {
                 walk(f);
             }
@@ -55,7 +55,7 @@ public class JarCheck extends JdrCommand {
         }
     }
 
-    private void check(Resource f) throws NoSuchAlgorithmException {
+    private void check(VirtualFile f) throws NoSuchAlgorithmException {
         InputStream is = null;
         try {
             MessageDigest alg = MessageDigest.getInstance("md5");
@@ -65,7 +65,7 @@ public class JarCheck extends JdrCommand {
             alg.update(buffer);
             String sum = new BigInteger(1, alg.digest()).toString(16);
             this.buffer.append(
-                    f.getPath().replace(this.env.getJbossHome(), "JBOSSHOME") + "\n"
+                    f.getPathName().replace(this.env.getJbossHome(), "JBOSSHOME") + "\n"
                     + sum + "\n"
                     + getManifestString(f) + "===");
         }
@@ -83,9 +83,9 @@ public class JarCheck extends JdrCommand {
         }
     }
 
-    private String getManifestString(Resource resource) throws java.io.IOException {
+    private String getManifestString(VirtualFile file) throws java.io.IOException {
         try {
-            String result = resource.getManifest();
+            String result = Utils.toString(file.getChild(Utils.MANIFEST_NAME));
             return result != null? result: "";
         } catch (Exception npe) {
             ROOT_LOGGER.tracef("no MANIFEST present");

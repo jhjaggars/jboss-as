@@ -21,14 +21,12 @@
  */
 package org.jboss.as.jdr.commands;
 
-import org.jboss.as.jdr.resource.ResourceFactory;
-import org.jboss.as.jdr.resource.Resource;
-import org.jboss.as.jdr.resource.Utils;
-import org.jboss.as.jdr.resource.filter.AndFilter;
-import org.jboss.as.jdr.resource.filter.RegexBlacklistFilter;
-import org.jboss.as.jdr.resource.filter.ResourceFilter;
-import org.jboss.as.jdr.resource.filter.WildcardPathFilter;
+import org.jboss.as.jdr.util.Utils;
 import org.jboss.as.jdr.util.FilteredSanitizer;
+import org.jboss.as.jdr.vfs.Filters;
+import org.jboss.vfs.VFS;
+import org.jboss.vfs.VirtualFile;
+import org.jboss.vfs.VirtualFileFilter;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,23 +38,23 @@ import java.util.List;
 
 public class CollectFiles extends JdrCommand {
 
-    private ResourceFilter filter = ResourceFilter.TRUE;
-    private ResourceFilter blacklistFilter = new RegexBlacklistFilter();
+    private VirtualFileFilter filter = Filters.TRUE;
+    private VirtualFileFilter blacklistFilter = Filters.regexBlackList();
     private LinkedList<FilteredSanitizer> sanitizers = new LinkedList<FilteredSanitizer>();
-    private Comparator<Resource> sorter = null;
+    private Comparator<VirtualFile> sorter = null;
 
     // -1 means no limit
     private long limit = -1;
 
-    public CollectFiles(ResourceFilter filter) {
+    public CollectFiles(VirtualFileFilter filter) {
         this.filter = filter;
     }
 
     public CollectFiles(String pattern) {
-        this.filter = new WildcardPathFilter(pattern);
+        this.filter = Filters.wildcard(pattern);
     }
 
-    public CollectFiles blacklist(ResourceFilter blacklistFilter) {
+    public CollectFiles blacklist(VirtualFileFilter blacklistFilter) {
         this.blacklistFilter = blacklistFilter;
         return this;
     }
@@ -66,7 +64,7 @@ public class CollectFiles extends JdrCommand {
         return this;
     }
 
-    public CollectFiles sorter(Comparator<Resource> sorter){
+    public CollectFiles sorter(Comparator<VirtualFile> sorter){
         this.sorter = sorter;
         return this;
     }
@@ -78,8 +76,8 @@ public class CollectFiles extends JdrCommand {
 
     @Override
     public void execute() throws Exception {
-        Resource root = ResourceFactory.getResource(this.env.getJbossHome());
-        List<Resource> matches = root.getChildrenRecursively(new AndFilter(this.filter, this.blacklistFilter));
+        VirtualFile root = VFS.getChild(this.env.getJbossHome());
+        List<VirtualFile> matches = root.getChildrenRecursively(Filters.and(this.filter, this.blacklistFilter));
 
         // order the files in some arbitrary way.. basically prep for the limiter so things like log files can
         // be gotten in chronological order.  Keep in mind everything that might be collected per the filter for
@@ -91,11 +89,11 @@ public class CollectFiles extends JdrCommand {
 
         // limit how much data we collect
         Limiter limiter = new Limiter(limit);
-        Iterator<Resource> iter = matches.iterator();
+        Iterator<VirtualFile> iter = matches.iterator();
 
         while(iter.hasNext() && !limiter.isDone()) {
 
-            Resource f = iter.next();
+            VirtualFile f = iter.next();
             InputStream stream = limiter.limit(f);
 
             for (FilteredSanitizer sanitizer : this.sanitizers) {
@@ -137,7 +135,7 @@ public class CollectFiles extends JdrCommand {
          * @return
          * @throws IOException
          */
-        public InputStream limit(Resource resource) throws IOException {
+        public InputStream limit(VirtualFile resource) throws IOException {
 
             InputStream is = resource.openStream();
             long resourceSize = resource.getSize();

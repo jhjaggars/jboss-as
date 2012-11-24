@@ -27,10 +27,10 @@ import org.jboss.as.jdr.commands.CollectFiles;
 import org.jboss.as.jdr.commands.JarCheck;
 import org.jboss.as.jdr.commands.JdrCommand;
 import org.jboss.as.jdr.commands.TreeCommand;
-import org.jboss.as.jdr.resource.filter.PathSuffixFilter;
 import org.jboss.as.jdr.util.FilteredSanitizer;
 import org.jboss.as.jdr.util.PatternSanitizer;
 import org.jboss.as.jdr.util.XMLSanitizer;
+import org.jboss.as.jdr.vfs.Filters;
 
 import java.util.Arrays;
 import java.util.List;
@@ -40,9 +40,9 @@ public class BasePlugin implements JdrPlugin {
     @Override
     public List<JdrCommand> getCommands() throws Exception {
         FilteredSanitizer xmlSanitizer = new FilteredSanitizer(
-                new XMLSanitizer("//password"), new PathSuffixFilter(".xml"));
+                new XMLSanitizer("//password"), Filters.suffix(".xml"));
         FilteredSanitizer passwordSanitizer = new FilteredSanitizer(
-                new PatternSanitizer("password=.*", "password=*"), new PathSuffixFilter(".properties"));
+                new PatternSanitizer("password=.*", "password=*"), Filters.suffix(".properties"));
 
         return Arrays.asList(
             new TreeCommand(),
