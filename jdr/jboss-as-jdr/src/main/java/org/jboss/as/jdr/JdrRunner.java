@@ -30,7 +30,10 @@ import org.jboss.as.jdr.commands.JdrEnvironment;
 import org.jboss.as.jdr.plugins.JdrPlugin;
 import org.jboss.as.jdr.util.JdrZipFile;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -75,6 +78,10 @@ public class JdrRunner implements JdrReportCollector {
 
         List<JdrCommand> commands = new ArrayList<JdrCommand>();
 
+        ByteArrayOutputStream versionStream = new ByteArrayOutputStream();
+        PrintWriter versionWriter = new PrintWriter(new OutputStreamWriter(versionStream));
+        versionWriter.println("JDR: " + Namespace.CURRENT.getUriString());
+
         try {
             InputStream is = this.getClass().getClassLoader().getResourceAsStream("plugins.properties");
             Properties plugins = new Properties();
@@ -83,7 +90,11 @@ public class JdrRunner implements JdrReportCollector {
                 Class pluginClass = Class.forName(pluginName);
                 JdrPlugin plugin = (JdrPlugin) pluginClass.newInstance();
                 commands.addAll(plugin.getCommands());
+                versionWriter.println(plugin.getPluginId());
             }
+            versionWriter.close();
+            this.env.getZip().add(new ByteArrayInputStream(versionStream.toByteArray()), "version.txt");
+
         } catch (Exception e) {
             ROOT_LOGGER.couldNotConfigureJDR(e);
             throw MESSAGES.couldNotConfigureJDR();

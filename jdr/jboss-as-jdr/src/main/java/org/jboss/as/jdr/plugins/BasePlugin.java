@@ -37,6 +37,8 @@ import java.util.List;
 
 public class BasePlugin implements JdrPlugin {
 
+    private final PluginId pluginId = new PluginId("BASE_PLUGIN", 1, 0, null);
+
     @Override
     public List<JdrCommand> getCommands() throws Exception {
         FilteredSanitizer xmlSanitizer = new FilteredSanitizer(
@@ -56,5 +58,9 @@ public class BasePlugin implements JdrPlugin {
             new CollectFiles("*.properties").sanitizer(passwordSanitizer),
             new CollectFiles("*.xml").sanitizer(xmlSanitizer)
         );
+    }
+
+    public PluginId getPluginId() {
+        return pluginId;
     }
 }
