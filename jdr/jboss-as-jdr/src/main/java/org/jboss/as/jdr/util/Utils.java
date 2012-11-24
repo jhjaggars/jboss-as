@@ -19,8 +19,6 @@ import java.util.jar.JarFile;
  */
 public final class Utils {
 
-    public static final String MANIFEST_NAME = "META-INF/MANIFEST.MF";
-
     public static void safeClose(JarFile jf){
         try{
             if(jf != null) {
@@ -108,6 +106,7 @@ public final class Utils {
 
     }
 
+    public static final String MANIFEST_NAME = "META-INF/MANIFEST.MF";
 
     public static final String LINE_SEP = String.format("%n");
     public static final char WIN_SEP = '\\';
