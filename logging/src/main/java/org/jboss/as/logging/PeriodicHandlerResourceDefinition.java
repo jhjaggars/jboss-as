@@ -29,6 +29,8 @@ import static org.jboss.as.logging.CommonAttributes.PERIODIC_ROTATING_FILE_HANDL
 import static org.jboss.as.logging.CommonAttributes.SUFFIX;
 
 import org.jboss.as.controller.AttributeDefinition;
+import org.jboss.as.controller.PathElement;
+import org.jboss.as.controller.services.path.ResolvePathHandler;
 import org.jboss.logmanager.handlers.PeriodicRotatingFileHandler;
 
 /**
@@ -36,15 +38,12 @@ import org.jboss.logmanager.handlers.PeriodicRotatingFileHandler;
  */
 class PeriodicHandlerResourceDefinition extends AbstractFileHandlerDefinition {
 
-    static final AttributeDefinition[] ATTRIBUTES = appendDefaultWritableAttributes(AUTOFLUSH, APPEND, FILE, SUFFIX);
+    static final PathElement PERIODIC_HANDLER_PATH = PathElement.pathElement(PERIODIC_ROTATING_FILE_HANDLER);
+    static final AttributeDefinition[] ATTRIBUTES = Logging.join(DEFAULT_ATTRIBUTES, AUTOFLUSH, APPEND, FILE, SUFFIX);
 
-    static final PeriodicHandlerResourceDefinition INSTANCE = new PeriodicHandlerResourceDefinition();
-
-    private PeriodicHandlerResourceDefinition() {
-        super(LoggingExtension.PERIODIC_HANDLER_PATH,
-                PERIODIC_ROTATING_FILE_HANDLER,
-                new HandlerOperations.HandlerAddOperationStepHandler(PeriodicRotatingFileHandler.class, ATTRIBUTES, FILE, APPEND),
-                ATTRIBUTES);
+    public PeriodicHandlerResourceDefinition(final ResolvePathHandler resolvePathHandler, final boolean includeLegacyAttributes) {
+        super(PERIODIC_HANDLER_PATH, PeriodicRotatingFileHandler.class, resolvePathHandler,
+                (includeLegacyAttributes ? Logging.join(ATTRIBUTES, LEGACY_ATTRIBUTES) : ATTRIBUTES));
     }
 
 }

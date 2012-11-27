@@ -22,16 +22,22 @@
 
 package org.jboss.as.connector.deployers.ra.processors;
 
-import org.jboss.as.connector.subsystems.resourceadapters.IronJacamarRegistrator;
-import org.jboss.as.connector.subsystems.resourceadapters.IronJacamarResourceCreator;
-import org.jboss.as.connector.util.ConnectorServices;
+import static org.jboss.as.connector.logging.ConnectorLogger.DEPLOYMENT_CONNECTOR_LOGGER;
+import static org.jboss.as.connector.logging.ConnectorMessages.MESSAGES;
+
+import java.util.Map;
+import java.util.Map.Entry;
+
 import org.jboss.as.connector.annotations.repository.jandex.JandexAnnotationRepositoryImpl;
-import org.jboss.as.connector.services.mdr.AS7MetadataRepository;
-import org.jboss.as.connector.services.resourceadapters.deployment.ResourceAdapterDeploymentService;
 import org.jboss.as.connector.metadata.xmldescriptors.ConnectorXmlDescriptor;
 import org.jboss.as.connector.metadata.xmldescriptors.IronJacamarXmlDescriptor;
+import org.jboss.as.connector.services.mdr.AS7MetadataRepository;
+import org.jboss.as.connector.services.resourceadapters.deployment.ResourceAdapterDeploymentService;
 import org.jboss.as.connector.services.resourceadapters.deployment.registry.ResourceAdapterDeploymentRegistry;
 import org.jboss.as.connector.subsystems.jca.JcaSubsystemConfiguration;
+import org.jboss.as.connector.subsystems.resourceadapters.IronJacamarResourceCreator;
+import org.jboss.as.connector.subsystems.resourceadapters.IronJacamarResourceDefinition;
+import org.jboss.as.connector.util.ConnectorServices;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.PathElement;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
@@ -64,11 +70,6 @@ import org.jboss.msc.service.ServiceController.Mode;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.ServiceTarget;
 import org.jboss.security.SubjectFactory;
-
-import java.util.Map;
-import java.util.Map.Entry;
-
-import static org.jboss.as.connector.logging.ConnectorMessages.MESSAGES;
 
 /**
  * DeploymentUnitProcessor responsible for using IronJacamar metadata and create
@@ -110,6 +111,8 @@ public class ParsedRaDeploymentProcessor implements DeploymentUnitProcessor {
         if (module == null)
             throw MESSAGES.failedToGetModuleAttachment(phaseContext.getDeploymentUnit());
 
+        DEPLOYMENT_CONNECTOR_LOGGER.debugf("ParsedRaDeploymentProcessor: Processing=%s", deploymentUnit);
+
         final ClassLoader classLoader = module.getClassLoader();
 
         Connector cmd = connectorXmlDescriptor != null ? connectorXmlDescriptor.getConnector() : null;
@@ -119,10 +122,20 @@ public class ParsedRaDeploymentProcessor implements DeploymentUnitProcessor {
             // Annotation merging
             Annotations annotator = new Annotations();
             Map<ResourceRoot, Index> indexes = AnnotationIndexUtils.getAnnotationIndexes(deploymentUnit);
-            for (Entry<ResourceRoot, Index> entry : indexes.entrySet()) {
-                AnnotationRepository repository = new JandexAnnotationRepositoryImpl(entry.getValue(), classLoader);
-                    cmd = annotator.merge(cmd, repository, classLoader);
+            if (indexes != null && indexes.size() > 0) {
+                DEPLOYMENT_CONNECTOR_LOGGER.debugf("ParsedRaDeploymentProcessor: Found %d indexes", indexes.size());
+                for (Index index : indexes.values()) {
+                    // Don't apply any empty indexes, as IronJacamar doesn't like that atm.
+                    if (index.getKnownClasses() != null && index.getKnownClasses().size() > 0) {
+                        AnnotationRepository repository = new JandexAnnotationRepositoryImpl(index, classLoader);
+                        cmd = annotator.merge(cmd, repository, classLoader);
+                        DEPLOYMENT_CONNECTOR_LOGGER.debugf("ParsedRaDeploymentProcessor: CMD=%s", cmd);
+                    }
+                }
             }
+            if (indexes == null || indexes.size() == 0)
+                DEPLOYMENT_CONNECTOR_LOGGER.debugf("ParsedRaDeploymentProcessor: Found 0 indexes");
+
             // FIXME: when the connector is null the Iron Jacamar data is ignored
             if (cmd != null) {
                 // Validate metadata
@@ -133,7 +146,7 @@ public class ParsedRaDeploymentProcessor implements DeploymentUnitProcessor {
             }
 
             final ServiceName deployerServiceName = ConnectorServices.RESOURCE_ADAPTER_DEPLOYER_SERVICE_PREFIX.append(connectorXmlDescriptor.getDeploymentName());
-            final ResourceAdapterDeploymentService raDeploymentService = new ResourceAdapterDeploymentService(connectorXmlDescriptor, cmd, ijmd, module, deployerServiceName);
+            final ResourceAdapterDeploymentService raDeploymentService = new ResourceAdapterDeploymentService(connectorXmlDescriptor, cmd, ijmd, module, deployerServiceName, deploymentUnit.getServiceName());
 
             final ServiceTarget serviceTarget = phaseContext.getServiceTarget();
 
@@ -155,7 +168,7 @@ public class ParsedRaDeploymentProcessor implements DeploymentUnitProcessor {
                 @Override
                 protected void registerIronjacamar(final ServiceController<? extends Object> controller, final ManagementResourceRegistration subRegistration, final Resource subsystemResource) {
                     //register ironJacamar
-                    new IronJacamarRegistrator(subRegistration).invoke();
+                    subRegistration.registerSubModel(new IronJacamarResourceDefinition());
                     AS7MetadataRepository mdr = ((ResourceAdapterDeploymentService) controller.getService()).getMdr();
                     IronJacamarResourceCreator.INSTANCE.execute(subsystemResource, mdr);
                 }

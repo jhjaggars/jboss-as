@@ -710,12 +710,22 @@
 
                 <dependency>
                     <groupId>org.hornetq</groupId>
-                    <artifactId>hornetq-core</artifactId>
+                    <artifactId>hornetq-core-client</artifactId>
                 </dependency>
 
                 <dependency>
                     <groupId>org.hornetq</groupId>
-                    <artifactId>hornetq-jms</artifactId>
+                    <artifactId>hornetq-server</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.hornetq</groupId>
+                    <artifactId>hornetq-jms-client</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.hornetq</groupId>
+                    <artifactId>hornetq-jms-server</artifactId>
                 </dependency>
 
                 <dependency>
@@ -941,7 +951,7 @@
                     <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-jsf</artifactId>
                 </dependency>
- 
+
                 <dependency>
                     <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-jsf-injection</artifactId>
@@ -1004,12 +1014,37 @@
 
                 <dependency>
                     <groupId>org.jboss.as</groupId>
+                    <artifactId>jboss-as-osgi-http</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.jboss.as</groupId>
+                    <artifactId>jboss-as-osgi-jmx</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.jboss.as</groupId>
+                    <artifactId>jboss-as-osgi-jpa</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.jboss.as</groupId>
+                    <artifactId>jboss-as-osgi-jta</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.jboss.as</groupId>
+                    <artifactId>jboss-as-osgi-naming</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-osgi-service</artifactId>
                 </dependency>
 
                 <dependency>
                     <groupId>org.jboss.as</groupId>
-                    <artifactId>jboss-as-osgi-integration</artifactId>
+                    <artifactId>jboss-as-osgi-web</artifactId>
                 </dependency>
 
                 <dependency>
@@ -1041,17 +1076,17 @@
                     <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-sar</artifactId>
                 </dependency>
-                
+
                 <dependency>
                     <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-security</artifactId>
                 </dependency>
-                
+
                 <dependency>
                     <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-system-jmx</artifactId>
                 </dependency>
-                
+
                 <dependency>
                     <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-threads</artifactId>
@@ -1188,12 +1223,12 @@
                 </dependency>
 
                 <dependency>
-                    <groupId>org.jboss.jbossts</groupId>
-                    <artifactId>jbossjts</artifactId>
+                    <groupId>org.jboss.jbossts.jts</groupId>
+                    <artifactId>jbossjts-jacorb</artifactId>
                 </dependency>
 
                 <dependency>
-                    <groupId>org.jboss.jbossts</groupId>
+                    <groupId>org.jboss.jbossts.jts</groupId>
                     <artifactId>jbossjts-integration</artifactId>
                 </dependency>
 
@@ -1203,13 +1238,14 @@
                 </dependency>
 
                 <dependency>
-                    <groupId>org.jboss.jbossts</groupId>
+                    <groupId>org.jboss.jbossts.xts</groupId>
                     <artifactId>jbossxts</artifactId>
                 </dependency>
 
                 <dependency>
-                    <groupId>org.jboss.jbossts</groupId>
-                    <artifactId>jbossxts-api</artifactId>
+                    <groupId>org.jboss.jbossts.xts</groupId>
+                    <artifactId>jbossxts</artifactId>
+                    <classifier>api</classifier>
                 </dependency>
 
                 <dependency>
@@ -1342,6 +1378,11 @@
                 <dependency>
                     <groupId>org.jboss.resteasy</groupId>
                     <artifactId>resteasy-cdi</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.jboss.resteasy</groupId>
+                    <artifactId>resteasy-hibernatevalidator-provider</artifactId>
                 </dependency>
 
                 <dependency>
@@ -1837,7 +1878,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
-                        <version>2.8.1</version>
+                        <version>2.9</version>
                         <executions>
                             <execution>
                                 <id>javadocs-dist</id>
@@ -1848,7 +1889,7 @@
                                 <configuration>
                                     <debug>true</debug>
                                     <verbose>true</verbose>
-                                    <maxmemory>2048m</maxmemory>
+                                    <maxmemory>1500m</maxmemory>
                                     <!-- To prevent problems with author names written in non-UTF-8:
                                     -->
                                     <encoding>ISO-8859-1</encoding>
@@ -1903,8 +1944,8 @@
                                         <include>org.jboss.jbossts:jbosstxbridge</include>
 
                                         <!--
-                                        <include>org.jboss.jbossts:jbossxts</include>
-                                        <include>org.jboss.jbossts:jbossxts-api</include>
+                                        <include>org.jboss.jbossts.xts:jbossxts</include>
+                                        <include>org.jboss.jbossts.xts:jbossxts-api</include>
                                         -->
                                         <include>org.jboss:jboss-vfs</include>
 

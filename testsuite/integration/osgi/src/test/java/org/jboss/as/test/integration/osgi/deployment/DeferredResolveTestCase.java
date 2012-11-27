@@ -17,9 +17,6 @@
 package org.jboss.as.test.integration.osgi.deployment;
 
 import java.io.InputStream;
-import java.util.concurrent.TimeUnit;
-
-import javax.inject.Inject;
 
 import org.jboss.arquillian.container.test.api.Deployer;
 import org.jboss.arquillian.container.test.api.Deployment;
@@ -48,6 +45,7 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleException;
 import org.osgi.service.packageadmin.PackageAdmin;
 import org.osgi.service.startlevel.StartLevel;
+import org.osgi.util.tracker.ServiceTracker;
 
 /**
  * Test deferred bundle resolution
@@ -91,7 +89,8 @@ public class DeferredResolveTestCase {
                 OSGiManifestBuilder builder = OSGiManifestBuilder.newInstance();
                 builder.addBundleSymbolicName(archive.getName());
                 builder.addBundleManifestVersion(2);
-                builder.addImportPackages(ModelControllerClient.class, ModelNode.class);
+                builder.addImportPackages(ModelControllerClient.class, ModelNode.class, ManagementClient.class);
+                builder.addImportPackages(PackageAdmin.class, StartLevel.class, ServiceTracker.class);
                 builder.addImportPackages(XBundle.class, BundleManager.class);
                 return builder.openStream();
             }
@@ -122,10 +121,10 @@ public class DeferredResolveTestCase {
             startLevel.setBundleStartLevel(bundle, 2);
             bundle.start();
             Assert.assertEquals("Bundle INSTALLED", Bundle.INSTALLED, bundle.getState());
-            FrameworkUtils.changeStartLevel(context, 2, 5, TimeUnit.SECONDS);
+            FrameworkUtils.changeStartLevel(context, 2);
             Assert.assertEquals("Bundle ACTIVE", Bundle.ACTIVE, bundle.getState());
         } finally {
-            startLevel.setStartLevel(orglevel);
+            FrameworkUtils.changeStartLevel(context, orglevel);
             bundle.uninstall();
         }
     }
@@ -186,14 +185,14 @@ public class DeferredResolveTestCase {
             startLevel.setBundleStartLevel(bundle, 2);
             bundle.start();
             Assert.assertEquals("Bundle INSTALLED", Bundle.INSTALLED, bundle.getState());
-            FrameworkUtils.changeStartLevel(context, 2, 5, TimeUnit.SECONDS);
+            FrameworkUtils.changeStartLevel(context, 2);
             Assert.assertEquals("Bundle RESOLVED", Bundle.RESOLVED, bundle.getState());
 
             // Attempt restarting after failure
             bundle.start();
             Assert.assertEquals("Bundle ACTIVE", Bundle.ACTIVE, bundle.getState());
         } finally {
-            startLevel.setStartLevel(orglevel);
+            FrameworkUtils.changeStartLevel(context, orglevel);
             bundle.uninstall();
         }
     }

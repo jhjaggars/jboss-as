@@ -717,10 +717,12 @@
         </module-def>
 
         <module-def name="org.hornetq">
-            <maven-resource group="org.hornetq" artifact="hornetq-core"/>
+            <maven-resource group="org.hornetq" artifact="hornetq-core-client"/>
+            <maven-resource group="org.hornetq" artifact="hornetq-server"/>
             <maven-resource group="org.hornetq" artifact="hornetq-commons"/>
             <maven-resource group="org.hornetq" artifact="hornetq-journal"/>
-            <maven-resource group="org.hornetq" artifact="hornetq-jms"/>
+            <maven-resource group="org.hornetq" artifact="hornetq-jms-client"/>
+            <maven-resource group="org.hornetq" artifact="hornetq-jms-server"/>
         </module-def>
 
         <module-def name="org.hornetq.ra">
@@ -943,8 +945,28 @@
             <maven-resource group="org.jboss.as" artifact="jboss-as-osgi-service"/>
         </module-def>
 
-     	<module-def name="org.jboss.as.osgi.integration">
-            <maven-resource group="org.jboss.as" artifact="jboss-as-osgi-integration"/>
+     	<module-def name="org.jboss.as.osgi.http">
+            <maven-resource group="org.jboss.as" artifact="jboss-as-osgi-http"/>
+        </module-def>
+
+     	<module-def name="org.jboss.as.osgi.jmx">
+            <maven-resource group="org.jboss.as" artifact="jboss-as-osgi-jmx"/>
+        </module-def>
+
+     	<module-def name="org.jboss.as.osgi.jpa">
+            <maven-resource group="org.jboss.as" artifact="jboss-as-osgi-jpa"/>
+        </module-def>
+
+     	<module-def name="org.jboss.as.osgi.jta">
+            <maven-resource group="org.jboss.as" artifact="jboss-as-osgi-jta"/>
+        </module-def>
+
+     	<module-def name="org.jboss.as.osgi.naming">
+            <maven-resource group="org.jboss.as" artifact="jboss-as-osgi-naming"/>
+        </module-def>
+
+     	<module-def name="org.jboss.as.osgi.web">
+            <maven-resource group="org.jboss.as" artifact="jboss-as-osgi-web"/>
         </module-def>
 
         <module-def name="org.jboss.as.sar">
@@ -1042,11 +1064,11 @@
         </module-def>
 
         <module-def name="org.jboss.jts">
-            <maven-resource group="org.jboss.jbossts" artifact="jbossjts"/>
+            <maven-resource group="org.jboss.jbossts.jts" artifact="jbossjts-jacorb"/>
         </module-def>
 
         <module-def name="org.jboss.jts.integration">
-            <maven-resource group="org.jboss.jbossts" artifact="jbossjts-integration"/>
+            <maven-resource group="org.jboss.jbossts.jts" artifact="jbossjts-integration"/>
         </module-def>
 
         <module-def name="org.jboss.metadata">
@@ -1104,40 +1126,44 @@
         </module-def>
 
         <module-def name="org.jboss.resteasy.resteasy-atom-provider">
-            <maven-resource group="org.jboss.resteasy" artifact="resteasy-atom-provider"  jandex="true"/>
+            <maven-resource group="org.jboss.resteasy" artifact="resteasy-atom-provider"/>
         </module-def>
 
         <module-def name="org.jboss.resteasy.resteasy-cdi">
             <maven-resource group="org.jboss.resteasy" artifact="resteasy-cdi"/>
         </module-def>
 
+        <module-def name="org.jboss.resteasy.resteasy-hibernatevalidator-provider">
+            <maven-resource group="org.jboss.resteasy" artifact="resteasy-hibernatevalidator-provider"/>
+        </module-def>
+
         <module-def name="org.jboss.resteasy.resteasy-jackson-provider">
-            <maven-resource group="org.jboss.resteasy" artifact="resteasy-jackson-provider" jandex="true"/>
+            <maven-resource group="org.jboss.resteasy" artifact="resteasy-jackson-provider"/>
         </module-def>
 
         <module-def name="org.jboss.resteasy.resteasy-jaxb-provider">
-            <maven-resource group="org.jboss.resteasy" artifact="resteasy-jaxb-provider" jandex="true"/>
+            <maven-resource group="org.jboss.resteasy" artifact="resteasy-jaxb-provider"/>
         </module-def>
 
         <module-def name="org.jboss.resteasy.resteasy-jettison-provider">
-            <maven-resource group="org.jboss.resteasy" artifact="resteasy-jettison-provider" jandex="true"/>
+            <maven-resource group="org.jboss.resteasy" artifact="resteasy-jettison-provider"/>
         </module-def>
 
         <module-def name="org.jboss.resteasy.resteasy-jaxrs">
             <maven-resource group="org.jboss.resteasy" artifact="async-http-servlet-3.0"/>
-            <maven-resource group="org.jboss.resteasy" artifact="resteasy-jaxrs" jandex="true"/>
+            <maven-resource group="org.jboss.resteasy" artifact="resteasy-jaxrs"/>
         </module-def>
 
         <module-def name="org.jboss.resteasy.resteasy-jsapi">
-            <maven-resource group="org.jboss.resteasy" artifact="resteasy-jsapi" jandex="true"/>
+            <maven-resource group="org.jboss.resteasy" artifact="resteasy-jsapi"/>
         </module-def>
 
         <module-def name="org.jboss.resteasy.resteasy-multipart-provider">
-            <maven-resource group="org.jboss.resteasy" artifact="resteasy-multipart-provider" jandex="true"/>
+            <maven-resource group="org.jboss.resteasy" artifact="resteasy-multipart-provider"/>
         </module-def>
 
         <module-def name="org.jboss.resteasy.resteasy-yaml-provider">
-            <maven-resource group="org.jboss.resteasy" artifact="resteasy-yaml-provider" jandex="true"/>
+            <maven-resource group="org.jboss.resteasy" artifact="resteasy-yaml-provider"/>
         </module-def>
 
         <module-def name="org.jboss.security.negotiation">
@@ -1236,8 +1262,7 @@
         </module-def>
 
         <module-def name="org.jboss.xts">
-            <maven-resource group="org.jboss.jbossts" artifact="jbossxts"/>
-            <maven-resource group="org.jboss.jbossts" artifact="jbossxts-api"/>
+            <maven-resource group="org.jboss.jbossts.xts" artifact="jbossxts"/>
             <maven-resource group="org.jboss.jbossts" artifact="jbosstxbridge"/>
         </module-def>
 

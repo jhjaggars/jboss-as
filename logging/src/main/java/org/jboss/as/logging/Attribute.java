@@ -26,13 +26,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.jboss.as.controller.AttributeDefinition;
+import org.jboss.as.controller.services.path.PathResourceDefinition;
 
 /**
  *
  */
 enum Attribute {
 
-    UNKNOWN(null),
+    UNKNOWN((String) null),
 
     APPEND(CommonAttributes.APPEND),
     AUTOFLUSH(CommonAttributes.AUTOFLUSH),
@@ -47,10 +48,10 @@ enum Attribute {
     NAME(CommonAttributes.HANDLER_NAME),
     NEW_LEVEL(CommonAttributes.NEW_LEVEL),
     OVERFLOW_ACTION(CommonAttributes.OVERFLOW_ACTION),
-    PATH(CommonAttributes.PATH),
+    PATH(PathResourceDefinition.PATH),
     PATTERN(CommonAttributes.PATTERN),
     QUEUE_LENGTH(CommonAttributes.QUEUE_LENGTH),
-    RELATIVE_TO(CommonAttributes.RELATIVE_TO),
+    RELATIVE_TO(PathResourceDefinition.RELATIVE_TO),
     REPLACEMENT(CommonAttributes.REPLACEMENT),
     REPLACE_ALL(CommonAttributes.REPLACE_ALL),
     ROTATE_SIZE(CommonAttributes.ROTATE_SIZE),
@@ -69,6 +70,11 @@ enum Attribute {
             this.name = definition.getXmlName();
         }
         this.definition = definition;
+    }
+
+    Attribute(final String name) {
+        this.name = name;
+        this.definition = null;
     }
 
     /**

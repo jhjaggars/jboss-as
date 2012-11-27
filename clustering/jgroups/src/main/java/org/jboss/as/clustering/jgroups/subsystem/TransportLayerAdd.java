@@ -1,3 +1,24 @@
+/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2012, Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags. See the copyright.txt file in the
+ * distribution for a full listing of individual contributors.
+ *
+ * This is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation; either version 2.1 of
+ * the License, or (at your option) any later version.
+ *
+ * This software is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this software; if not, write to the Free
+ * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+ * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
+ */
 package org.jboss.as.clustering.jgroups.subsystem;
 
 import org.jboss.as.clustering.jgroups.JGroupsMessages;
@@ -37,12 +58,8 @@ public class TransportLayerAdd implements OperationStepHandler {
             // don't process properties twice - we do them below
             if (attribute.getName().equals(ModelKeys.PROPERTIES))
                 continue ;
-
             attribute.validateAndSet(operation, subModel);
         }
-
-        // Process type specific properties if required
-        process(subModel, operation);
 
         // The transport config parameters  <property name=>value</property>
         if(operation.hasDefined(ModelKeys.PROPERTIES)) {
@@ -50,7 +67,7 @@ public class TransportLayerAdd implements OperationStepHandler {
                 // create a new property=name resource
                 final Resource param = context.createResource(PathAddress.pathAddress(PathElement.pathElement(ModelKeys.PROPERTY, property.getName())));
                 final ModelNode value = property.getValue();
-                if(! value.isDefined()) {
+                if(!value.isDefined()) {
                     throw JGroupsMessages.MESSAGES.propertyNotDefined(property.getName(), transportRelativePath.toString());
                 }
                 // set the value of the property
@@ -62,9 +79,6 @@ public class TransportLayerAdd implements OperationStepHandler {
         context.stepCompleted();
     }
 
-    void process(ModelNode subModel, ModelNode operation) {
-        //
-    }
 
     /**
      * Add a step triggering the {@linkplain org.jboss.as.controller.OperationContext#reloadRequired()} in case the

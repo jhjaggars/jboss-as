@@ -2537,4 +2537,14 @@ public interface ControllerMessages {
 
     @Message(id = Message.NONE, value = "Services that may be the cause:")
     String missingTransitiveDependencies();
+
+    @Message(id = 14880, value = "No operation entry called '%s' registered at '%s'")
+    String noOperationEntry(String op, PathAddress pathAddress);
+
+
+    @Message(id = 14881, value = "No operation handler called '%s' registered at '%s'")
+    String noOperationHandler(String op, PathAddress pathAddress);
+
+    @Message(id = 14882, value = "There is no registered path to resolve with path attribute '%s' and/or relative-to attribute '%s on: %s")
+    IllegalStateException noPathToResolve(String pathAttributeName, String relativeToAttributeName, ModelNode model);
 }

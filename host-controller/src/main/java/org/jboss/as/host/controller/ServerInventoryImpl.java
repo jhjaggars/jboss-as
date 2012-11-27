@@ -26,6 +26,7 @@ import org.jboss.as.controller.ModelVersion;
 import org.jboss.as.controller.PathAddress;
 import org.jboss.as.controller.ProxyController;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.HOST;
+import org.jboss.as.controller.remote.TransactionalProtocolClient;
 import static org.jboss.as.host.controller.HostControllerLogger.ROOT_LOGGER;
 import static org.jboss.as.host.controller.HostControllerMessages.MESSAGES;
 
@@ -33,11 +34,13 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
@@ -172,7 +175,11 @@ public class ServerInventoryImpl implements ServerInventory {
         }
         ManagedServer server = servers.get(serverName);
         if(server == null) {
-            final ManagedServer newServer = createManagedServer(serverName, domainModel);
+            // Create a new authKey
+            final byte[] authKey = new byte[16];
+            new Random(new SecureRandom().nextLong()).nextBytes(authKey);
+            // Create the managed server
+            final ManagedServer newServer = createManagedServer(serverName, domainModel, authKey);
             server = servers.putIfAbsent(serverName, newServer);
             if(server == null) {
                 server = newServer;
@@ -235,7 +242,7 @@ public class ServerInventoryImpl implements ServerInventory {
     }
 
     @Override
-    public void reconnectServer(final String serverName, final ModelNode domainModel, final boolean running, final boolean stopping) {
+    public void reconnectServer(final String serverName, final ModelNode domainModel, final byte[] authKey, final boolean running, final boolean stopping) {
         if(shutdown || connectionFinished) {
             throw HostControllerMessages.MESSAGES.hostAlreadyShutdown();
         }
@@ -244,7 +251,7 @@ public class ServerInventoryImpl implements ServerInventory {
             ROOT_LOGGER.existingServerWithState(serverName, existing.getState());
             return;
         }
-        final ManagedServer server = createManagedServer(serverName, domainModel);
+        final ManagedServer server = createManagedServer(serverName, domainModel, authKey);
         if(servers.putIfAbsent(serverName, server) != null) {
             ROOT_LOGGER.existingServerWithState(serverName, existing.getState());
             return;
@@ -304,7 +311,7 @@ public class ServerInventoryImpl implements ServerInventory {
         }
     }
 
-    public void shutdown(final int gracefulTimeout, final boolean blockUntilStopped) {
+    void shutdown(final boolean shutdownServers, final int gracefulTimeout, final boolean blockUntilStopped) {
         final boolean shutdown = this.shutdown;
         this.shutdown = true;
         if(! shutdown) {
@@ -313,7 +320,10 @@ public class ServerInventoryImpl implements ServerInventory {
                 // nor can expect to receive any further notifications notifications.
                 return;
             }
-            stopServers(gracefulTimeout, blockUntilStopped);
+            if(shutdownServers) {
+                // Shutdown the servers as well
+                stopServers(gracefulTimeout, blockUntilStopped);
+            }
         }
     }
 
@@ -329,16 +339,19 @@ public class ServerInventoryImpl implements ServerInventory {
             return null;
         }
         try {
-            final ProxyController proxy = server.channelRegistered(channelAssociation);
+            final TransactionalProtocolClient client = server.channelRegistered(channelAssociation);
             final Channel channel = channelAssociation.getChannel();
             channel.addCloseHandler(new CloseHandler<Channel>() {
 
                 public void handleClose(final Channel closed, final IOException exception) {
-                    server.callbackUnregistered(proxy);
-                    domainController.unregisterRunningServer(server.getServerName());
+                    final boolean shuttingDown = shutdown || connectionFinished;
+                    // Unregister right away
+                    if(server.callbackUnregistered(client, shuttingDown)) {
+                        domainController.unregisterRunningServer(server.getServerName());
+                    }
                 }
             });
-            return proxy;
+            return server.getProxyController();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -346,13 +359,14 @@ public class ServerInventoryImpl implements ServerInventory {
 
     @Override
     public boolean serverReconnected(String serverProcessName, ManagementChannelHandler channelHandler) {
-        // For now just reuse the existing register and started notification
-        final ProxyController controller = serverCommunicationRegistered(serverProcessName, channelHandler);
+        final String serverName = ManagedServer.getServerName(serverProcessName);
+        final ManagedServer server = servers.get(serverName);
+        // Register the new communication channel
+        serverCommunicationRegistered(serverProcessName, channelHandler);
+        // Mark the server as started
         serverStarted(serverProcessName);
-        domainController.registerRunningServer(controller);
-        final boolean inSync = true;
-        // TODO determine whether the server is in sync
-        return inSync;
+        // If the server requires a reload, means we are out of sync
+        return server.isRequiresReload() == false;
     }
 
     @Override
@@ -363,6 +377,8 @@ public class ServerInventoryImpl implements ServerInventory {
             ROOT_LOGGER.noServerAvailable(serverName);
             return;
         }
+        // always un-register in case the process exits
+        domainController.unregisterRunningServer(server.getServerName());
         server.processFinished();
         synchronized (shutdownCondition) {
             shutdownCondition.notifyAll();
@@ -484,7 +500,7 @@ public class ServerInventoryImpl implements ServerInventory {
         }
     }
 
-    private ManagedServer createManagedServer(final String serverName, final ModelNode domainModel) {
+    private ManagedServer createManagedServer(final String serverName, final ModelNode domainModel, final byte[] authKey) {
         final String hostControllerName = domainController.getLocalHostInfo().getLocalHostName();
         final ModelNode hostModel = domainModel.require(HOST).require(hostControllerName);
         final ManagedServerBootCmdFactory combiner = new ManagedServerBootCmdFactory(serverName, domainModel, hostModel, environment, domainController.getExpressionResolver());
@@ -493,7 +509,7 @@ public class ServerInventoryImpl implements ServerInventory {
         final ModelVersion modelVersion = ModelVersion.create(Version.MANAGEMENT_MAJOR_VERSION, Version.MANAGEMENT_MINOR_VERSION, Version.MANAGEMENT_MICRO_VERSION);
         final TransformationTarget target = TransformationTargetImpl.create(extensionRegistry.getTransformerRegistry(),
                 modelVersion, subsystems, null, TransformationTarget.TransformationTargetType.SERVER);
-        return new ManagedServer(hostControllerName, serverName, processControllerClient, managementAddress, configuration, target);
+        return new ManagedServer(hostControllerName, serverName, authKey, processControllerClient, managementAddress, configuration, target);
     }
 
     @Override

@@ -49,7 +49,6 @@ import org.jboss.jca.deployers.common.CommonDeployment;
 import org.jboss.logging.Logger;
 import org.jboss.modules.Module;
 import org.jboss.msc.service.Service;
-import org.jboss.msc.service.ServiceContainer;
 import org.jboss.msc.service.ServiceController.Mode;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.ServiceTarget;
@@ -72,25 +71,34 @@ public final class ResourceAdapterDeploymentService extends AbstractResourceAdap
     private final Connector cmd;
     private final IronJacamar ijmd;
     private CommonDeployment raDeployment = null;
+    private String deploymentName;
 
-    private String raName;
     private ServiceName deploymentServiceName;
+    private final ServiceName duServiceName;
 
+    /**
+     *
+     * @param connectorXmlDescriptor
+     * @param cmd
+     * @param ijmd
+     * @param module
+     * @param deploymentServiceName
+     * @param duServiceName the deployment unit's service name
+     */
     public ResourceAdapterDeploymentService(final ConnectorXmlDescriptor connectorXmlDescriptor, final Connector cmd,
-                                            final IronJacamar ijmd, final Module module, final ServiceName deploymentServiceName) {
+                                            final IronJacamar ijmd, final Module module, final ServiceName deploymentServiceName, final ServiceName duServiceName) {
         this.connectorXmlDescriptor = connectorXmlDescriptor;
         this.cmd = cmd;
         this.ijmd = ijmd;
         this.module = module;
-        this.raName = null;
         this.deploymentServiceName = deploymentServiceName;
+        this.duServiceName = duServiceName;
     }
 
     @Override
     public void start(StartContext context) throws StartException {
-        final ServiceContainer container = context.getController().getServiceContainer();
         final URL url = connectorXmlDescriptor == null ? null : connectorXmlDescriptor.getUrl();
-        final String deploymentName = connectorXmlDescriptor == null ? null : connectorXmlDescriptor.getDeploymentName();
+        deploymentName = connectorXmlDescriptor == null ? null : connectorXmlDescriptor.getDeploymentName();
         final File root = connectorXmlDescriptor == null ? null : connectorXmlDescriptor.getRoot();
         DEPLOYMENT_CONNECTOR_LOGGER.debugf("DEPLOYMENT name = %s",deploymentName);
         final AS7RaDeployer raDeployer =
@@ -99,9 +107,10 @@ public final class ResourceAdapterDeploymentService extends AbstractResourceAdap
 
         ClassLoader old = SecurityActions.getThreadContextClassLoader();
         try {
-            WritableServiceBasedNamingStore.pushOwner(container.subTarget());
+            WritableServiceBasedNamingStore.pushOwner(duServiceName);
             SecurityActions.setThreadContextClassLoader(module.getClassLoader());
             raDeployment = raDeployer.doDeploy();
+            deploymentName = raDeployment.getDeploymentName();
         } catch (Throwable t) {
             unregisterAll(deploymentName);
             throw MESSAGES.failedToStartRaDeployment(t, deploymentName);
@@ -110,20 +119,22 @@ public final class ResourceAdapterDeploymentService extends AbstractResourceAdap
             WritableServiceBasedNamingStore.popOwner();
         }
 
-        raName = raDeployment.getDeploymentName();
-        ServiceName raServiceName = ConnectorServices.registerResourceAdapter(raName);
-
-        value = new ResourceAdapterDeployment(raDeployment, raName, raServiceName);
-
-        managementRepository.getValue().getConnectors().add(value.getDeployment().getConnector());
 
         if (raDeployer.checkActivation(cmd, ijmd)) {
+            DEPLOYMENT_CONNECTOR_LOGGER.debugf("Activating: %s", deploymentName);
+
+            ServiceName raServiceName = ConnectorServices.registerResourceAdapter(deploymentName);
+            value = new ResourceAdapterDeployment(raDeployment, deploymentName, raServiceName);
+
+            managementRepository.getValue().getConnectors().add(value.getDeployment().getConnector());
             registry.getValue().registerResourceAdapterDeployment(value);
 
             context.getChildTarget()
                     .addService(raServiceName,
-                                new ResourceAdapterService(raName, raServiceName, value.getDeployment().getResourceAdapter())).setInitialMode(Mode.ACTIVE)
+                                new ResourceAdapterService(deploymentName, raServiceName, value.getDeployment().getResourceAdapter())).setInitialMode(Mode.ACTIVE)
                     .install();
+        } else {
+            DEPLOYMENT_CONNECTOR_LOGGER.debugf("Not activating: %s", deploymentName);
         }
     }
 
@@ -133,9 +144,11 @@ public final class ResourceAdapterDeploymentService extends AbstractResourceAdap
      */
     @Override
     public void stop(StopContext context) {
-        String deploymentName = value.getDeployment() != null ? value.getDeployment().getDeploymentName() : "";
+        if (deploymentServiceName != null) {
+            ConnectorServices.unregisterDeployment(raDeployment.getDeploymentName(), deploymentServiceName);
+        }
         DEPLOYMENT_CONNECTOR_LOGGER.debugf("Stopping sevice %s",
-                        ConnectorServices.RESOURCE_ADAPTER_DEPLOYMENT_SERVICE_PREFIX.append(deploymentName));
+                ConnectorServices.RESOURCE_ADAPTER_DEPLOYMENT_SERVICE_PREFIX.append(deploymentName));
         unregisterAll(deploymentName);
 
     }
@@ -143,13 +156,7 @@ public final class ResourceAdapterDeploymentService extends AbstractResourceAdap
     @Override
     public void unregisterAll(String deploymentName) {
 
-        if (raName != null && deploymentServiceName != null) {
-            ConnectorServices.unregisterDeployment(raName, deploymentServiceName);
-        }
-
-        if (raName != null) {
-            ConnectorServices.unregisterResourceAdapterIdentifier(raName);
-        }
+        ConnectorServices.unregisterResourceAdapterIdentifier(deploymentName);
 
         super.unregisterAll(deploymentName);
 

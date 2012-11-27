@@ -45,7 +45,7 @@ import org.jboss.msc.service.ServiceRegistry;
 import org.jboss.msc.service.ServiceTarget;
 import org.jboss.msc.service.ValueService;
 import org.jboss.msc.value.ImmediateValue;
-import org.jboss.osgi.framework.spi.IntegrationService.BootstrapPhase;
+import org.jboss.osgi.framework.spi.IntegrationServices.BootstrapPhase;
 import org.jboss.osgi.framework.spi.ServiceTracker;
 
 /**
@@ -67,13 +67,15 @@ public class InitialDeploymentTracker extends ServiceTracker<Object> {
     private ServiceTarget listenerTarget;
 
     public InitialDeploymentTracker(OperationContext context, ServiceVerificationHandler verificationHandler) {
+        super(InitialDeploymentTracker.class.getSimpleName());
 
         serviceTarget = context.getServiceTarget();
         deploymentNames = getDeploymentNames(context);
 
-        // Track the persistent REGISTER services
+        // Track the persistent DEPENDENCIES services
+        // This makes sure that Bundle.INSTALL services have completed
         for (String name : deploymentNames) {
-            expectedServices.add(Services.deploymentUnitName(name, Phase.REGISTER));
+            expectedServices.add(Services.deploymentUnitName(name, Phase.DEPENDENCIES));
         }
 
         // Register this tracker with the server controller

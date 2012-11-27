@@ -23,11 +23,6 @@
 package org.jboss.as.messaging;
 
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ADD;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.FAILED;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.FAILURE_DESCRIPTION;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.IGNORED;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.NAME;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OUTCOME;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.PATH;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUBSYSTEM;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.VALUE;
@@ -40,6 +35,7 @@ import static org.jboss.as.messaging.CommonAttributes.CHECK_FOR_LIVE_SERVER;
 import static org.jboss.as.messaging.CommonAttributes.CLUSTERED;
 import static org.jboss.as.messaging.CommonAttributes.CLUSTER_CONNECTION;
 import static org.jboss.as.messaging.CommonAttributes.CONNECTION_FACTORY;
+import static org.jboss.as.messaging.CommonAttributes.CORE_ADDRESS;
 import static org.jboss.as.messaging.CommonAttributes.DISCOVERY_GROUP;
 import static org.jboss.as.messaging.CommonAttributes.HA;
 import static org.jboss.as.messaging.CommonAttributes.HORNETQ_SERVER;
@@ -49,6 +45,8 @@ import static org.jboss.as.messaging.CommonAttributes.JGROUPS_STACK;
 import static org.jboss.as.messaging.CommonAttributes.PARAM;
 import static org.jboss.as.messaging.CommonAttributes.POOLED_CONNECTION_FACTORY;
 import static org.jboss.as.messaging.CommonAttributes.REPLICATION_CLUSTERNAME;
+import static org.jboss.as.messaging.CommonAttributes.RUNTIME_QUEUE;
+import static org.jboss.as.messaging.GroupingHandlerDefinition.TYPE;
 import static org.jboss.as.messaging.Namespace.MESSAGING_1_0;
 import static org.jboss.as.messaging.Namespace.MESSAGING_1_1;
 import static org.jboss.as.messaging.Namespace.MESSAGING_1_2;
@@ -73,12 +71,12 @@ import org.jboss.as.controller.descriptions.StandardResourceDescriptionResolver;
 import org.jboss.as.controller.operations.common.GenericSubsystemDescribeHandler;
 import org.jboss.as.controller.parsing.ExtensionParsingContext;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
+import org.jboss.as.controller.services.path.ResolvePathHandler;
 import org.jboss.as.controller.transform.AbstractSubsystemTransformer;
 import org.jboss.as.controller.transform.OperationTransformer;
 import org.jboss.as.controller.transform.RejectExpressionValuesTransformer;
 import org.jboss.as.controller.transform.TransformationContext;
 import org.jboss.as.controller.transform.TransformersSubRegistration;
-import org.jboss.as.messaging.jms.ConnectionFactoryAttributes.Common;
 import org.jboss.as.messaging.jms.ConnectionFactoryAttributes.Pooled;
 import org.jboss.as.messaging.jms.ConnectionFactoryDefinition;
 import org.jboss.as.messaging.jms.JMSQueueDefinition;
@@ -99,7 +97,7 @@ import org.jboss.dmr.Property;
  *       <li>Management model: 1.2.0
  *     </ul>
  *   </dd>
- *   <dt>AS 7.1.2<dt>
+ *   <dt>AS 7.1.2, 7.1.3<dt>
  *   <dd>
  *     <ul>
  *       <li>XML namespace: urn:jboss:domain:messaging:1.2
@@ -178,8 +176,11 @@ public class MessagingExtension implements Extension {
         serverRegistration.registerSubModel(new DivertDefinition(registerRuntimeOnly));
 
         // Core queues
-        serverRegistration.registerSubModel(new QueueDefinition(registerRuntimeOnly));
+        serverRegistration.registerSubModel(QueueDefinition.newQueueDefinition(registerRuntimeOnly));
         // getExpiryAddress, setExpiryAddress, getDeadLetterAddress, setDeadLetterAddress  -- no -- just toggle the 'queue-address', make this a mutable attr of address-setting
+
+        // Runtime core queues
+        serverRegistration.registerSubModel(QueueDefinition.newRuntimeQueueDefinition(registerRuntimeOnly));
 
         // Acceptors
         serverRegistration.registerSubModel(GenericTransportDefinition.createAcceptorDefinition(registerRuntimeOnly));
@@ -209,6 +210,14 @@ public class MessagingExtension implements Extension {
             ManagementResourceRegistration bindings = serverRegistration.registerSubModel(PathElement.pathElement(PATH, path),
                     new MessagingSubsystemProviders.PathProvider(path));
             MessagingPathHandlers.register(bindings, path);
+            // Create the path resolver operation
+            if (context.getProcessType().isServer()) {
+                final ResolvePathHandler resolvePathHandler = ResolvePathHandler.Builder.of(context.getPathManager())
+                        .setPathAttribute(MessagingPathHandlers.PATHS.get(path))
+                        .setRelativeToAttribute(MessagingPathHandlers.RELATIVE_TO)
+                        .build();
+                bindings.registerOperationHandler(resolvePathHandler.getOperationDefinition(), resolvePathHandler);
+            }
         }
 
         // Connection factories
@@ -309,6 +318,13 @@ public class MessagingExtension implements Extension {
                                 }
                             }
                         }
+                        //TODO - a nicer way to automagically remove these runtime resources?
+                        if (server.getValue().hasDefined(CORE_ADDRESS)) {
+                            oldModel.get(HORNETQ_SERVER, server.getName()).remove(CORE_ADDRESS);
+                        }
+                        if (server.getValue().hasDefined(RUNTIME_QUEUE)) {
+                            oldModel.get(HORNETQ_SERVER, server.getName()).remove(RUNTIME_QUEUE);
+                        }
                     }
                 }
                 return oldModel;
@@ -362,5 +378,10 @@ public class MessagingExtension implements Extension {
             }
         });
         pooledConnectionFactory.registerOperationTransformer(WRITE_ATTRIBUTE_OPERATION, new OperationTransformers.FailUnignoredAttributesOperationTransformer(transformerdPooledCFAttributes));
+
+        RejectExpressionValuesTransformer rejectTypeExpressionTransformer = new RejectExpressionValuesTransformer(TYPE);
+        TransformersSubRegistration groupingHandler = server.registerSubResource(GroupingHandlerDefinition.PATH);
+        groupingHandler.registerOperationTransformer(ADD, rejectTypeExpressionTransformer);
+        groupingHandler.registerOperationTransformer(WRITE_ATTRIBUTE_OPERATION, rejectTypeExpressionTransformer.getWriteAttributeTransformer());
     }
 }

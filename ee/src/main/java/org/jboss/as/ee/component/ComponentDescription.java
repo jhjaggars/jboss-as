@@ -22,10 +22,6 @@
 
 package org.jboss.as.ee.component;
 
-import static org.jboss.as.ee.EeLogger.SERVER_DEPLOYMENT_LOGGER;
-import static org.jboss.as.ee.EeMessages.MESSAGES;
-import static org.jboss.as.server.deployment.Attachments.REFLECTION_INDEX;
-
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -75,6 +71,10 @@ import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.value.ConstructedValue;
 import org.jboss.msc.value.InjectedValue;
 import org.jboss.msc.value.Value;
+
+import static org.jboss.as.ee.EeLogger.SERVER_DEPLOYMENT_LOGGER;
+import static org.jboss.as.ee.EeMessages.MESSAGES;
+import static org.jboss.as.server.deployment.Attachments.REFLECTION_INDEX;
 
 /**
  * A description of a generic Java EE component.  The description is pre-classloading so it references everything by name.
@@ -825,6 +825,8 @@ public class ComponentDescription implements ResourceInjectionTarget {
 
                     final List<InterceptorFactory> userAroundInvokes = new ArrayList<InterceptorFactory>();
                     final List<InterceptorFactory> userAroundTimeouts = new ArrayList<InterceptorFactory>();
+                    final List<InterceptorFactory> userComponentAroundInvokes = new ArrayList<InterceptorFactory>();
+                    final List<InterceptorFactory> userComponentAroundTimeouts = new ArrayList<InterceptorFactory>();
                     // first add the default interceptors (if not excluded) to the deque
                     if (!description.isExcludeDefaultInterceptors() && !description.isExcludeDefaultInterceptors(identifier)) {
                         for (InterceptorDescription interceptorDescription : description.getDefaultInterceptors()) {
@@ -878,11 +880,12 @@ public class ComponentDescription implements ResourceInjectionTarget {
                     }
 
                     // finally add the component level around invoke to the deque so that it's triggered last
-                    userAroundInvokes.addAll(componentUserAroundInvoke);
+                    userComponentAroundInvokes.addAll(componentUserAroundInvoke);
                     if (componentUserAroundTimeout != null) {
-                        userAroundTimeouts.addAll(componentUserAroundTimeout);
+                        userComponentAroundTimeouts.addAll(componentUserAroundTimeout);
                     }
                     configuration.addComponentInterceptor(method, new UserInterceptorFactory(weaved(userAroundInvokes), weaved(userAroundTimeouts)), InterceptorOrder.Component.USER_INTERCEPTORS);
+                    configuration.addComponentInterceptor(method, new UserInterceptorFactory(weaved(userComponentAroundInvokes), weaved(userComponentAroundTimeouts)), InterceptorOrder.Component.USER_COMPONENT_INTERCEPTORS);
                 }
             }
 
@@ -973,16 +976,6 @@ public class ComponentDescription implements ResourceInjectionTarget {
             }
         }
 
-        private InterceptorClassDescription mergeInterceptorConfig(final Class<?> clazz, final EEModuleClassDescription classDescription, final ComponentDescription description, final boolean metadataComplete) {
-            final InterceptorClassDescription interceptorConfig;
-            if (classDescription != null && !metadataComplete) {
-                interceptorConfig = InterceptorClassDescription.merge(classDescription.getInterceptorClassDescription(), description.interceptorClassOverrides.get(clazz.getName()));
-            } else {
-                interceptorConfig = InterceptorClassDescription.merge(null, description.interceptorClassOverrides.get(clazz.getName()));
-            }
-            return interceptorConfig;
-        }
-
         private boolean isNotOverriden(final Class<?> clazz, final Method method, final Class<?> actualClass, final DeploymentReflectionIndex deploymentReflectionIndex) throws DeploymentUnitProcessingException {
             return Modifier.isPrivate(method.getModifiers()) || ClassReflectionIndexUtil.findRequiredMethod(deploymentReflectionIndex, actualClass, method).getDeclaringClass() == clazz;
         }
@@ -1038,4 +1031,29 @@ public class ComponentDescription implements ResourceInjectionTarget {
             return Collections.unmodifiableMap(injections);
         }
     }
+
+    /**
+     * If this method returns true then Weld will directly create the component instance,
+     * which will apply interceptors and decorators via sub classing.
+     *
+     * For most components this is not necessary.
+     *
+     * Also not that even though EJB's are intercepted, their interceptor is done through
+     * a different method that integrates with the existing EJB interceptor chain
+     *
+     */
+    public boolean isCDIInterceptorEnabled() {
+        return false;
+    }
+
+    public static InterceptorClassDescription mergeInterceptorConfig(final Class<?> clazz, final EEModuleClassDescription classDescription, final ComponentDescription description, final boolean metadataComplete) {
+        final InterceptorClassDescription interceptorConfig;
+        if (classDescription != null && !metadataComplete) {
+            interceptorConfig = InterceptorClassDescription.merge(classDescription.getInterceptorClassDescription(), description.interceptorClassOverrides.get(clazz.getName()));
+        } else {
+            interceptorConfig = InterceptorClassDescription.merge(null, description.interceptorClassOverrides.get(clazz.getName()));
+        }
+        return interceptorConfig;
+    }
+
 }

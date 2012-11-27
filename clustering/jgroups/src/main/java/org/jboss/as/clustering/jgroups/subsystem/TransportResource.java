@@ -1,3 +1,25 @@
+/*
+ * JBoss, Home of Professional Open Source.
+ * Copyright 2012, Red Hat, Inc., and individual contributors
+ * as indicated by the @author tags. See the copyright.txt file in the
+ * distribution for a full listing of individual contributors.
+ *
+ * This is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation; either version 2.1 of
+ * the License, or (at your option) any later version.
+ *
+ * This software is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this software; if not, write to the Free
+ * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+ * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
+ */
+
 package org.jboss.as.clustering.jgroups.subsystem;
 
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ADD;
@@ -15,7 +37,6 @@ import org.jboss.as.controller.SimpleOperationDefinitionBuilder;
 import org.jboss.as.controller.SimpleResourceDefinition;
 import org.jboss.as.controller.registry.AttributeAccess;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
-import org.jboss.as.controller.registry.OperationEntry;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
 
@@ -110,7 +131,7 @@ public class TransportResource extends SimpleResourceDefinition {
 
     static SimpleAttributeDefinition PROPERTY = new SimpleAttributeDefinition(ModelKeys.PROPERTY, ModelType.PROPERTY, true);
 
-    static SimpleListAttributeDefinition PROPERTIES = SimpleListAttributeDefinition.Builder.of(ModelKeys.PROPERTIES, PROPERTY).
+    static SimpleListAttributeDefinition PROPERTIES = new SimpleListAttributeDefinition.Builder(ModelKeys.PROPERTIES, PROPERTY).
             setAllowNull(true).
             build();
 
@@ -145,13 +166,14 @@ public class TransportResource extends SimpleResourceDefinition {
     TransportResource() {
         super(TRANSPORT_PATH,
                 JGroupsExtension.getResourceDescriptionResolver(ModelKeys.TRANSPORT),
-                TRANSPORT_ADD,
+                null,  //we register it manualy in #  registerOperations
                 TRANSPORT_REMOVE);
     }
 
     @Override
-    public void registerOperations(ManagementResourceRegistration resourceRegistration) {
-        super.registerOperations(resourceRegistration);
+    public void registerOperations(ManagementResourceRegistration registration) {
+        super.registerOperations(registration);
+        registration.registerOperationHandler(TRANSPORT_ADD_DEFINITION, TRANSPORT_ADD);
     }
 
     @Override
@@ -169,11 +191,4 @@ public class TransportResource extends SimpleResourceDefinition {
         super.registerChildren(resourceRegistration);
         resourceRegistration.registerSubModel(PropertyResource.INSTANCE);
     }
-
-    // override the add operation to provide a custom definition (for the optional PROPERTIES parameter to add())
-    @Override
-    protected void registerAddOperation(final ManagementResourceRegistration registration, final OperationStepHandler handler, OperationEntry.Flag... flags) {
-        registration.registerOperationHandler(TRANSPORT_ADD_DEFINITION, handler);
-    }
-
 }

@@ -33,6 +33,7 @@ import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.as.controller.OperationStepHandler;
 import org.jboss.as.controller.PathAddress;
+import org.jboss.as.controller.PropertiesAttributeDefinition;
 import org.jboss.as.controller.ServiceVerificationHandler;
 import org.jboss.as.controller.SimpleAttributeDefinition;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
@@ -44,18 +45,15 @@ import org.jboss.dmr.Property;
 import org.jboss.jca.core.api.connectionmanager.ccm.CachedConnectionManager;
 import org.jboss.jca.core.api.management.ManagementRepository;
 import org.jboss.jca.core.spi.transaction.TransactionIntegration;
-import org.jboss.logging.Logger;
 import org.jboss.msc.service.ServiceBuilder;
 import org.jboss.msc.service.ServiceController;
 import org.jboss.msc.service.ServiceName;
-import org.jboss.msc.service.ServiceRegistry;
 import org.jboss.msc.service.ServiceTarget;
 import org.jboss.msc.service.ValueInjectionService;
 import org.jboss.security.SubjectFactory;
 
-import static org.jboss.as.connector.logging.ConnectorMessages.MESSAGES;
 import static org.jboss.as.connector.subsystems.datasources.Constants.DATASOURCE_DRIVER;
-import static org.jboss.as.connector.subsystems.datasources.Constants.JNDINAME;
+import static org.jboss.as.connector.subsystems.datasources.Constants.JNDI_NAME;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OP_ADDR;
 
 /**
@@ -115,7 +113,7 @@ public abstract class AbstractDataSourceAdd extends AbstractAddStepHandler {
                                 final ServiceVerificationHandler verificationHandler, final List<ServiceController<?>> controllers) throws OperationFailedException {
         final ModelNode address = operation.require(OP_ADDR);
         final String dsName = PathAddress.pathAddress(address).getLastElement().getValue();
-        final String jndiName = model.get(JNDINAME.getName()).asString();
+        final String jndiName = model.get(JNDI_NAME.getName()).asString();
 
         final ServiceTarget serviceTarget = context.getServiceTarget();
 
@@ -173,18 +171,6 @@ public abstract class AbstractDataSourceAdd extends AbstractAddStepHandler {
 
     }
 
-    static String cleanupJavaContext(String jndiName) {
-        String bindName;
-        if (jndiName.startsWith("java:/")) {
-            bindName = jndiName.substring(6);
-        } else if(jndiName.startsWith("java:")) {
-            bindName = jndiName.substring(5);
-        } else {
-            bindName = jndiName;
-        }
-        return bindName;
-    }
-
     protected abstract void startConfigAndAddDependency(ServiceBuilder<?> dataSourceServiceBuilder,
             AbstractDataSourceService dataSourceService, String jndiName, ServiceTarget serviceTarget, final ModelNode operation, final ServiceVerificationHandler serviceVerificationHandler)
             throws OperationFailedException;
@@ -194,9 +180,8 @@ public abstract class AbstractDataSourceAdd extends AbstractAddStepHandler {
     protected abstract AbstractDataSourceService createDataSourceService(final String jndiName) throws OperationFailedException;
 
     static void populateAddModel(final ModelNode operation, final ModelNode modelNode,
-            final String connectionPropertiesProp, final SimpleAttributeDefinition[] attributes) throws OperationFailedException {
+            final String connectionPropertiesProp, final SimpleAttributeDefinition[] attributes, PropertiesAttributeDefinition[] properties) throws OperationFailedException {
         if (operation.hasDefined(connectionPropertiesProp)) {
-
             for (Property property : operation.get(connectionPropertiesProp).asPropertyList()) {
                 modelNode.get(connectionPropertiesProp, property.getName()).set(property.getValue().asString());
             }
@@ -205,7 +190,9 @@ public abstract class AbstractDataSourceAdd extends AbstractAddStepHandler {
             attribute.validateAndSet(operation, modelNode);
         }
 
-
+        for (final PropertiesAttributeDefinition attribute : properties) {
+            attribute.validateAndSet(operation, modelNode);
+        }
     }
 
 }

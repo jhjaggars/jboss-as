@@ -23,7 +23,6 @@
 package org.jboss.as.web;
 
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.ADD;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.DESCRIBE;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.FAILED;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.FAILURE_DESCRIPTION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.NAME;
@@ -46,7 +45,6 @@ import org.jboss.as.controller.operations.common.GenericSubsystemDescribeHandler
 import org.jboss.as.controller.parsing.ExtensionParsingContext;
 import org.jboss.as.controller.registry.AliasEntry;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
-import org.jboss.as.controller.registry.OperationEntry;
 import org.jboss.as.controller.transform.AbstractSubsystemTransformer;
 import org.jboss.as.controller.transform.AliasOperationTransformer;
 import org.jboss.as.controller.transform.AliasOperationTransformer.AddressTransformer;
@@ -88,6 +86,10 @@ public class WebExtension implements Extension {
     protected static final PathElement DIRECTORY_ALIAS = PathElement.pathElement(Constants.DIRECTORY, Constants.CONFIGURATION);
 
     protected static final PathElement REWRITECOND_PATH = PathElement.pathElement(Constants.CONDITION);
+
+    protected static final PathElement VALVE_PATH = PathElement.pathElement(Constants.VALVE);
+
+    protected static final PathElement PARAM = PathElement.pathElement(Constants.PARAM);
 
     private static final String RESOURCE_NAME = WebExtension.class.getPackage().getName() + ".LocalDescriptions";
 
@@ -154,6 +156,8 @@ public class WebExtension implements Extension {
         final ManagementResourceRegistration deployments = subsystem.registerDeploymentModel(WebDeploymentDefinition.INSTANCE);
         deployments.registerSubModel(WebDeploymentServletDefinition.INSTANCE);
 
+        // Global valve.
+        registration.registerSubModel(WebValveDefinition.INSTANCE);
         registerTransformers_1_1_0(subsystem);
     }
 
@@ -162,6 +166,7 @@ public class WebExtension implements Extension {
      */
     @Override
     public void initializeParsers(ExtensionParsingContext context) {
+        context.setSubsystemXmlMapping(SUBSYSTEM_NAME, Namespace.WEB_1_3.getUriString(), WebSubsystemParser.getInstance());
         context.setSubsystemXmlMapping(SUBSYSTEM_NAME, Namespace.WEB_1_2.getUriString(), WebSubsystemParser.getInstance());
         context.setSubsystemXmlMapping(SUBSYSTEM_NAME, Namespace.WEB_1_1.getUriString(), WebSubsystemParser.getInstance());
         context.setSubsystemXmlMapping(SUBSYSTEM_NAME, Namespace.WEB_1_0.getUriString(), WebSubsystemParser.getInstance());
