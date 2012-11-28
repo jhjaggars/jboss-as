@@ -21,14 +21,12 @@
  */
 package org.jboss.as.jdr.commands;
 
-import org.jboss.as.jdr.resource.ResourceFactory;
-import org.jboss.as.jdr.resource.Resource;
-import org.jboss.as.jdr.resource.Utils;
-import org.jboss.as.jdr.resource.filter.AndFilter;
-import org.jboss.as.jdr.resource.filter.ResourceFilter;
-import org.jboss.as.jdr.resource.filter.WildcardBlacklistFilter;
-import org.jboss.as.jdr.resource.filter.WildcardPathFilter;
+import org.jboss.as.jdr.util.Utils;
 import org.jboss.as.jdr.util.Sanitizer;
+import org.jboss.as.jdr.vfs.Filters;
+import org.jboss.vfs.VFS;
+import org.jboss.vfs.VirtualFile;
+import org.jboss.vfs.VirtualFileFilter;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,30 +38,25 @@ import java.util.List;
 
 public class CollectFiles extends JdrCommand {
 
-    private ResourceFilter filter = ResourceFilter.TRUE;
-    private WildcardBlacklistFilter blacklistFilter = new WildcardBlacklistFilter();
+    private VirtualFileFilter filter = Filters.TRUE;
+    private Filters.BlacklistFilter blacklistFilter = Filters.wildcardBlackList();
     private LinkedList<Sanitizer> sanitizers = new LinkedList<Sanitizer>();
-    private Comparator<Resource> sorter = new Comparator<Resource>() {
+    private Comparator<VirtualFile> sorter = new Comparator<VirtualFile>() {
         @Override
-        public int compare(Resource resource, Resource resource1) {
-            return Long.signum(resource.lastModified() - resource1.lastModified());
+        public int compare(VirtualFile resource, VirtualFile resource1) {
+            return Long.signum(resource.getLastModified() - resource1.getLastModified());
         }
     };
 
     // -1 means no limit
     private long limit = -1;
 
-    public CollectFiles(ResourceFilter filter) {
+    public CollectFiles(VirtualFileFilter filter) {
         this.filter = filter;
     }
 
     public CollectFiles(String pattern) {
-        this.filter = new WildcardPathFilter(pattern);
-    }
-
-    public CollectFiles blacklist(WildcardBlacklistFilter blacklistFilter) {
-        this.blacklistFilter = blacklistFilter;
-        return this;
+        this.filter = Filters.wildcard(pattern);
     }
 
     public CollectFiles sanitizer(Sanitizer ... sanitizers) {
@@ -73,7 +66,7 @@ public class CollectFiles extends JdrCommand {
         return this;
     }
 
-    public CollectFiles sorter(Comparator<Resource> sorter){
+    public CollectFiles sorter(Comparator<VirtualFile> sorter){
         this.sorter = sorter;
         return this;
     }
@@ -84,14 +77,14 @@ public class CollectFiles extends JdrCommand {
     }
 
     public CollectFiles omit(String pattern) {
-        this.blacklistFilter.add(pattern);
+        blacklistFilter.add(pattern);
         return this;
     }
 
     @Override
     public void execute() throws Exception {
-        Resource root = ResourceFactory.getResource(this.env.getJbossHome());
-        List<Resource> matches = root.getChildrenRecursively(new AndFilter(this.filter, this.blacklistFilter));
+        VirtualFile root = VFS.getChild(this.env.getJbossHome());
+        List<VirtualFile> matches = root.getChildrenRecursively(Filters.and(this.filter, this.blacklistFilter));
 
         // order the files in some arbitrary way.. basically prep for the limiter so things like log files can
         // be gotten in chronological order.  Keep in mind everything that might be collected per the filter for
@@ -103,11 +96,11 @@ public class CollectFiles extends JdrCommand {
 
         // limit how much data we collect
         Limiter limiter = new Limiter(limit);
-        Iterator<Resource> iter = matches.iterator();
+        Iterator<VirtualFile> iter = matches.iterator();
 
         while(iter.hasNext() && !limiter.isDone()) {
 
-            Resource f = iter.next();
+            VirtualFile f = iter.next();
             InputStream stream = limiter.limit(f);
 
             for (Sanitizer sanitizer : this.sanitizers) {
@@ -122,14 +115,14 @@ public class CollectFiles extends JdrCommand {
     }
 
     /**
-     * A Limiter is constructed with a number, and it can be repeatedly given Resources for which it will return an
+     * A Limiter is constructed with a number, and it can be repeatedly given VirtualFiles for which it will return an
      * InputStream that possibly is adjusted so that the number of bytes the stream can provide, when added to what the
      * Limiter already has seen, won't be more than the limit.
      *
-     * If the Resource's size minus the amount already seen by the Limiter is smaller than the limit, the Resource's
-     * InputStream is simply returned and its size added to the number of bytes the Limiter has seen.  Otherwise, the
-     * Resource's InputStream is skipped ahead so that the total number of bytes it will provide before exhaustion will
-     * make the total amount seen by the Limiter equal to its limit.
+     * If the VirtualFiles's size minus the amount already seen by the Limiter is smaller than the limit, the
+     * VirtualFiles's InputStream is simply returned and its size added to the number of bytes the Limiter has seen.
+     * Otherwise, the VirtualFiles's InputStream is skipped ahead so that the total number of bytes it will provide
+     * before exhaustion will make the total amount seen by the Limiter equal to its limit.
      */
     private static class Limiter {
 
@@ -149,14 +142,14 @@ public class CollectFiles extends JdrCommand {
          * @return
          * @throws IOException
          */
-        public InputStream limit(Resource resource) throws IOException {
+        public InputStream limit(VirtualFile resource) throws IOException {
 
             InputStream is = resource.openStream();
             long resourceSize = resource.getSize();
 
             // if we're limiting and know we're not going to consume the whole file, we skip
             // ahead so that we get the tail of the file instead of the beginning of it, and we
-            // throw the done switch.
+            // toggle the done switch.
             if(limit != -1){
                 long leftToRead = limit - amountRead;
                 if(leftToRead < resourceSize){

@@ -26,5 +26,7 @@ import org.jboss.as.jdr.commands.JdrCommand;
 import java.util.List;
 
 public interface JdrPlugin {
+
     List<JdrCommand> getCommands() throws Exception;
+    PluginId getPluginId();
 }

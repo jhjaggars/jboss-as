@@ -69,7 +69,7 @@ public class WildcardPattern {
             }
             else{
                 if(target.substring(targetIdx).startsWith(tokens[tokenIdx])){
-                    targetIdx+=tokens[tokenIdx].length();
+                    targetIdx += tokens[tokenIdx].length();
                     tokenIdx++;
                 } else {
                     targetIdx = -1;
