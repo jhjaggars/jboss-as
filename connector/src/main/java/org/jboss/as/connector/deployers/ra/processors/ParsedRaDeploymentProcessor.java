@@ -22,6 +22,7 @@
 
 package org.jboss.as.connector.deployers.ra.processors;
 
+import static org.jboss.as.connector.logging.ConnectorLogger.DEPLOYMENT_CONNECTOR_LOGGER;
 import static org.jboss.as.connector.logging.ConnectorMessages.MESSAGES;
 
 import java.util.Map;
@@ -110,6 +111,8 @@ public class ParsedRaDeploymentProcessor implements DeploymentUnitProcessor {
         if (module == null)
             throw MESSAGES.failedToGetModuleAttachment(phaseContext.getDeploymentUnit());
 
+        DEPLOYMENT_CONNECTOR_LOGGER.debugf("ParsedRaDeploymentProcessor: Processing=%s", deploymentUnit);
+
         final ClassLoader classLoader = module.getClassLoader();
 
         Connector cmd = connectorXmlDescriptor != null ? connectorXmlDescriptor.getConnector() : null;
@@ -119,10 +122,20 @@ public class ParsedRaDeploymentProcessor implements DeploymentUnitProcessor {
             // Annotation merging
             Annotations annotator = new Annotations();
             Map<ResourceRoot, Index> indexes = AnnotationIndexUtils.getAnnotationIndexes(deploymentUnit);
-            for (Entry<ResourceRoot, Index> entry : indexes.entrySet()) {
-                AnnotationRepository repository = new JandexAnnotationRepositoryImpl(entry.getValue(), classLoader);
-                    cmd = annotator.merge(cmd, repository, classLoader);
+            if (indexes != null && indexes.size() > 0) {
+                DEPLOYMENT_CONNECTOR_LOGGER.debugf("ParsedRaDeploymentProcessor: Found %d indexes", indexes.size());
+                for (Index index : indexes.values()) {
+                    // Don't apply any empty indexes, as IronJacamar doesn't like that atm.
+                    if (index.getKnownClasses() != null && index.getKnownClasses().size() > 0) {
+                        AnnotationRepository repository = new JandexAnnotationRepositoryImpl(index, classLoader);
+                        cmd = annotator.merge(cmd, repository, classLoader);
+                        DEPLOYMENT_CONNECTOR_LOGGER.debugf("ParsedRaDeploymentProcessor: CMD=%s", cmd);
+                    }
+                }
             }
+            if (indexes == null || indexes.size() == 0)
+                DEPLOYMENT_CONNECTOR_LOGGER.debugf("ParsedRaDeploymentProcessor: Found 0 indexes");
+
             // FIXME: when the connector is null the Iron Jacamar data is ignored
             if (cmd != null) {
                 // Validate metadata
@@ -133,7 +146,7 @@ public class ParsedRaDeploymentProcessor implements DeploymentUnitProcessor {
             }
 
             final ServiceName deployerServiceName = ConnectorServices.RESOURCE_ADAPTER_DEPLOYER_SERVICE_PREFIX.append(connectorXmlDescriptor.getDeploymentName());
-            final ResourceAdapterDeploymentService raDeploymentService = new ResourceAdapterDeploymentService(connectorXmlDescriptor, cmd, ijmd, module, deployerServiceName);
+            final ResourceAdapterDeploymentService raDeploymentService = new ResourceAdapterDeploymentService(connectorXmlDescriptor, cmd, ijmd, module, deployerServiceName, deploymentUnit.getServiceName());
 
             final ServiceTarget serviceTarget = phaseContext.getServiceTarget();
 

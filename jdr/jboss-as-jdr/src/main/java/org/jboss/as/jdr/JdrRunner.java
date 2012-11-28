@@ -102,12 +102,12 @@ public class JdrRunner implements JdrReportCollector {
             command.setEnvironment(new JdrEnvironment(this.env));
             try {
                 command.execute();
-            } catch (Exception e) {
+            } catch (Throwable t) {
                 String message = "Skipping command " + command.toString();
                 ROOT_LOGGER.debugf(message);
                 skips.append(message);
                 PrintWriter pw = new PrintWriter(new StringWriter());
-                e.printStackTrace(pw);
+                t.printStackTrace(pw);
                 skips.append(pw.toString());
             }
         }

@@ -21,11 +21,13 @@
  */
 package org.jboss.as.jdr;
 
+import org.jboss.as.jdr.resource.FileResource;
+import org.jboss.as.jdr.resource.Resource;
+import org.jboss.as.jdr.resource.filter.ResourceFilter;
+import org.jboss.as.jdr.resource.filter.WildcardPathFilter;
 import org.jboss.as.jdr.util.BlackListFilter;
 import org.jboss.as.jdr.util.PatternSanitizer;
 import org.jboss.as.jdr.util.XMLSanitizer;
-import org.junit.Test;
-
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileFilter;
@@ -33,6 +35,8 @@ import java.io.InputStream;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import org.junit.Test;
 
 public class JdrTestCase {
 
@@ -58,10 +62,93 @@ public class JdrTestCase {
     public void testPatternSanitizer() throws Exception {
         String propf = "password=123456";
         InputStream is = new ByteArrayInputStream(propf.getBytes());
-        PatternSanitizer s = new PatternSanitizer("password=*");
+        PatternSanitizer s = new PatternSanitizer("password=.*", "password=*");
         InputStream res = s.sanitize(is);
         byte [] buf = new byte [res.available()];
         res.read(buf);
         assertEquals("password=*", new String(buf));
+    }
+
+    @Test
+    public void testWildcardFilterAcceptAnything() throws Exception {
+        ResourceFilter filter = new WildcardPathFilter("*");
+        Resource good = new FileResource(new File("/this/is/a/test.txt"));
+        assertTrue(filter.accepts(good));
+    }
+
+    @Test
+    public void testWildcardFilterPrefixGlob() throws Exception {
+        ResourceFilter filter = new WildcardPathFilter("*.txt");
+        Resource good = new FileResource(new File("/this/is/a/test.txt"));
+        Resource bad = new FileResource(new File("/this/is/a/test.xml"));
+        assertTrue(filter.accepts(good));
+        assertFalse(filter.accepts(bad));
+    }
+
+    @Test
+    public void testWildcardFilterSuffixGlob() throws Exception {
+        ResourceFilter filter = new WildcardPathFilter("/this/is*");
+        Resource good = new FileResource(new File("/this/is/a/test.txt"));
+        Resource bad = new FileResource(new File("/that/is/a/test.txt"));
+        assertTrue(filter.accepts(good));
+        assertFalse(filter.accepts(bad));
+    }
+
+    @Test
+    public void testWildcardFilterMiddleGlob() throws Exception {
+        ResourceFilter filter = new WildcardPathFilter("/this*test.txt");
+        Resource good = new FileResource(new File("/this/is/a/test.txt"));
+        Resource bad1 = new FileResource(new File("/that/is/a/test.txt"));
+        Resource bad2 = new FileResource(new File("/this/is/a/test.xml"));
+        assertTrue(filter.accepts(good));
+        assertFalse(filter.accepts(bad1));
+        assertFalse(filter.accepts(bad2));
+    }
+
+    @Test
+    public void testWildcardFilterPrefixSingle() throws Exception {
+        ResourceFilter filter = new WildcardPathFilter("?this/is/a/test.txt");
+        Resource good = new FileResource(new File("/this/is/a/test.txt"));
+        Resource bad = new FileResource(new File("/that/is/a/test.txt"));
+        assertTrue(filter.accepts(good));
+        assertFalse(filter.accepts(bad));
+
+        ResourceFilter filter2 = new WildcardPathFilter("?????/is/a/test.txt");
+        Resource good2 = new FileResource(new File("/this/is/a/test.txt"));
+        Resource bad2 = new FileResource(new File("/this/was/a/test.txt"));
+        assertTrue(filter2.accepts(good2));
+        assertFalse(filter2.accepts(bad2));
+    }
+
+    @Test
+    public void testWildcardFilterPostfixSingle() throws Exception {
+        ResourceFilter filter1 = new WildcardPathFilter("/this/is/a/test.tx?");
+        Resource good1 = new FileResource(new File("/this/is/a/test.txt"));
+        Resource bad1 = new FileResource(new File("/that/is/a/test.dat"));
+        assertTrue(filter1.accepts(good1));
+        assertFalse(filter1.accepts(bad1));
+
+        ResourceFilter filter2 = new WildcardPathFilter("/this/is/a/test.???");
+        Resource good2 = new FileResource(new File("/this/is/a/test.txt"));
+        Resource bad2 = new FileResource(new File("/that/is/a/blah.txt"));
+        assertTrue(filter2.accepts(good2));
+        assertFalse(filter2.accepts(bad2));
+
+    }
+
+    @Test
+    public void testWildcardFilterMiddleSingle() throws Exception {
+        ResourceFilter filter1 = new WildcardPathFilter("/this/???/a/test.txt");
+        Resource good1 = new FileResource(new File("/this/iss/a/test.txt"));
+        Resource bad1 = new FileResource(new File("/that/was/no/test.dat"));
+        assertTrue(filter1.accepts(good1));
+        assertFalse(filter1.accepts(bad1));
+
+        ResourceFilter filter2 = new WildcardPathFilter("/????/is/a/????.txt");
+        Resource good2 = new FileResource(new File("/this/is/a/test.txt"));
+        Resource bad2 = new FileResource(new File("/that/is/no/test.txt"));
+        assertTrue(filter2.accepts(good2));
+        assertFalse(filter2.accepts(bad2));
+
     }
 }

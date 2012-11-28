@@ -710,12 +710,22 @@
 
                 <dependency>
                     <groupId>org.hornetq</groupId>
-                    <artifactId>hornetq-core</artifactId>
+                    <artifactId>hornetq-core-client</artifactId>
                 </dependency>
 
                 <dependency>
                     <groupId>org.hornetq</groupId>
-                    <artifactId>hornetq-jms</artifactId>
+                    <artifactId>hornetq-server</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.hornetq</groupId>
+                    <artifactId>hornetq-jms-client</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.hornetq</groupId>
+                    <artifactId>hornetq-jms-server</artifactId>
                 </dependency>
 
                 <dependency>
@@ -941,7 +951,7 @@
                     <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-jsf</artifactId>
                 </dependency>
- 
+
                 <dependency>
                     <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-jsf-injection</artifactId>
@@ -1066,17 +1076,17 @@
                     <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-sar</artifactId>
                 </dependency>
-                
+
                 <dependency>
                     <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-security</artifactId>
                 </dependency>
-                
+
                 <dependency>
                     <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-system-jmx</artifactId>
                 </dependency>
-                
+
                 <dependency>
                     <groupId>org.jboss.as</groupId>
                     <artifactId>jboss-as-threads</artifactId>
@@ -1368,6 +1378,11 @@
                 <dependency>
                     <groupId>org.jboss.resteasy</groupId>
                     <artifactId>resteasy-cdi</artifactId>
+                </dependency>
+
+                <dependency>
+                    <groupId>org.jboss.resteasy</groupId>
+                    <artifactId>resteasy-hibernatevalidator-provider</artifactId>
                 </dependency>
 
                 <dependency>
@@ -1928,7 +1943,7 @@
                                         <include>org.jboss:jboss-remote-naming</include>
                                         <include>org.jboss.jbossts:jbosstxbridge</include>
 
-                                        <!--                                        
+                                        <!--
                                         <include>org.jboss.jbossts.xts:jbossxts</include>
                                         <include>org.jboss.jbossts.xts:jbossxts-api</include>
                                         -->

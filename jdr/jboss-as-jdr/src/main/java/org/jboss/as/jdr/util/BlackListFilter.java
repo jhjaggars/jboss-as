@@ -39,6 +39,10 @@ public class BlackListFilter implements FileFilter {
         this.patterns = patterns;
     }
 
+    public void add(String pattern) {
+        this.patterns.add(pattern);
+    }
+
     public boolean accept(File f) {
         for(String pattern : this.patterns) {
             if (FilenameUtils.wildcardMatch(f.getPath(), pattern)) {

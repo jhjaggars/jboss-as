@@ -825,6 +825,8 @@ public class ComponentDescription implements ResourceInjectionTarget {
 
                     final List<InterceptorFactory> userAroundInvokes = new ArrayList<InterceptorFactory>();
                     final List<InterceptorFactory> userAroundTimeouts = new ArrayList<InterceptorFactory>();
+                    final List<InterceptorFactory> userComponentAroundInvokes = new ArrayList<InterceptorFactory>();
+                    final List<InterceptorFactory> userComponentAroundTimeouts = new ArrayList<InterceptorFactory>();
                     // first add the default interceptors (if not excluded) to the deque
                     if (!description.isExcludeDefaultInterceptors() && !description.isExcludeDefaultInterceptors(identifier)) {
                         for (InterceptorDescription interceptorDescription : description.getDefaultInterceptors()) {
@@ -878,11 +880,12 @@ public class ComponentDescription implements ResourceInjectionTarget {
                     }
 
                     // finally add the component level around invoke to the deque so that it's triggered last
-                    userAroundInvokes.addAll(componentUserAroundInvoke);
+                    userComponentAroundInvokes.addAll(componentUserAroundInvoke);
                     if (componentUserAroundTimeout != null) {
-                        userAroundTimeouts.addAll(componentUserAroundTimeout);
+                        userComponentAroundTimeouts.addAll(componentUserAroundTimeout);
                     }
                     configuration.addComponentInterceptor(method, new UserInterceptorFactory(weaved(userAroundInvokes), weaved(userAroundTimeouts)), InterceptorOrder.Component.USER_INTERCEPTORS);
+                    configuration.addComponentInterceptor(method, new UserInterceptorFactory(weaved(userComponentAroundInvokes), weaved(userComponentAroundTimeouts)), InterceptorOrder.Component.USER_COMPONENT_INTERCEPTORS);
                 }
             }
 
@@ -973,16 +976,6 @@ public class ComponentDescription implements ResourceInjectionTarget {
             }
         }
 
-        private InterceptorClassDescription mergeInterceptorConfig(final Class<?> clazz, final EEModuleClassDescription classDescription, final ComponentDescription description, final boolean metadataComplete) {
-            final InterceptorClassDescription interceptorConfig;
-            if (classDescription != null && !metadataComplete) {
-                interceptorConfig = InterceptorClassDescription.merge(classDescription.getInterceptorClassDescription(), description.interceptorClassOverrides.get(clazz.getName()));
-            } else {
-                interceptorConfig = InterceptorClassDescription.merge(null, description.interceptorClassOverrides.get(clazz.getName()));
-            }
-            return interceptorConfig;
-        }
-
         private boolean isNotOverriden(final Class<?> clazz, final Method method, final Class<?> actualClass, final DeploymentReflectionIndex deploymentReflectionIndex) throws DeploymentUnitProcessingException {
             return Modifier.isPrivate(method.getModifiers()) || ClassReflectionIndexUtil.findRequiredMethod(deploymentReflectionIndex, actualClass, method).getDeclaringClass() == clazz;
         }
@@ -1051,6 +1044,16 @@ public class ComponentDescription implements ResourceInjectionTarget {
      */
     public boolean isCDIInterceptorEnabled() {
         return false;
+    }
+
+    public static InterceptorClassDescription mergeInterceptorConfig(final Class<?> clazz, final EEModuleClassDescription classDescription, final ComponentDescription description, final boolean metadataComplete) {
+        final InterceptorClassDescription interceptorConfig;
+        if (classDescription != null && !metadataComplete) {
+            interceptorConfig = InterceptorClassDescription.merge(classDescription.getInterceptorClassDescription(), description.interceptorClassOverrides.get(clazz.getName()));
+        } else {
+            interceptorConfig = InterceptorClassDescription.merge(null, description.interceptorClassOverrides.get(clazz.getName()));
+        }
+        return interceptorConfig;
     }
 
 }

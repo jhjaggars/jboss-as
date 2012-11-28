@@ -21,31 +21,40 @@
  */
 package org.jboss.as.jdr.util;
 
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
+import org.jboss.as.jdr.resource.Utils;
+import org.jboss.as.jdr.resource.filter.ResourceFilter;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-public class PatternSanitizer implements Sanitizer {
-    String pattern;
-    String replacement;
+public class PatternSanitizer extends AbstractSanitizer {
 
-    public PatternSanitizer (String pattern) throws Exception {
-        this.pattern = pattern;
+    private final Pattern pattern;
+    private final String replacement;
+
+    public PatternSanitizer(String pattern, String replacement, ResourceFilter filter) throws Exception {
+        this.pattern = Pattern.compile(pattern);
+        this.replacement = replacement;
+        this.filter = filter;
     }
 
     public InputStream sanitize(InputStream in) throws Exception {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        for(String line : IOUtils.readLines(in)) {
-           if(FilenameUtils.wildcardMatch(line, pattern)) {
-               output.write(pattern.getBytes());
-           }
-           else {
-               output.write(line.getBytes());
-           }
+        PrintWriter writer = new PrintWriter(output);
+        String[] lines = Utils.readLines(in).toArray(new String[0]);
+        int lineCount = lines.length;
+        for(int i = 0; i < lineCount; i++) {
+            Matcher matcher = pattern.matcher(lines[i]);
+            writer.write(matcher.replaceAll(replacement));
+            if(i < (lineCount-1)){
+                writer.write(Utils.LINE_SEP);
+            }
         }
+        writer.close();
         return new ByteArrayInputStream(output.toByteArray());
     }
 }

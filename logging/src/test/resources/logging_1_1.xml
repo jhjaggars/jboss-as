@@ -109,6 +109,17 @@
         <append value="false"/>
     </size-rotating-file-handler>
 
+    <root-logger>
+        <level name="INFO"/>
+        <filter>
+            <level name="TRACE" />
+        </filter>
+        <handlers>
+            <handler name="CONSOLE"/>
+            <handler name="FILE"/>
+        </handlers>
+    </root-logger>
+
     <logger category="com.example" use-parent-handlers="false">
         <level name="TRACE"/>
         <filter>
@@ -132,15 +143,4 @@
             <replace pattern="\b(Name)|\b(name)" replacement="user" replace-all="true"/>
         </filter>
     </logger>
-
-    <root-logger>
-        <level name="INFO"/>
-        <filter>
-            <level name="TRACE" />
-        </filter>
-        <handlers>
-            <handler name="CONSOLE"/>
-            <handler name="FILE"/>
-        </handlers>
-    </root-logger>
 </subsystem>

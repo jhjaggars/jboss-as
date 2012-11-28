@@ -23,6 +23,7 @@
 package org.jboss.as.test.multinode.remotecall.scoped.context;
 
 import javax.ejb.Remote;
+import javax.ejb.RemoteHome;
 import javax.ejb.Stateful;
 
 /**
@@ -30,6 +31,7 @@ import javax.ejb.Stateful;
  */
 @Stateful
 @Remote(StatefulRemoteOnOtherServer.class)
+@RemoteHome(StatefulRemoteHomeForBeanOnOtherServer.class)
 public class StatefulBeanOnOtherServer implements StatefulRemoteOnOtherServer {
     private int count;
 
@@ -42,5 +44,17 @@ public class StatefulBeanOnOtherServer implements StatefulRemoteOnOtherServer {
     public int incrementCount() {
         this.count++;
         return this.count;
+    }
+
+    public void ejbCreate() {
+
+    }
+
+    public void ejbCreateDifferentWay() {
+
+    }
+
+    public void ejbCreateYetAnotherWay(final int initialCount) {
+        this.count = initialCount;
     }
 }

@@ -21,9 +21,11 @@
  */
 package org.jboss.as.jdr.util;
 
-import org.apache.commons.io.FileUtils;
+import org.jboss.as.jdr.resource.ResourceFactory;
+import org.jboss.as.jdr.resource.Resource;
+import org.jboss.as.jdr.resource.Utils;
 
-import java.io.File;
+import java.util.List;
 
 public class FSTree {
     int directoryCount = 0;
@@ -42,14 +44,14 @@ public class FSTree {
 
     private static String formatBytes(long size) {
 
-        if (size > FileUtils.ONE_TB) {
-            return String.format("%.1fT", div(size, FileUtils.ONE_TB));
-        } else if (size > FileUtils.ONE_GB) {
-            return String.format("%.1fG", div(size, FileUtils.ONE_GB));
-        } else if (size > FileUtils.ONE_MB) {
-            return String.format("%.1fM", div(size, FileUtils.ONE_MB));
-        } else if (size > FileUtils.ONE_KB) {
-            return String.format("%.1fK", div(size, FileUtils.ONE_KB));
+        if (size > Utils.ONE_TB) {
+            return String.format("%.1fT", div(size, Utils.ONE_TB));
+        } else if (size > Utils.ONE_GB) {
+            return String.format("%.1fG", div(size, Utils.ONE_GB));
+        } else if (size > Utils.ONE_MB) {
+            return String.format("%.1fM", div(size, Utils.ONE_MB));
+        } else if (size > Utils.ONE_KB) {
+            return String.format("%.1fK", div(size, Utils.ONE_KB));
         } else {
             return String.format("%d", size);
         }
@@ -59,16 +61,16 @@ public class FSTree {
         traverse(dir, padding, false);
     }
 
-    private void append(File f, String padding) {
-        String basename = f.getName();
-        String size = formatBytes(f.length());
-        buf.append(String.format(fmt, padding, "+-- ", size, basename));
+    private void append(Resource f, String padding) {
+        String baseName = f.getName();
+        String size = formatBytes(f.getSize());
+        buf.append(String.format(fmt, padding, "+-- ", size, baseName));
         buf.append("\n");
     }
 
     private void traverse(String dir, String padding, boolean first)
         throws java.io.IOException {
-        File path = new File(dir).getCanonicalFile();
+        Resource path = ResourceFactory.getResource(dir);
 
         if (!first) {
             String _p = padding.substring(0, padding.length() -1);
@@ -81,8 +83,8 @@ public class FSTree {
         }
 
         int count = 0;
-        File [] files = path.listFiles();
-        for (File f : files ) {
+        List<Resource> files = path.getChildren();
+        for (Resource f : files ) {
             count += 1;
 
             if (f.getPath().startsWith(".")) {
@@ -91,16 +93,16 @@ public class FSTree {
             else if (f.isFile()) {
                 append(f, padding);
             }
-            else if (FileUtils.isSymlink(f)) {
+            else if (f.isSymlink()) {
                 buf.append(padding);
                 buf.append("+-- ");
                 buf.append(f.getName());
                 buf.append(" -> ");
-                buf.append(f.getCanonicalFile().getPath());
+                buf.append(f.getPath());
                 buf.append("\n");
             }
             else if (f.isDirectory()) {
-                if (count == files.length) {
+                if (count == files.size()) {
                     traverse(f.getPath(), padding + " ");
                 }
                 else {
