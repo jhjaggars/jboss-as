@@ -21,8 +21,7 @@
  */
 package org.jboss.as.jdr.util;
 
-import org.jboss.as.jdr.resource.Utils;
-import org.jboss.as.jdr.resource.filter.ResourceFilter;
+import org.jboss.vfs.VirtualFileFilter;
 
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
@@ -36,7 +35,7 @@ public class PatternSanitizer extends AbstractSanitizer {
     private final Pattern pattern;
     private final String replacement;
 
-    public PatternSanitizer(String pattern, String replacement, ResourceFilter filter) throws Exception {
+    public PatternSanitizer(String pattern, String replacement, VirtualFileFilter filter) throws Exception {
         this.pattern = Pattern.compile(pattern);
         this.replacement = replacement;
         this.filter = filter;

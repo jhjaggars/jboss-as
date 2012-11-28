@@ -22,7 +22,7 @@
 package org.jboss.as.jdr.util;
 
 import org.jboss.as.jdr.commands.JdrEnvironment;
-import org.jboss.as.jdr.resource.Resource;
+import org.jboss.vfs.VirtualFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -96,8 +96,8 @@ public class JdrZipFile {
         }
     }
 
-    public void add(Resource file, InputStream is) throws Exception {
-        String name = "JBOSS_HOME" + file.getPath().substring(this.jbossHome.length());
+    public void add(VirtualFile file, InputStream is) throws Exception {
+        String name = "JBOSS_HOME" + file.getPathName().substring(this.jbossHome.length());
         this.add(is, name);
     }
 

@@ -1,20 +1,21 @@
 package org.jboss.as.jdr.util;
 
-import org.jboss.as.jdr.resource.Resource;
-import org.jboss.as.jdr.resource.filter.ResourceFilter;
+import org.jboss.as.jdr.vfs.Filters;
+import org.jboss.vfs.VirtualFile;
+import org.jboss.vfs.VirtualFileFilter;
 
 import java.io.InputStream;
 
 abstract class AbstractSanitizer implements Sanitizer {
 
-    protected ResourceFilter filter = ResourceFilter.TRUE;
+    protected VirtualFileFilter filter = Filters.TRUE;
 
     @Override
     public abstract InputStream sanitize(InputStream in) throws Exception;
 
 
     @Override
-    public boolean accepts(Resource resource) {
-        return filter.accepts(resource);  //To change body of implemented methods use File | Settings | File Templates.
+    public boolean accepts(VirtualFile resource) {
+        return filter.accepts(resource);
     }
 }
