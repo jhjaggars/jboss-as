@@ -21,11 +21,11 @@
  */
 package org.jboss.as.jdr.util;
 
-import org.jboss.as.jdr.resource.Resource;
+import org.jboss.vfs.VirtualFile;
 
 import java.io.InputStream;
 
 public interface Sanitizer {
     InputStream sanitize(InputStream in) throws Exception;
-    public boolean accepts(Resource resource);
+    boolean accepts(VirtualFile resource);
 }

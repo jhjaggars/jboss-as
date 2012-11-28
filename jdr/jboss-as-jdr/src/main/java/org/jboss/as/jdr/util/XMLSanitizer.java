@@ -21,7 +21,7 @@
  */
 package org.jboss.as.jdr.util;
 
-import org.jboss.as.jdr.resource.filter.ResourceFilter;
+import org.jboss.vfs.VirtualFileFilter;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
@@ -45,7 +45,7 @@ public class XMLSanitizer extends AbstractSanitizer {
     private DocumentBuilder builder;
     private Transformer transformer;
 
-    public XMLSanitizer(String pattern, ResourceFilter filter) throws Exception {
+    public XMLSanitizer(String pattern, VirtualFileFilter filter) throws Exception {
         this.filter = filter;
         XPathFactory factory = XPathFactory.newInstance();
         XPath xpath = factory.newXPath();

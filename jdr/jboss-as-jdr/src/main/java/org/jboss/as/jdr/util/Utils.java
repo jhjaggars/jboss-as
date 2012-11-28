@@ -1,6 +1,6 @@
-package org.jboss.as.jdr.resource;
+package org.jboss.as.jdr.util;
 
-import org.jboss.as.jdr.resource.filter.ResourceFilter;
+import org.jboss.vfs.VirtualFile;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -18,18 +18,6 @@ import java.util.jar.JarFile;
  * Time: 3:40 PM
  */
 public final class Utils {
-
-    public static final String MANIFEST_NAME = "META-INF/MANIFEST.MF";
-
-    public static List<Resource> applyFilter(List<Resource> resources, ResourceFilter filter) {
-        List<Resource> filtered = new ArrayList<Resource>();
-        for(Resource resource: resources){
-            if(filter.accepts(resource)){
-                filtered.add(resource);
-            }
-        }
-        return filtered;
-    }
 
     public static void safeClose(JarFile jf){
         try{
@@ -63,7 +51,11 @@ public final class Utils {
         return result;
     }
 
-    public static String resourceToString(Resource r) throws IOException {
+    public static String toString(VirtualFile r) throws IOException {
+        return new String(toBytes(r));
+    }
+
+    public static byte[] toBytes(VirtualFile r) throws IOException {
         byte [] buffer = new byte[1024];
         InputStream is = r.openStream();
 
@@ -75,8 +67,7 @@ public final class Utils {
         }
 
         Utils.safelyClose(is);
-
-        return new String(os.toByteArray());
+        return os.toByteArray();
     }
 
     /**
@@ -93,6 +84,32 @@ public final class Utils {
             leftToSkip -= amountSkipped;
         }
     }
+
+    public static boolean isSymlink(VirtualFile vFile) throws IOException {
+
+        File file = vFile.getPhysicalFile();
+
+        if(Utils.isWindows()){
+            return false;
+        }
+
+        File fileInCanonicalDir = null;
+        if (file.getParent() == null) {
+            fileInCanonicalDir = file;
+        } else {
+            File canonicalDir = file.getParentFile().getCanonicalFile();
+            fileInCanonicalDir = new File(canonicalDir, file.getName());
+        }
+
+        if (fileInCanonicalDir.getCanonicalFile().equals(fileInCanonicalDir.getAbsoluteFile())) {
+            return false;
+        } else {
+            return true;
+        }
+
+    }
+
+    public static final String MANIFEST_NAME = "META-INF/MANIFEST.MF";
 
     public static final String LINE_SEP = String.format("%n");
     public static final char WIN_SEP = '\\';
