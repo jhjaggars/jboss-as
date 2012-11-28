@@ -27,14 +27,16 @@ import org.jboss.as.jdr.commands.CollectFiles;
 import org.jboss.as.jdr.commands.JarCheck;
 import org.jboss.as.jdr.commands.JdrCommand;
 import org.jboss.as.jdr.commands.TreeCommand;
-import org.jboss.as.jdr.resource.Utils;
-import org.jboss.as.jdr.resource.filter.PathSuffixFilter;
-import org.jboss.as.jdr.util.*;
+import org.jboss.as.jdr.util.Sanitizer;
+import org.jboss.as.jdr.util.Sanitizers;
+import org.jboss.as.jdr.util.Utils;
 
 import java.util.Arrays;
 import java.util.List;
 
 public class AS7Plugin implements JdrPlugin {
+
+    private final PluginId pluginId = new PluginId("AS7_PLUGIN", 1, 0, null);
 
     @Override
     public List<JdrCommand> getCommands() throws Exception {
@@ -54,5 +56,9 @@ public class AS7Plugin implements JdrPlugin {
             new CollectFiles("*.properties").sanitizer(passwordSanitizer),
             new CollectFiles("*.xml").sanitizer(xmlSanitizer)
         );
+    }
+
+    public PluginId getPluginId() {
+        return pluginId;
     }
 }
